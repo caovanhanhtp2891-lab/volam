@@ -119,12 +119,24 @@ interface Telegraph {
   label: string;
 }
 
+interface SkillEffect {
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  startedAt: number;
+  duration: number;
+  kind: "slash" | "burst" | "orb" | "heal" | "shield";
+  angle?: number;
+}
+
 interface GameState {
   player: Player;
   enemies: Enemy[];
   worldEnemies: Enemy[];
   loot: GroundLoot[];
   telegraphs: Telegraph[];
+  effects: SkillEffect[];
   logs: string[];
   targetId: string | null;
   moveTarget: { x: number; y: number } | null;
@@ -249,6 +261,7 @@ app.innerHTML = `
           <div class="section-kicker">ĐIỀU KHIỂN</div>
           <div class="controls-grid">
             <span><kbd>WASD</kbd> Di chuyển</span>
+            <span><kbd>Chạm</kbd> Joystick mobile</span>
             <span><kbd>Click</kbd> Chọn mục tiêu</span>
             <span><kbd>1 2 3</kbd> Võ công</span>
             <span><kbd>E</kbd> Nhặt đồ</span>
@@ -263,6 +276,10 @@ app.innerHTML = `
           <canvas id="game-canvas" width="960" height="600" aria-label="Bản đồ game Giang Hồ Dị Truyện"></canvas>
           <div class="canvas-badge" id="canvas-badge"><span class="live-dot"></span> RỪNG TRÚC · KÊNH 01</div>
           <div class="canvas-tip" id="canvas-tip">Chọn môn phái để bắt đầu hành trình</div>
+          <div class="mobile-hud" id="mobile-hud" aria-label="Điều khiển trên điện thoại">
+            <div class="joystick" id="joystick" aria-label="Cần điều khiển di chuyển"><div class="joystick-ring"><div class="joystick-knob" id="joystick-knob"></div></div></div>
+            <button class="mobile-pickup" id="mobile-pickup" type="button"><span>✦</span><small>Nhặt</small></button>
+          </div>
         </div>
         <div class="combat-bar">
           <div class="combat-status"><span class="target-dot"></span><span id="combat-status-text">Chưa có mục tiêu</span></div>
@@ -303,7 +320,7 @@ app.innerHTML = `
         <h1>Chọn con đường nhập môn</h1>
         <p class="dialog-lead">Mỗi môn phái có nhịp chiến đấu riêng. Bạn có thể thử lại bằng nút Chơi lại.</p>
         <div class="sect-cards" id="sect-cards"></div>
-        <div class="dialog-footer"><span>Prototype P2</span><span>WASD · Click · 1 / 2 / 3 · E</span></div>
+        <div class="dialog-footer"><span>Prototype P6 · giao diện mobile</span><span>WASD / Joystick · Click · 1 / 2 / 3 · E</span></div>
       </div>
     </div>
 
@@ -328,6 +345,10 @@ const skillBar = document.querySelector<HTMLDivElement>("#skill-bar")!;
 const canvasTip = document.querySelector<HTMLDivElement>("#canvas-tip")!;
 const canvasBadge = document.querySelector<HTMLDivElement>("#canvas-badge")!;
 const combatStatusText = document.querySelector<HTMLSpanElement>("#combat-status-text")!;
+const joystick = document.querySelector<HTMLDivElement>("#joystick")!;
+const joystickRing = document.querySelector<HTMLDivElement>(".joystick-ring")!;
+const joystickKnob = document.querySelector<HTMLDivElement>("#joystick-knob")!;
+const mobilePickup = document.querySelector<HTMLButtonElement>("#mobile-pickup")!;
 const connectionLabel = document.querySelector<HTMLSpanElement>("#connection-label")!;
 const connectionPill = document.querySelector<HTMLSpanElement>("#connection-pill")!;
 const onlineButton = document.querySelector<HTMLButtonElement>("#online-btn")!;
@@ -337,6 +358,8 @@ let activeTab: PanelTab = "bag";
 let lastFrame = performance.now();
 let lastUiUpdate = 0;
 let toastTimer = 0;
+const touchInput = { x: 0, y: 0 };
+let joystickPointerId: number | null = null;
 
 const onlineClient = new OnlineClient({
   onStatus: (status: OnlineStatus, detail?: string) => {
@@ -574,6 +597,7 @@ function createGame(sectId: SectId): GameState {
     worldEnemies: [],
     loot: [],
     telegraphs: [],
+    effects: [],
     logs: [],
     targetId: null,
     moveTarget: null,
@@ -635,6 +659,11 @@ function skillScale(skill: SkillKey, base: number): number {
   return base + Math.max(0, rank - 1) * 0.14;
 }
 
+function addSkillEffect(effect: Omit<SkillEffect, "startedAt">): void {
+  if (!game) return;
+  game.effects.push({ ...effect, startedAt: nowMs() });
+}
+
 function upgradeSkill(skill: SkillKey): void {
   if (!game) return;
   const player = game.player;
@@ -689,6 +718,7 @@ function enterDungeon(): void {
   game.moveTarget = null;
   game.loot = [];
   game.telegraphs = [];
+  game.effects = [];
   game.player.x = 300;
   game.player.y = 690;
   canvasBadge.innerHTML = `<span class="live-dot"></span> CỔ MỘ BÍ ẨN · INSTANCE`;
@@ -713,6 +743,7 @@ function leaveDungeon(): void {
   game.moveTarget = null;
   game.telegraphs = [];
   game.loot = [];
+  game.effects = [];
   game.player.x = cleared ? 430 : PLAYER_START.x;
   game.player.y = cleared ? 530 : PLAYER_START.y;
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
@@ -850,15 +881,22 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
     if (player.cooldowns.ultimate > 0) return;
     player.rage = 0;
     player.cooldowns.ultimate = 15;
+    let ultimateX = player.x;
+    let ultimateY = player.y;
     if (player.sect === "kim") dealAreaDamage(player.x, player.y, 210, skillScale("ultimate", 3.1), sect.ultimate);
     if (player.sect === "hoa") {
       const target = currentTarget() ?? nearestEnemy(440);
-      if (target) dealAreaDamage(target.x, target.y, 180, skillScale("ultimate", 3.35), sect.ultimate);
+      if (target) {
+        ultimateX = target.x;
+        ultimateY = target.y;
+        dealAreaDamage(target.x, target.y, 180, skillScale("ultimate", 3.35), sect.ultimate);
+      }
     }
     if (player.sect === "thuy") {
       dealAreaDamage(player.x, player.y, 180, skillScale("ultimate", 1.55), sect.ultimate);
       player.hp = clamp(player.hp + Math.floor(player.maxHp * 0.38), 0, player.maxHp);
     }
+    addSkillEffect({ x: ultimateX, y: ultimateY, radius: player.sect === "hoa" ? 180 : 210, color: sect.color, duration: 720, kind: "burst" });
     game.screenFlash = 0.35;
     addLog(`${sect.ultimate} đã được thi triển.`);
     return;
@@ -875,13 +913,16 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
       if (!target || distance(player, target) > 155) return addLog("Phá Giáp Trảm cần một mục tiêu trong tầm.");
       target.defenseDownUntil = nowMs() + 4000;
       dealDamage(target, skillScale("skill1", 1.75), sect.skills[0]);
+      addSkillEffect({ x: target.x, y: target.y, radius: 82, color: sect.color, duration: 420, kind: "slash", angle: Math.atan2(target.y - player.y, target.x - player.x) });
     } else if (player.sect === "hoa") {
       if (!target) return addLog("Chưa có mục tiêu để phóng hỏa cầu.");
       dealAreaDamage(target.x, target.y, 105, skillScale("skill1", 1.35), sect.skills[0]);
+      addSkillEffect({ x: target.x, y: target.y, radius: 105, color: sect.color, duration: 560, kind: "orb" });
     } else {
       const heal = Math.floor(player.maxHp * 0.22);
       player.hp = clamp(player.hp + heal, 0, player.maxHp);
       if (target && distance(player, target) <= 160) dealDamage(target, skillScale("skill1", 0.82), sect.skills[0]);
+      addSkillEffect({ x: player.x, y: player.y, radius: 70, color: sect.color, duration: 720, kind: "heal" });
       addLog(`${sect.skills[0]} hồi ${heal} HP.`);
     }
     player.rage = clamp(player.rage + 10, 0, 100);
@@ -897,12 +938,15 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
         player.y = dashY;
       }
       dealDamage(target, skillScale("skill2", 1.4), sect.skills[1]);
+      addSkillEffect({ x: target.x, y: target.y, radius: 68, color: sect.color, duration: 420, kind: "slash", angle: Math.atan2(target.y - player.y, target.x - player.x) });
     } else if (player.sect === "hoa") {
       dealAreaDamage(player.x, player.y, 135, skillScale("skill2", 1.2), sect.skills[1]);
+      addSkillEffect({ x: player.x, y: player.y, radius: 135, color: sect.color, duration: 680, kind: "burst" });
     } else {
       player.shield = Math.floor(player.maxHp * 0.28);
       player.shieldUntil = nowMs() + 5000;
       if (target && distance(player, target) <= 150) dealDamage(target, skillScale("skill2", 0.95), sect.skills[1]);
+      addSkillEffect({ x: player.x, y: player.y, radius: 62, color: sect.color, duration: 520, kind: "shield" });
       addLog(`${sect.skills[1]} tạo khiên ${player.shield} điểm trong 5 giây.`);
     }
     player.rage = clamp(player.rage + 14, 0, 100);
@@ -1104,6 +1148,7 @@ function loadGame(): void {
       worldEnemies,
       loot: [],
       telegraphs: [],
+      effects: [],
       logs: [],
       targetId: null,
       moveTarget: null,
@@ -1129,6 +1174,7 @@ function loadGame(): void {
 
 function resetGame(): void {
   onlineClient.disconnect();
+  resetJoystick();
   game = null;
   sectOverlay.classList.remove("hidden");
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
@@ -1209,8 +1255,10 @@ function update(dt: number, now: number): void {
   if (player.shieldUntil <= now) player.shield = 0;
   player.rage = clamp(player.rage + dt * 1.1, 0, 100);
 
-  const inputX = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
-  const inputY = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
+  const keyboardX = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
+  const keyboardY = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
+  const inputX = clamp(keyboardX !== 0 ? keyboardX : touchInput.x, -1, 1);
+  const inputY = clamp(keyboardY !== 0 ? keyboardY : touchInput.y, -1, 1);
   onlineClient.sendInput(inputX, inputY);
   if (inputX !== 0 || inputY !== 0) {
     game.moveTarget = null;
@@ -1278,6 +1326,7 @@ function update(dt: number, now: number): void {
     } else remainingTelegraphs.push(telegraph);
   }
   game.telegraphs = remainingTelegraphs;
+  game.effects = game.effects.filter((effect) => now - effect.startedAt < effect.duration);
   game.loot = game.loot.filter((loot) => loot.expiresAt > now);
   game.cameraX = clamp(player.x - VIEW_WIDTH / 2, 0, WORLD_WIDTH - VIEW_WIDTH);
   game.cameraY = clamp(player.y - VIEW_HEIGHT / 2, 0, WORLD_HEIGHT - VIEW_HEIGHT);
@@ -1385,6 +1434,7 @@ function drawWorld(now: number): void {
     for (const npc of NPCS) drawNpc(npc, now);
   }
 
+  for (const effect of game.effects) drawSkillEffect(effect, now);
   for (const loot of game.loot) drawLoot(loot, now);
   for (const enemy of game.enemies) if (!enemy.dead) drawEnemy(enemy, now);
   for (const remote of game.onlinePlayers) drawRemotePlayer(remote, now);
@@ -1447,6 +1497,84 @@ function drawNpc(npc: Npc, now: number): void {
   ctx.restore();
 }
 
+function drawSkillEffect(effect: SkillEffect, now: number): void {
+  const elapsed = now - effect.startedAt;
+  const progress = clamp(elapsed / effect.duration, 0, 1);
+  const fade = Math.sin(Math.PI * progress);
+  const radius = effect.radius * (0.55 + progress * 0.55);
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  ctx.globalAlpha = fade;
+  ctx.globalCompositeOperation = "lighter";
+  if (effect.kind === "slash") {
+    ctx.rotate(effect.angle ?? 0);
+    for (let index = 0; index < 3; index += 1) {
+      ctx.strokeStyle = effect.color;
+      ctx.lineWidth = 7 - index * 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * (0.72 + index * 0.08), -0.8 - index * 0.08, 0.72 + index * 0.08);
+      ctx.stroke();
+    }
+  } else if (effect.kind === "orb") {
+    const orb = Math.max(9, radius * 0.24);
+    ctx.fillStyle = hexToRgba(effect.color, 0.26);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = effect.color;
+    ctx.beginPath();
+    ctx.arc(Math.cos(now / 130) * radius * 0.18, Math.sin(now / 130) * radius * 0.18, orb, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(effect.color, 0.88);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.66, now / 300, now / 300 + Math.PI * 1.5);
+    ctx.stroke();
+  } else if (effect.kind === "heal") {
+    ctx.strokeStyle = effect.color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    ctx.stroke();
+    ctx.fillStyle = effect.color;
+    ctx.fillRect(-5, -22 - progress * 6, 10, 29);
+    ctx.fillRect(-15, -12 - progress * 6, 30, 10);
+  } else if (effect.kind === "shield") {
+    ctx.strokeStyle = effect.color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(effect.color, 0.4);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.8, -now / 500, -now / 500 + Math.PI * 1.3);
+    ctx.stroke();
+  } else {
+    const gradient = ctx.createRadialGradient(0, 0, radius * 0.08, 0, 0, radius);
+    gradient.addColorStop(0, hexToRgba(effect.color, 0.72));
+    gradient.addColorStop(0.45, hexToRgba(effect.color, 0.22));
+    gradient.addColorStop(1, hexToRgba(effect.color, 0));
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = effect.color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * (0.62 + progress * 0.25), 0, Math.PI * 2);
+    ctx.stroke();
+    for (let index = 0; index < 8; index += 1) {
+      const angle = index * Math.PI / 4 + now / 700;
+      ctx.fillStyle = effect.color;
+      ctx.beginPath();
+      ctx.arc(Math.cos(angle) * radius * 0.8, Math.sin(angle) * radius * 0.8, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawTelegraph(telegraph: Telegraph, now: number): void {
   const remaining = clamp((telegraph.triggerAt - now) / 950, 0, 1);
   ctx.fillStyle = `rgba(255, 85, 91, ${0.13 + (1 - remaining) * 0.14})`;
@@ -1472,15 +1600,146 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.save();
   ctx.translate(loot.x, loot.y);
   ctx.scale(pulse, pulse);
-  ctx.fillStyle = loot.item ? hexToRgba(loot.item.color, 0.24) : "rgba(246, 198, 92, .22)";
+  const lootColor = loot.item?.color ?? "#f6c65c";
+  ctx.fillStyle = hexToRgba(lootColor, 0.24);
   ctx.beginPath();
-  ctx.arc(0, 0, 19, 0, Math.PI * 2);
+  ctx.arc(0, 0, loot.item ? 21 : 17, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = loot.item?.color ?? "#f6c65c";
-  ctx.font = "700 18px Georgia, serif";
-  ctx.textAlign = "center";
-  ctx.fillText(loot.item?.icon ?? "◆", 0, 6);
-  ctx.textAlign = "left";
+  if (loot.item) {
+    ctx.save();
+    ctx.rotate(Math.PI / 4 + Math.sin(now / 300) * 0.08);
+    ctx.fillStyle = lootColor;
+    ctx.fillRect(-9, -9, 18, 18);
+    ctx.fillStyle = "rgba(255,255,255,.38)";
+    ctx.fillRect(-6, -6, 5, 5);
+    ctx.strokeStyle = "rgba(10,24,30,.48)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-9, -9, 18, 18);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = lootColor;
+    ctx.beginPath();
+    ctx.ellipse(-4, 2, 8, 5, -0.18, 0, Math.PI * 2);
+    ctx.ellipse(5, -4, 7, 4, -0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#fff0a4";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(2, -7);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemySprite(enemy: Enemy, now: number): void {
+  const scale = enemy.radius / 19;
+  const hitColor = enemy.hitFlash > 0 ? "#fff5df" : enemy.color;
+  const isWolf = enemy.name.includes("Lang") || enemy.name.includes("Trúc Lang");
+  const isInsect = enemy.name.includes("Trùng");
+  const isUndead = enemy.name.includes("U Binh") || enemy.name.includes("Mộ Tướng");
+  ctx.save();
+  ctx.scale(scale, scale);
+  const bob = Math.sin(now / 180 + enemy.x) * (isWolf ? 1.2 : 0.6);
+  ctx.translate(0, bob);
+  if (isWolf) {
+    ctx.fillStyle = hitColor;
+    ctx.beginPath();
+    ctx.ellipse(-2, 3, 18, 11, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(14, -6, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f1d4be";
+    ctx.beginPath();
+    ctx.arc(18, -4, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = hitColor;
+    for (const earX of [8, 18]) {
+      ctx.beginPath();
+      ctx.moveTo(earX - 6, -11);
+      ctx.lineTo(earX, -24);
+      ctx.lineTo(earX + 5, -10);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "#172231";
+    ctx.beginPath();
+    ctx.arc(17, -7, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#d5a4a1";
+    ctx.lineWidth = 3;
+    for (const pawX of [-12, 2]) {
+      ctx.beginPath();
+      ctx.moveTo(pawX, 9);
+      ctx.lineTo(pawX - 2, 18);
+      ctx.stroke();
+    }
+  } else if (isInsect) {
+    ctx.fillStyle = hitColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 14, 19, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#c6e3a8";
+    ctx.beginPath();
+    ctx.arc(-5, -8, 4, 0, Math.PI * 2);
+    ctx.arc(5, -8, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hitColor;
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      for (const offset of [-8, 0, 8]) {
+        ctx.beginPath();
+        ctx.moveTo(side * 8, offset);
+        ctx.lineTo(side * 21, offset + side * 5);
+        ctx.stroke();
+      }
+    }
+  } else {
+    ctx.fillStyle = hitColor;
+    ctx.beginPath();
+    ctx.moveTo(0, -18);
+    ctx.lineTo(16, -4);
+    ctx.lineTo(13, 17);
+    ctx.lineTo(-13, 17);
+    ctx.lineTo(-16, -4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = isUndead ? "#c8d4d7" : "#efc09e";
+    ctx.beginPath();
+    ctx.arc(0, -12, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = isUndead ? "#b0c1c8" : "#293144";
+    ctx.beginPath();
+    ctx.arc(0, -15, 9, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = isUndead ? "#27394b" : "#1a2532";
+    ctx.fillRect(-9, -4, 18, 4);
+    ctx.strokeStyle = isUndead ? "#d8e3e1" : "#d49b67";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(10, 2);
+    ctx.lineTo(24, -9);
+    ctx.stroke();
+    if (enemy.kind !== "normal") {
+      ctx.strokeStyle = "#e9c875";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-12, -16);
+      ctx.lineTo(-7, -25);
+      ctx.lineTo(0, -17);
+      ctx.lineTo(7, -25);
+      ctx.lineTo(12, -16);
+      ctx.stroke();
+    }
+  }
+  if (enemy.kind === "boss") {
+    ctx.strokeStyle = "#e9c875";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1499,29 +1758,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
     ctx.arc(0, 0, enemy.radius + 8 + Math.sin(now / 160) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.fillStyle = enemy.hitFlash > 0 ? "#fff5df" : enemy.color;
-  ctx.beginPath();
-  ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(10, 15, 23, .72)";
-  ctx.beginPath();
-  ctx.arc(-enemy.radius * 0.32, -enemy.radius * 0.12, enemy.radius * 0.12, 0, Math.PI * 2);
-  ctx.arc(enemy.radius * 0.32, -enemy.radius * 0.12, enemy.radius * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-  if (enemy.kind === "boss") {
-    ctx.strokeStyle = "#e9c875";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-19, -enemy.radius - 12, 38, 12);
-    ctx.fillStyle = "#e9c875";
-    ctx.beginPath();
-    ctx.moveTo(-17, -enemy.radius - 12);
-    ctx.lineTo(-11, -enemy.radius - 23);
-    ctx.lineTo(-3, -enemy.radius - 12);
-    ctx.lineTo(4, -enemy.radius - 23);
-    ctx.lineTo(13, -enemy.radius - 12);
-    ctx.closePath();
-    ctx.fill();
-  }
+  drawEnemySprite(enemy, now);
   ctx.restore();
   const barWidth = enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
   drawBar(enemy.x - barWidth / 2, enemy.y - enemy.radius - 23, barWidth, enemy.kind === "boss" ? 8 : 5, enemy.hp / enemy.maxHp, enemy.kind === "boss" ? "#dd6c79" : "#a6d36c");
@@ -1532,17 +1769,16 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.textAlign = "left";
 }
 
-function drawPlayer(player: Player, now: number): void {
-  const sect = SECTS[player.sect];
+function drawHeroSprite(sect: Sect, facingX: number, facingY: number, now: number, remote = false): void {
+  const bob = Math.sin(now / 170) * (remote ? 0.9 : 1.5);
   ctx.save();
-  ctx.translate(player.x, player.y);
-  const bob = Math.sin(now / 170) * 1.5;
   ctx.translate(0, bob);
+  ctx.scale(remote ? 0.9 : 1, remote ? 0.9 : 1);
   ctx.fillStyle = "rgba(0,0,0,.32)";
   ctx.beginPath();
   ctx.ellipse(0, 17, 21, 7, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = sect.color;
+  ctx.fillStyle = hexToRgba(sect.color, 0.92);
   ctx.beginPath();
   ctx.moveTo(0, -21);
   ctx.lineTo(15, -5);
@@ -1559,19 +1795,68 @@ function drawPlayer(player: Player, now: number): void {
   ctx.beginPath();
   ctx.arc(0, -15, 10, Math.PI, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = sect.accent;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, 2);
-  ctx.lineTo(player.facingX * 22, 2 + player.facingY * 22);
-  ctx.stroke();
-  if (player.shieldUntil > now && player.shield > 0) {
+  ctx.fillStyle = sect.accent;
+  ctx.fillRect(-8, -5, 16, 3);
+  const angle = Math.atan2(facingY, facingX);
+  ctx.save();
+  ctx.rotate(angle);
+  if (sect.id === "kim") {
+    ctx.strokeStyle = "#eef4e9";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.lineTo(30, 2);
+    ctx.stroke();
+    ctx.strokeStyle = sect.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, -4);
+    ctx.lineTo(10, 8);
+    ctx.stroke();
+  } else if (sect.id === "hoa") {
+    ctx.strokeStyle = "#8f6a4b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(4, 12);
+    ctx.lineTo(4, -17);
+    ctx.stroke();
+    ctx.fillStyle = "#ffbd66";
+    ctx.beginPath();
+    ctx.arc(4, -21, 6 + Math.sin(now / 90) * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff0a4";
+    ctx.beginPath();
+    ctx.arc(2, -23, 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = sect.accent;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(3, 10);
+    ctx.quadraticCurveTo(20, 0, 7, -13);
+    ctx.quadraticCurveTo(20, -4, 29, -9);
+    ctx.stroke();
+    ctx.fillStyle = "#bcecff";
+    ctx.beginPath();
+    ctx.arc(28, -9, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  if (!remote && game?.player.shieldUntil && game.player.shieldUntil > now && game.player.shield > 0) {
     ctx.strokeStyle = hexToRgba(sect.accent, 0.7);
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(0, 0, 29 + Math.sin(now / 120) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function drawPlayer(player: Player, now: number): void {
+  const sect = SECTS[player.sect];
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
   drawBar(player.x - 25, player.y - 42, 50, 5, player.hp / player.maxHp, "#66db9c");
   ctx.fillStyle = "#e8eff1";
@@ -1584,27 +1869,7 @@ function drawPlayer(player: Player, now: number): void {
 function drawRemotePlayer(remote: OnlineSnapshot["players"][number], now: number): void {
   ctx.save();
   ctx.translate(remote.x, remote.y + Math.sin(now / 190 + remote.x) * 1.2);
-  ctx.fillStyle = "rgba(0,0,0,.3)";
-  ctx.beginPath();
-  ctx.ellipse(0, 17, 19, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#72b9e8";
-  ctx.beginPath();
-  ctx.moveTo(0, -20);
-  ctx.lineTo(14, -4);
-  ctx.lineTo(12, 16);
-  ctx.lineTo(-12, 16);
-  ctx.lineTo(-14, -4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#f0c5a4";
-  ctx.beginPath();
-  ctx.arc(0, -12, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#263449";
-  ctx.beginPath();
-  ctx.arc(0, -15, 9, Math.PI, Math.PI * 2);
-  ctx.fill();
+  drawHeroSprite(SECTS.thuy, 1, 0, now, true);
   ctx.restore();
   drawBar(remote.x - 23, remote.y - 40, 46, 4, 1, "#72b9e8");
   ctx.fillStyle = "#c5e4f2";
@@ -1646,7 +1911,8 @@ function refreshUi(force = false): void {
   setText("#bag-count", `${player.inventory.length}/12`);
   const avatar = document.querySelector<HTMLElement>("#avatar-orb");
   if (avatar) {
-    avatar.textContent = player.sect === "kim" ? "劍" : player.sect === "hoa" ? "炎" : "水";
+    avatar.className = `avatar-orb avatar-${player.sect}`;
+    avatar.innerHTML = `<span class="portrait-hair"></span><span class="portrait-face"></span><span class="portrait-collar"></span>`;
     avatar.style.background = `linear-gradient(135deg, ${hexToRgba(sect.color, 0.6)}, #142434)`;
   }
   const bars: Record<string, string> = {
@@ -1683,6 +1949,10 @@ function refreshUi(force = false): void {
   logList.innerHTML = game.logs.map((log) => `<div class="log-entry"><span>›</span>${escapeHtml(log)}</div>`).join("");
 }
 
+function skillGlyphMarkup(skill: SkillKey, sectId: SectId): string {
+  return `<span class="skill-glyph skill-${skill} sect-${sectId}" aria-hidden="true"><span></span></span>`;
+}
+
 function renderSkillBar(): void {
   if (!game) {
     skillBar.innerHTML = "";
@@ -1699,7 +1969,7 @@ function renderSkillBar(): void {
     const locked = skill.key === "skill2" && player.level < 3 || skill.key === "ultimate" && player.level < 5;
     const cooldown = player.cooldowns[skill.key];
     const coolText = locked ? "KHÓA" : cooldown > 0 ? `${cooldown.toFixed(1)}s` : skill.key === "ultimate" ? `${Math.floor(player.rage)}% nộ` : "SẴN SÀNG";
-    return `<button class="skill-button ${locked ? "locked" : ""}" data-skill="${skill.key}" title="${skill.name}"><span class="skill-number">${skill.number}</span><span class="skill-icon" style="color:${sect.color}">${skill.icon}</span><span class="skill-name">${skill.name}</span><span class="skill-cooldown">${coolText}</span></button>`;
+    return `<button class="skill-button ${locked ? "locked" : ""}" data-skill="${skill.key}" title="${skill.name}"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown">${coolText}</span></button>`;
   }).join("");
 }
 
@@ -1740,7 +2010,7 @@ function renderInventory(): void {
       <div class="skill-list">${skillRows.map((skill) => {
         const rank = player.skillRanks[skill.key] ?? 0;
         const unlocked = player.level >= skill.unlock;
-        return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skill.icon}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${skill.description}</span><small>${unlocked ? `Bậc ${rank}/5 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 5 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 5 ? "TỐI ĐA" : "NÂNG +1"}</button></div>`;
+        return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skillGlyphMarkup(skill.key, sect.id)}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${skill.description}</span><small>${unlocked ? `Bậc ${rank}/5 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 5 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 5 ? "TỐI ĐA" : "NÂNG +1"}</button></div>`;
       }).join("")}</div>
     `;
     return;
@@ -1784,7 +2054,7 @@ function startGame(sect: SectId): void {
 function renderSectCards(): void {
   sectCards.innerHTML = Object.values(SECTS).map((sect) => `
     <button class="sect-card" data-sect="${sect.id}" style="--sect-color:${sect.color};--sect-accent:${sect.accent}">
-      <span class="sect-card-top"><span class="sect-emblem">${sect.id === "kim" ? "劍" : sect.id === "hoa" ? "炎" : "水"}</span><span class="sect-role">${sect.title}</span></span>
+      <span class="sect-card-top"><span class="sect-emblem sect-${sect.id}"><span class="sect-art" aria-hidden="true"></span></span><span class="sect-role">${sect.title}</span></span>
       <strong>${sect.name}</strong>
       <span class="sect-description">${sect.description}</span>
       <span class="sect-skills"><b>1</b> ${sect.skills[0]} <b>2</b> ${sect.skills[1]}</span>
@@ -1792,6 +2062,48 @@ function renderSectCards(): void {
     </button>
   `).join("");
 }
+
+function resetJoystick(): void {
+  joystickPointerId = null;
+  touchInput.x = 0;
+  touchInput.y = 0;
+  joystickKnob.style.transform = "translate(-50%, -50%)";
+}
+
+function updateJoystick(event: PointerEvent): void {
+  const rect = joystickRing.getBoundingClientRect();
+  const maxDistance = rect.width * 0.31;
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = event.clientX - centerX;
+  const dy = event.clientY - centerY;
+  const length = Math.hypot(dx, dy);
+  const factor = length > maxDistance ? maxDistance / length : 1;
+  const limitedX = dx * factor;
+  const limitedY = dy * factor;
+  touchInput.x = clamp(limitedX / maxDistance, -1, 1);
+  touchInput.y = clamp(limitedY / maxDistance, -1, 1);
+  joystickKnob.style.transform = `translate(calc(-50% + ${limitedX}px), calc(-50% + ${limitedY}px))`;
+}
+
+joystick.addEventListener("pointerdown", (event) => {
+  if (!game) return;
+  event.preventDefault();
+  joystickPointerId = event.pointerId;
+  joystick.setPointerCapture(event.pointerId);
+  updateJoystick(event);
+});
+joystick.addEventListener("pointermove", (event) => {
+  if (event.pointerId === joystickPointerId) {
+    event.preventDefault();
+    updateJoystick(event);
+  }
+});
+joystick.addEventListener("pointerup", (event) => {
+  if (event.pointerId === joystickPointerId) resetJoystick();
+});
+joystick.addEventListener("pointercancel", resetJoystick);
+mobilePickup.addEventListener("click", pickupNearby);
 
 document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
