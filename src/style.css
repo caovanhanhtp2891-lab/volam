@@ -254,6 +254,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 .mobile-pickup span { font-size: 20px; line-height: 19px; }
 .mobile-pickup small { color: #b9c7b9; font-size: 8px; }
 .mobile-map-card, .mobile-resource-strip, .mobile-action-rail, .mobile-chat, .mobile-bottom-nav { display: none; }
+.mobile-sheet-handle, .mobile-sheet-backdrop { display: none; }
+.mobile-sheet-close { border: 0; color: #d5e3da; background: transparent; cursor: pointer; font-size: 24px; line-height: 20px; }
 .mobile-bottom-nav { border: 1px solid rgba(190,224,214,.14); border-radius: 12px; background: rgba(8,22,31,.9); box-shadow: 0 12px 30px rgba(0,0,0,.24); }
 .mobile-nav-button { min-width: 0; display: grid; place-items: center; gap: 2px; border: 0; color: #8fa5a2; background: transparent; cursor: pointer; }
 .mobile-nav-button span { color: #e4c875; font-size: 20px; line-height: 20px; }
@@ -366,6 +368,10 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .skill-cooldown { width: 100%; color: #bbd5dc; font-size: 7px; }
   .log-panel { display: none; }
   .mobile-bottom-nav { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 58px; margin: 8px; padding: 5px 3px; }
+  .mobile-sheet-handle { display: flex; height: 24px; align-items: center; justify-content: center; border-bottom: 1px solid var(--line); }
+  .mobile-sheet-handle > span { width: 38px; height: 4px; border-radius: 8px; background: rgba(211,229,219,.34); }
+  .mobile-sheet-close { position: absolute; top: 1px; right: 8px; width: 34px; height: 30px; color: #d6e6dc; }
+  .mobile-sheet-backdrop.show { position: fixed; z-index: 24; inset: 0; display: block; background: rgba(2,8,14,.62); backdrop-filter: blur(3px); }
   .left-rail, .right-rail { display: contents; }
   .character-panel { position: absolute; z-index: 5; top: 47px; left: 9px; width: 190px; padding: 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; background: rgba(7,20,28,.68); box-shadow: 0 8px 21px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
   .character-panel .section-kicker, .character-panel .stat-grid, .character-panel .currency-row { display: none; }
@@ -392,6 +398,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .target-heading span, .target-meta, .target-hp-row { font-size: 7px; }
   .target-empty { min-height: 24px; padding: 2px; font-size: 8px; }
   .inventory-panel { width: 100%; margin-top: 8px; }
+  .inventory-panel.mobile-sheet-open { position: fixed; z-index: 25; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); left: 8px; width: auto; max-height: min(72dvh, 610px); margin: 0; overflow: auto; border-color: rgba(233,200,117,.34); box-shadow: 0 22px 70px rgba(0,0,0,.58); }
+  .inventory-panel.mobile-sheet-open .panel-tabs { position: sticky; z-index: 2; top: 0; background: rgba(11,28,39,.98); }
   .guild-teaser, .controls-panel { display: none; }
   .sect-overlay { padding: 12px; }
 }

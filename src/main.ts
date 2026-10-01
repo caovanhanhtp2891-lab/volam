@@ -320,6 +320,7 @@ app.innerHTML = `
           <div id="target-content" class="target-empty">Click vào quái để chọn mục tiêu</div>
         </section>
         <section class="panel inventory-panel">
+          <div class="mobile-sheet-handle"><span></span><button class="mobile-sheet-close" id="mobile-sheet-close" type="button" aria-label="Đóng menu">×</button></div>
           <div class="panel-tabs">
             <button class="tab-button active" data-tab="bag">TÚI ĐỒ <span id="bag-count">0/12</span></button>
             <button class="tab-button" data-tab="smith">THỢ RÈN</button>
@@ -336,6 +337,8 @@ app.innerHTML = `
         </section>
       </aside>
     </main>
+
+    <div class="mobile-sheet-backdrop" id="mobile-sheet-backdrop"></div>
 
     <div class="sect-overlay" id="sect-overlay">
       <div class="sect-dialog">
@@ -388,6 +391,9 @@ const joystickKnob = document.querySelector<HTMLDivElement>("#joystick-knob")!;
 const mobilePickup = document.querySelector<HTMLButtonElement>("#mobile-pickup")!;
 const mobileAuto = document.querySelector<HTMLButtonElement>("#mobile-auto")!;
 const mobileChat = document.querySelector<HTMLDivElement>("#mobile-chat")!;
+const inventoryPanel = document.querySelector<HTMLElement>(".inventory-panel")!;
+const mobileSheetBackdrop = document.querySelector<HTMLDivElement>("#mobile-sheet-backdrop")!;
+const mobileSheetClose = document.querySelector<HTMLButtonElement>("#mobile-sheet-close")!;
 const connectionLabel = document.querySelector<HTMLSpanElement>("#connection-label")!;
 const connectionPill = document.querySelector<HTMLSpanElement>("#connection-pill")!;
 const onlineButton = document.querySelector<HTMLButtonElement>("#online-btn")!;
@@ -1216,6 +1222,7 @@ function loadGame(): void {
 function resetGame(): void {
   onlineClient.disconnect();
   resetJoystick();
+  closeMobileSheet();
   game = null;
   sectOverlay.classList.remove("hidden");
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
@@ -2114,6 +2121,19 @@ function renderSectCards(): void {
   `).join("");
 }
 
+function closeMobileSheet(): void {
+  inventoryPanel.classList.remove("mobile-sheet-open");
+  mobileSheetBackdrop.classList.remove("show");
+}
+
+function openMobileSheet(tab: PanelTab): void {
+  if (!game) return showToast("Hãy gia nhập môn phái trước.");
+  activeTab = tab;
+  inventoryPanel.classList.add("mobile-sheet-open");
+  mobileSheetBackdrop.classList.add("show");
+  refreshUi(true);
+}
+
 function resetJoystick(): void {
   joystickPointerId = null;
   touchInput.x = 0;
@@ -2158,6 +2178,10 @@ mobilePickup.addEventListener("click", pickupNearby);
 
 document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
+  if (key === "escape") {
+    closeMobileSheet();
+    return;
+  }
   if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
     event.preventDefault();
     keys.add(key);
@@ -2227,15 +2251,14 @@ document.querySelectorAll<HTMLButtonElement>(".tab-button").forEach((button) => 
 
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-tab]").forEach((button) => {
   button.addEventListener("click", () => {
-    if (!game) return showToast("Hãy gia nhập môn phái trước.");
-    activeTab = button.dataset.mobileTab as PanelTab;
-    document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    refreshUi(true);
+    openMobileSheet(button.dataset.mobileTab as PanelTab);
   });
 });
 
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-guild]").forEach((button) => button.addEventListener("click", openGuildRoadmap));
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-settings]").forEach((button) => button.addEventListener("click", () => showToast("Cài đặt âm thanh và tài khoản sẽ mở ở mốc vận hành.")));
+mobileSheetClose.addEventListener("click", closeMobileSheet);
+mobileSheetBackdrop.addEventListener("click", closeMobileSheet);
 mobileAuto.addEventListener("click", () => {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
   game.autoBattle = !game.autoBattle;
