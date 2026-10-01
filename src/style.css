@@ -253,6 +253,11 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 .mobile-pickup { width: 56px; height: 56px; display: grid; place-items: center; pointer-events: auto; border: 1px solid rgba(233,200,117,.42); border-radius: 50%; color: #ffe3a0; background: rgba(16,35,45,.82); box-shadow: 0 7px 18px rgba(0,0,0,.28); cursor: pointer; touch-action: manipulation; }
 .mobile-pickup span { font-size: 20px; line-height: 19px; }
 .mobile-pickup small { color: #b9c7b9; font-size: 8px; }
+.mobile-map-card, .mobile-action-rail, .mobile-bottom-nav { display: none; }
+.mobile-bottom-nav { border: 1px solid rgba(190,224,214,.14); border-radius: 12px; background: rgba(8,22,31,.9); box-shadow: 0 12px 30px rgba(0,0,0,.24); }
+.mobile-nav-button { min-width: 0; display: grid; place-items: center; gap: 2px; border: 0; color: #8fa5a2; background: transparent; cursor: pointer; }
+.mobile-nav-button span { color: #e4c875; font-size: 20px; line-height: 20px; }
+.mobile-nav-button small { font-size: 8px; }
 
 @media (max-width: 1200px) {
   .game-layout { grid-template-columns: 220px minmax(480px, 1fr); }
@@ -304,4 +309,91 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   #inventory-content { padding: 10px; }
   .sect-dialog { max-height: calc(100vh - 24px); overflow: auto; padding: 23px 14px; }
   .dialog-footer { align-items: flex-start; flex-direction: column; gap: 5px; }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .app-shell { min-height: 100dvh; padding: 0 0 max(8px, env(safe-area-inset-bottom)); }
+  .topbar { position: absolute; z-index: 8; top: max(5px, env(safe-area-inset-top)); right: 8px; left: 8px; width: auto; margin: 0; pointer-events: none; }
+  .brand-lockup, .top-actions { pointer-events: auto; }
+  .brand-lockup { padding: 4px 7px 4px 4px; border: 1px solid rgba(255,255,255,.11); border-radius: 24px; background: rgba(7,19,29,.64); backdrop-filter: blur(8px); }
+  .brand-mark { width: 31px; height: 31px; border-radius: 50%; }
+  .brand-name { max-width: 118px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .top-actions { margin-left: auto; }
+  .top-actions .ghost-button { border-color: rgba(233,200,117,.35); border-radius: 18px; color: #ffe4a1; background: rgba(11,24,33,.7); }
+  .top-actions .ghost-button:not(#online-btn) { display: none; }
+  .game-layout { position: relative; display: block; width: 100%; margin: 0; }
+  .game-column { position: relative; z-index: 1; display: block; width: 100%; }
+  .canvas-frame { min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; background: #102c2d; }
+  #game-canvas { width: 100%; height: auto; aspect-ratio: 9 / 16; cursor: default; }
+  .canvas-badge { top: 48px; left: 10px; max-width: 42%; padding: 5px 7px; font-size: 8px; }
+  .mobile-map-card { position: absolute; z-index: 5; top: 47px; right: 9px; display: block; width: 124px; padding: 5px; border: 2px solid rgba(233,200,117,.6); border-radius: 9px; color: #fff0c3; background: rgba(24,27,23,.74); box-shadow: 0 8px 22px rgba(0,0,0,.25); backdrop-filter: blur(5px); }
+  .mobile-map-title { display: flex; align-items: center; justify-content: space-between; font: 700 8px Georgia, serif; letter-spacing: .04em; }
+  .mobile-map-title span { color: #ffd878; font-size: 15px; }
+  .mobile-map-art { position: relative; height: 72px; margin-top: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; background: linear-gradient(145deg, #6a9d68 0 34%, #d1b676 35% 57%, #508d71 58% 100%); }
+  .mobile-map-art::before { position: absolute; width: 140px; height: 17px; top: 29px; left: -8px; background: rgba(243,213,140,.78); content: ""; transform: rotate(-23deg); }
+  .mobile-map-art::after { position: absolute; width: 70px; height: 20px; right: -13px; bottom: -5px; border-radius: 50%; background: rgba(74,130,169,.72); content: ""; }
+  .mobile-map-art i, .mobile-map-art b, .mobile-map-art em, .mobile-map-art strong { position: absolute; z-index: 1; display: block; border-radius: 50%; }
+  .mobile-map-art i { width: 7px; height: 7px; top: 14px; left: 22px; background: #ed5e4e; box-shadow: 47px 24px #ed5e4e, 75px -2px #ed5e4e; }
+  .mobile-map-art b { width: 8px; height: 8px; top: 35px; left: 61px; background: #65bcfa; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
+  .mobile-map-art em { width: 13px; height: 5px; right: 14px; top: 8px; border-radius: 4px; background: #3e624a; transform: rotate(-28deg); }
+  .mobile-map-art strong { width: 12px; height: 5px; left: 8px; bottom: 8px; border-radius: 4px; background: #3e624a; transform: rotate(24deg); }
+  .mobile-map-channel { margin: 3px -1px -1px; padding: 4px 6px 2px; border-radius: 5px; color: #fff0c3; background: rgba(8,18,20,.76); font: 700 9px Georgia, serif; text-align: center; }
+  .mobile-action-rail { position: absolute; z-index: 5; top: 205px; right: 5px; display: grid; gap: 8px; }
+  .mobile-action { width: 62px; height: 62px; display: grid; place-items: center; border: 2px solid rgba(233,200,117,.58); border-radius: 50%; color: #f8e8bb; background: radial-gradient(circle at 32% 24%, #735a38, #171c20 68%); box-shadow: 0 8px 17px rgba(0,0,0,.34); cursor: pointer; }
+  .mobile-action span { color: #e9c875; font-size: 23px; line-height: 20px; }
+  .mobile-action small { max-width: 55px; overflow: hidden; font: 700 8px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-hud { display: flex; bottom: 86px; padding: 13px 10px; }
+  .joystick { width: 124px; height: 124px; }
+  .joystick-ring { width: 98px; height: 98px; }
+  .mobile-pickup { margin-right: 74px; }
+  .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: 8px; left: 8px; display: flex; flex-direction: row; align-items: flex-end; padding: 0; border: 0; background: transparent; pointer-events: none; }
+  .combat-status { position: absolute; right: 0; bottom: 119px; max-width: 48%; padding: 5px 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; color: #e5eee6; background: rgba(5,18,25,.65); pointer-events: none; }
+  .skill-bar { width: 100%; justify-content: flex-end; gap: 7px; pointer-events: auto; }
+  .skill-button { width: 61px; min-height: 61px; display: grid; grid-template-columns: 1fr; grid-template-rows: 39px 12px 10px; justify-items: center; padding: 4px 2px; border: 2px solid rgba(233,200,117,.52); border-radius: 50%; background: radial-gradient(circle at 30% 20%, rgba(75,143,223,.72), rgba(7,21,48,.95) 68%); box-shadow: 0 6px 15px rgba(0,0,0,.35); text-align: center; }
+  .skill-button:last-child { width: 70px; height: 70px; margin-top: -9px; border-color: rgba(255,210,101,.88); background: radial-gradient(circle at 35% 22%, #fff0a5, #d37d32 23%, #173b67 63%, #081426 75%); }
+  .skill-number { top: 4px; left: 9px; color: #fff2c5; font-size: 9px; }
+  .skill-glyph { grid-row: 1; width: 34px; height: 34px; margin: 0; border-radius: 50%; border-color: rgba(255,255,255,.38); }
+  .skill-name { width: 100%; color: #fff4d0; font-size: 7px; }
+  .skill-cooldown { width: 100%; color: #bbd5dc; font-size: 7px; }
+  .log-panel { display: none; }
+  .mobile-bottom-nav { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 58px; margin: 8px; padding: 5px 3px; }
+  .left-rail, .right-rail { display: contents; }
+  .character-panel { position: absolute; z-index: 5; top: 9px; left: 9px; width: 190px; padding: 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; background: rgba(7,20,28,.68); box-shadow: 0 8px 21px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
+  .character-panel .section-kicker, .character-panel .stat-grid, .character-panel .currency-row { display: none; }
+  .character-heading { gap: 7px; margin: 0 0 5px; }
+  .avatar-orb { width: 38px; height: 38px; flex: 0 0 auto; }
+  .character-name { font-size: 11px; }
+  .character-sect { max-width: 135px; font-size: 8px; }
+  .level-row { margin-bottom: 3px; font-size: 9px; }
+  .level-row span:last-child { font-size: 8px; }
+  .resource-row { display: none; }
+  .character-panel .meter { height: 5px; margin-top: 3px; }
+  .character-panel .xp-meter { display: block; }
+  .quest-panel { position: absolute; z-index: 5; top: 121px; left: 9px; width: 195px; padding: 8px; border: 1px solid rgba(233,200,117,.3); border-radius: 9px; background: rgba(12,23,27,.7); box-shadow: 0 8px 21px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
+  .quest-panel .section-kicker { font-size: 8px; }
+  .quest-title { margin: 5px 0 3px; font-size: 10px; }
+  .quest-text { max-height: 27px; overflow: hidden; font-size: 8px; line-height: 1.35; }
+  .quest-progress { margin-top: 5px; font-size: 8px; }
+  .quest-reward { display: none; }
+  .target-panel { position: absolute; z-index: 5; top: 205px; right: 5px; width: 135px; min-height: 0; padding: 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(7,18,25,.58); pointer-events: none; }
+  .target-panel .section-kicker { font-size: 7px; }
+  .target-heading { gap: 5px; margin: 4px 0; }
+  .target-orb { width: 21px; height: 21px; }
+  .target-heading strong { font-size: 8px; }
+  .target-heading span, .target-meta, .target-hp-row { font-size: 7px; }
+  .target-empty { min-height: 24px; padding: 2px; font-size: 8px; }
+  .inventory-panel { width: 100%; margin-top: 8px; }
+  .guild-teaser, .controls-panel { display: none; }
+  .sect-overlay { padding: 12px; }
+}
+
+@media (max-width: 360px) and (orientation: portrait) {
+  .character-panel { width: 174px; }
+  .character-sect { max-width: 120px; }
+  .mobile-map-card { width: 111px; }
+  .mobile-action { width: 56px; height: 56px; }
+  .mobile-action-rail { top: 190px; }
+  .skill-bar { gap: 4px; }
+  .skill-button { width: 56px; height: 56px; min-height: 56px; }
+  .skill-button:last-child { width: 64px; height: 64px; }
 }

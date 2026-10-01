@@ -153,8 +153,8 @@ interface GameState {
 
 const WORLD_WIDTH = 1900;
 const WORLD_HEIGHT = 1200;
-const VIEW_WIDTH = 960;
-const VIEW_HEIGHT = 600;
+let VIEW_WIDTH = 960;
+let VIEW_HEIGHT = 600;
 const PLAYER_START = { x: 300, y: 360 };
 const SAVE_KEY = "giang-ho-di-truyen-prototype";
 
@@ -276,6 +276,15 @@ app.innerHTML = `
           <canvas id="game-canvas" width="960" height="600" aria-label="Bản đồ game Giang Hồ Dị Truyện"></canvas>
           <div class="canvas-badge" id="canvas-badge"><span class="live-dot"></span> RỪNG TRÚC · KÊNH 01</div>
           <div class="canvas-tip" id="canvas-tip">Chọn môn phái để bắt đầu hành trình</div>
+          <div class="mobile-map-card" aria-label="Bản đồ nhỏ">
+            <div class="mobile-map-title">THANH KHÊ TRẤN <span>☼</span></div>
+            <div class="mobile-map-art"><i></i><b></b><em></em><strong></strong></div>
+            <div class="mobile-map-channel">Kênh 1⌄</div>
+          </div>
+          <div class="mobile-action-rail" aria-label="Menu nhanh">
+            <button class="mobile-action" type="button" data-mobile-tab="bag"><span>◈</span><small>Hành trang</small></button>
+            <button class="mobile-action" type="button" data-mobile-tab="skills"><span>✦</span><small>Nhân vật</small></button>
+          </div>
           <div class="mobile-hud" id="mobile-hud" aria-label="Điều khiển trên điện thoại">
             <div class="joystick" id="joystick" aria-label="Cần điều khiển di chuyển"><div class="joystick-ring"><div class="joystick-knob" id="joystick-knob"></div></div></div>
             <button class="mobile-pickup" id="mobile-pickup" type="button"><span>✦</span><small>Nhặt</small></button>
@@ -289,6 +298,13 @@ app.innerHTML = `
           <div class="section-kicker">NHẬT KÝ GIANG HỒ <span>·</span> <span id="log-hint">Mới nhất ở dưới</span></div>
           <div id="log-list" class="log-list"></div>
         </div>
+        <nav class="mobile-bottom-nav" aria-label="Thanh menu mobile">
+          <button class="mobile-nav-button" type="button" data-mobile-tab="skills"><span>✧</span><small>Kỹ năng</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-guild="true"><span>⚑</span><small>Bang</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="smith"><span>⚒</span><small>Rèn</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="bag"><span>◈</span><small>Túi đồ</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-settings="true"><span>⚙</span><small>Cài đặt</small></button>
+        </nav>
       </section>
 
       <aside class="right-rail">
@@ -334,6 +350,20 @@ const canvas: HTMLCanvasElement = canvasElement;
 const context = canvas.getContext("2d");
 if (!context) throw new Error("Không khởi tạo được canvas context");
 const ctx: CanvasRenderingContext2D = context;
+
+function resizeGameViewport(): void {
+  const phonePortrait = window.innerWidth <= 600 && window.innerHeight >= window.innerWidth;
+  const nextWidth = phonePortrait ? 675 : 960;
+  const nextHeight = phonePortrait ? 1200 : 600;
+  if (canvas.width === nextWidth && canvas.height === nextHeight) return;
+  VIEW_WIDTH = nextWidth;
+  VIEW_HEIGHT = nextHeight;
+  canvas.width = nextWidth;
+  canvas.height = nextHeight;
+}
+
+resizeGameViewport();
+window.addEventListener("resize", resizeGameViewport);
 
 const sectOverlay = document.querySelector<HTMLDivElement>("#sect-overlay")!;
 const sectCards = document.querySelector<HTMLDivElement>("#sect-cards")!;
@@ -2173,6 +2203,18 @@ document.querySelectorAll<HTMLButtonElement>(".tab-button").forEach((button) => 
     refreshUi(true);
   });
 });
+
+document.querySelectorAll<HTMLButtonElement>("[data-mobile-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (!game) return showToast("Hãy gia nhập môn phái trước.");
+    activeTab = button.dataset.mobileTab as PanelTab;
+    document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    refreshUi(true);
+  });
+});
+
+document.querySelectorAll<HTMLButtonElement>("[data-mobile-guild]").forEach((button) => button.addEventListener("click", openGuildRoadmap));
+document.querySelectorAll<HTMLButtonElement>("[data-mobile-settings]").forEach((button) => button.addEventListener("click", () => showToast("Cài đặt âm thanh và tài khoản sẽ mở ở mốc vận hành.")));
 
 document.querySelector<HTMLButtonElement>("#save-btn")!.addEventListener("click", saveGame);
 document.querySelector<HTMLButtonElement>("#load-btn")!.addEventListener("click", loadGame);
