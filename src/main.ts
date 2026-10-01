@@ -130,6 +130,16 @@ interface SkillEffect {
   angle?: number;
 }
 
+interface FloatingText {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  startedAt: number;
+  duration: number;
+  size: number;
+}
+
 interface GameState {
   player: Player;
   enemies: Enemy[];
@@ -137,6 +147,7 @@ interface GameState {
   loot: GroundLoot[];
   telegraphs: Telegraph[];
   effects: SkillEffect[];
+  floatingTexts: FloatingText[];
   logs: string[];
   targetId: string | null;
   moveTarget: { x: number; y: number } | null;
@@ -643,6 +654,7 @@ function createGame(sectId: SectId): GameState {
     loot: [],
     telegraphs: [],
     effects: [],
+    floatingTexts: [],
     logs: [],
     targetId: null,
     moveTarget: null,
@@ -708,6 +720,11 @@ function skillScale(skill: SkillKey, base: number): number {
 function addSkillEffect(effect: Omit<SkillEffect, "startedAt">): void {
   if (!game) return;
   game.effects.push({ ...effect, startedAt: nowMs() });
+}
+
+function addFloatingText(x: number, y: number, text: string, color: string, size = 18): void {
+  if (!game) return;
+  game.floatingTexts.push({ x, y, text, color, startedAt: nowMs(), duration: 900, size });
 }
 
 function upgradeSkill(skill: SkillKey): void {
@@ -886,6 +903,7 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string): void {
   enemy.hp = Math.max(0, enemy.hp - damage);
   enemy.hitFlash = 0.16;
   game.player.rage = clamp(game.player.rage + 7, 0, 100);
+  addFloatingText(enemy.x + randomBetween(-8, 8), enemy.y - enemy.radius - 7, `-${damage}`, critical ? "#ffe28a" : "#fff1d1", critical ? 23 : 18);
   if (critical) addLog(`${source}: chí mạng ${damage} sát thương.`);
   if (enemy.hp <= 0) killEnemy(enemy);
 }
@@ -940,7 +958,9 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
     }
     if (player.sect === "thuy") {
       dealAreaDamage(player.x, player.y, 180, skillScale("ultimate", 1.55), sect.ultimate);
-      player.hp = clamp(player.hp + Math.floor(player.maxHp * 0.38), 0, player.maxHp);
+      const heal = Math.floor(player.maxHp * 0.38);
+      player.hp = clamp(player.hp + heal, 0, player.maxHp);
+      addFloatingText(player.x, player.y - 40, `+${heal}`, "#b8edff", 21);
     }
     addSkillEffect({ x: ultimateX, y: ultimateY, radius: player.sect === "hoa" ? 180 : 210, color: sect.color, duration: 720, kind: "burst" });
     game.screenFlash = 0.35;
@@ -968,6 +988,7 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
       const heal = Math.floor(player.maxHp * 0.22);
       player.hp = clamp(player.hp + heal, 0, player.maxHp);
       if (target && distance(player, target) <= 160) dealDamage(target, skillScale("skill1", 0.82), sect.skills[0]);
+      addFloatingText(player.x, player.y - 36, `+${heal}`, "#b8edff", 18);
       addSkillEffect({ x: player.x, y: player.y, radius: 70, color: sect.color, duration: 720, kind: "heal" });
       addLog(`${sect.skills[0]} hồi ${heal} HP.`);
     }
@@ -992,6 +1013,7 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
       player.shield = Math.floor(player.maxHp * 0.28);
       player.shieldUntil = nowMs() + 5000;
       if (target && distance(player, target) <= 150) dealDamage(target, skillScale("skill2", 0.95), sect.skills[1]);
+      addFloatingText(player.x, player.y - 37, `+${player.shield} khiên`, "#a9dcff", 14);
       addSkillEffect({ x: player.x, y: player.y, radius: 62, color: sect.color, duration: 520, kind: "shield" });
       addLog(`${sect.skills[1]} tạo khiên ${player.shield} điểm trong 5 giây.`);
     }
@@ -1003,6 +1025,7 @@ function rewardExperience(amount: number): void {
   if (!game) return;
   const player = game.player;
   player.xp += amount;
+  addFloatingText(player.x, player.y - 35, `+${amount} XP`, "#a9e8a8", 13);
   let leveled = false;
   while (player.xp >= xpToNext(player.level) && player.level < 30) {
     player.xp -= xpToNext(player.level);
@@ -1016,6 +1039,7 @@ function rewardExperience(amount: number): void {
   }
   if (leveled) {
     syncStats(true);
+    addFloatingText(player.x, player.y - 62, `CẤP ${player.level}!`, "#ffe18a", 23);
     addLog(`Bạn đã đạt cấp ${player.level}. Chỉ số được tăng và hồi đầy sinh lực.`);
     addLog("Nhận 1 điểm võ học. Mở tab Võ công để nâng chiêu.");
     if (player.level >= 3 && player.skillRanks.skill2 === 0) {
@@ -1090,6 +1114,7 @@ function damagePlayer(amount: number, source: string): void {
   }
   if (remaining > 0) player.hp = Math.max(0, player.hp - remaining);
   player.rage = clamp(player.rage + 5, 0, 100);
+  addFloatingText(player.x + randomBetween(-7, 7), player.y - 39, remaining > 0 ? `-${remaining}` : "ĐỠ", remaining > 0 ? "#ff9c88" : "#9ed9f4", remaining > 0 ? 18 : 14);
   if (remaining > 0) addLog(`${source} gây ${remaining} sát thương.`);
   if (player.hp <= 0) {
     player.x = PLAYER_START.x;
@@ -1195,6 +1220,7 @@ function loadGame(): void {
       loot: [],
       telegraphs: [],
       effects: [],
+      floatingTexts: [],
       logs: [],
       targetId: null,
       moveTarget: null,
@@ -1379,6 +1405,7 @@ function update(dt: number, now: number): void {
   }
   game.telegraphs = remainingTelegraphs;
   game.effects = game.effects.filter((effect) => now - effect.startedAt < effect.duration);
+  game.floatingTexts = game.floatingTexts.filter((floatingText) => now - floatingText.startedAt < floatingText.duration);
   game.loot = game.loot.filter((loot) => loot.expiresAt > now);
   game.cameraX = clamp(player.x - VIEW_WIDTH / 2, 0, WORLD_WIDTH - VIEW_WIDTH);
   game.cameraY = clamp(player.y - VIEW_HEIGHT / 2, 0, WORLD_HEIGHT - VIEW_HEIGHT);
@@ -1492,6 +1519,7 @@ function drawWorld(now: number): void {
   for (const remote of game.onlinePlayers) drawRemotePlayer(remote, now);
   drawPlayer(player, now);
   for (const telegraph of game.telegraphs) drawTelegraph(telegraph, now);
+  for (const floatingText of game.floatingTexts) drawFloatingText(floatingText, now);
   if (game.moveTarget) {
     ctx.strokeStyle = "rgba(255,246,185,.75)";
     ctx.lineWidth = 2;
@@ -1624,6 +1652,29 @@ function drawSkillEffect(effect: SkillEffect, now: number): void {
       ctx.fill();
     }
   }
+  ctx.restore();
+}
+
+function drawFloatingText(floatingText: FloatingText, now: number): void {
+  const progress = clamp((now - floatingText.startedAt) / floatingText.duration, 0, 1);
+  const alpha = progress < 0.18 ? progress / 0.18 : 1 - (progress - 0.18) / 0.82;
+  const lift = progress * 38;
+  const scale = 0.82 + Math.min(progress / 0.18, 1) * 0.18;
+  ctx.save();
+  ctx.translate(floatingText.x, floatingText.y - lift);
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `900 ${floatingText.size}px 'DM Sans', sans-serif`;
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(3, floatingText.size * 0.22);
+  ctx.strokeStyle = "rgba(24, 20, 20, .84)";
+  ctx.strokeText(floatingText.text, 0, 0);
+  ctx.fillStyle = floatingText.color;
+  ctx.fillText(floatingText.text, 0, 0);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
   ctx.restore();
 }
 
