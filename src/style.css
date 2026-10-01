@@ -51,6 +51,8 @@ button:focus-visible { outline: 2px solid #f6d88a; outline-offset: 2px; }
 .top-actions { gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .connection-pill { display: inline-flex; align-items: center; gap: 7px; margin-right: 10px; color: #9bc5b9; font-size: 12px; }
 .connection-pill i, .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+.connection-pill[data-status="offline"] i { background: #80939a; box-shadow: none; }
+.connection-pill[data-status="connecting"] i { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
 .ghost-button, .outline-button { border: 1px solid var(--line); border-radius: 7px; padding: 8px 11px; color: var(--soft); background: rgba(21, 45, 57, .46); cursor: pointer; font-size: 11px; transition: .2s ease; }
 .ghost-button:hover, .outline-button:hover { border-color: rgba(233, 200, 117, .5); color: #fff1c7; background: rgba(35, 64, 72, .76); }
 .danger-text:hover { color: #ffaaa5; border-color: rgba(240,126,121,.4); }

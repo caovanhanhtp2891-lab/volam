@@ -16,6 +16,23 @@ pnpm build
 pnpm preview
 ```
 
+## Chạy nền online P3
+
+Mở thêm một terminal để chạy server session/World WebSocket:
+
+```bash
+pnpm --config.store-dir=/tmp/volam-pnpm-store run server:build
+pnpm --config.store-dir=/tmp/volam-pnpm-store run server:start
+```
+
+Server mặc định ở `http://127.0.0.1:8787`. Kiểm tra nhanh:
+
+```bash
+curl -fsS http://127.0.0.1:8787/api/health/ready
+```
+
+Trong game, chọn môn phái rồi bấm **Kết nối online**. Bản P3 hiện có guest session lưu JSON, health check, snapshot WebSocket, input di chuyển được kiểm tra phía server và hiển thị người chơi đang kết nối; chiến đấu, tổ đội và bang hội vẫn là các mốc kế tiếp.
+
 Trong môi trường cloud bị giới hạn thư mục store mặc định của pnpm, dùng:
 
 ```bash
@@ -33,4 +50,4 @@ pnpm --config.store-dir=/tmp/volam-pnpm-store run build
 - `K`: mở tab Võ công; click NPC Mộc sư huynh, Lão Thiết hoặc cổng Cổ Mộ để tương tác.
 - Click một điểm trên mặt đất để di chuyển tới điểm đó.
 
-Prototype hiện chạy cục bộ trên trình duyệt. Đã có lát gameplay tiếp theo gồm điểm võ học/nâng kỹ năng, NPC, nhiệm vụ nhận thưởng và phụ bản solo 3 phút với boss Cổ Mộ Thủ Vệ. Tài khoản, server authoritative, tổ đội online và bang hội vẫn nằm ở các milestone backend tiếp theo. Đây là nền P0–P5 local để kiểm chứng cảm giác di chuyển, chiến đấu, loot, cường hóa và boss trước khi triển khai online.
+Prototype đã có lát gameplay local gồm điểm võ học/nâng kỹ năng, NPC, nhiệm vụ nhận thưởng và phụ bản solo 3 phút với boss Cổ Mộ Thủ Vệ, cùng nền online P3 để tạo guest session và đồng bộ người chơi. Server authoritative cho chiến đấu, tổ đội online và bang hội vẫn là các mốc kế tiếp.

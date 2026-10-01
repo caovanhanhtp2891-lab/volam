@@ -8,10 +8,16 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "server:build": "tsc -p tsconfig.server.json",
+    "server:start": "node dist-server/index.js",
+    "server:check": "tsc -p tsconfig.server.json --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^24.8.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.9.2",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "ws": "^8.18.3"
   }
 }

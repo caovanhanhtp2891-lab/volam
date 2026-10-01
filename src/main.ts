@@ -1,4 +1,5 @@
 import "./style.css";
+import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
 
 type SectId = "kim" | "hoa" | "thuy";
 type ItemSlot = "weapon" | "armor";
@@ -135,6 +136,7 @@ interface GameState {
   dungeonTimeLeft: number;
   dungeonCleared: boolean;
   dungeonRewardClaimed: boolean;
+  onlinePlayers: OnlineSnapshot["players"];
 }
 
 const WORLD_WIDTH = 1900;
@@ -206,7 +208,8 @@ app.innerHTML = `
         </div>
       </div>
       <div class="top-actions">
-        <span class="connection-pill"><i></i> Máy chủ cục bộ</span>
+        <span class="connection-pill" id="connection-pill"><i></i> <span id="connection-label">Ngoại tuyến</span></span>
+        <button class="ghost-button" id="online-btn">Kết nối online</button>
         <button class="ghost-button" id="save-btn">Lưu tiến trình</button>
         <button class="ghost-button" id="load-btn">Tải tiến trình</button>
         <button class="ghost-button danger-text" id="reset-btn">Chơi lại</button>
@@ -325,12 +328,38 @@ const skillBar = document.querySelector<HTMLDivElement>("#skill-bar")!;
 const canvasTip = document.querySelector<HTMLDivElement>("#canvas-tip")!;
 const canvasBadge = document.querySelector<HTMLDivElement>("#canvas-badge")!;
 const combatStatusText = document.querySelector<HTMLSpanElement>("#combat-status-text")!;
+const connectionLabel = document.querySelector<HTMLSpanElement>("#connection-label")!;
+const connectionPill = document.querySelector<HTMLSpanElement>("#connection-pill")!;
+const onlineButton = document.querySelector<HTMLButtonElement>("#online-btn")!;
 const keys = new Set<string>();
 let game: GameState | null = null;
 let activeTab: PanelTab = "bag";
 let lastFrame = performance.now();
 let lastUiUpdate = 0;
 let toastTimer = 0;
+
+const onlineClient = new OnlineClient({
+  onStatus: (status: OnlineStatus, detail?: string) => {
+    const labels: Record<OnlineStatus, string> = {
+      offline: "Ngoại tuyến",
+      connecting: "Đang kết nối…",
+      online: "Đã kết nối online",
+    };
+    connectionLabel.textContent = labels[status];
+    connectionPill.dataset.status = status;
+    onlineButton.textContent = status === "online" ? "Ngắt kết nối" : "Kết nối online";
+    if (status === "online") {
+      if (game) addLog("Đã vào máy chủ online. Bạn có thể thấy người chơi khác trong Rừng Trúc.");
+      else showToast("Đã kết nối máy chủ online.");
+    } else if (detail && game) {
+      addLog(`Online: ${detail}`);
+    }
+  },
+  onSnapshot: (snapshot: OnlineSnapshot) => {
+    if (!game) return;
+    game.onlinePlayers = snapshot.players.filter((player) => player.id !== snapshot.self.id);
+  },
+});
 
 const obstacles = [
   { x: 50, y: 70, w: 170, h: 78, type: "grove" },
@@ -556,6 +585,7 @@ function createGame(sectId: SectId): GameState {
     dungeonTimeLeft: 0,
     dungeonCleared: false,
     dungeonRewardClaimed: false,
+    onlinePlayers: [],
   };
   state.worldEnemies = state.enemies;
   game = state;
@@ -805,6 +835,7 @@ function playerBasicAttack(): void {
 
 function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
   if (!game) return;
+  onlineClient.sendSkill(skill);
   const player = game.player;
   const sect = SECTS[player.sect];
   if (skill === "ultimate") {
@@ -1084,6 +1115,7 @@ function loadGame(): void {
       dungeonTimeLeft: 0,
       dungeonCleared: false,
       dungeonRewardClaimed: false,
+      onlinePlayers: [],
     };
     syncStats();
     sectOverlay.classList.add("hidden");
@@ -1096,6 +1128,7 @@ function loadGame(): void {
 }
 
 function resetGame(): void {
+  onlineClient.disconnect();
   game = null;
   sectOverlay.classList.remove("hidden");
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
@@ -1178,6 +1211,7 @@ function update(dt: number, now: number): void {
 
   const inputX = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
   const inputY = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
+  onlineClient.sendInput(inputX, inputY);
   if (inputX !== 0 || inputY !== 0) {
     game.moveTarget = null;
     movePlayer(inputX * player.speed * dt, inputY * player.speed * dt);
@@ -1353,6 +1387,7 @@ function drawWorld(now: number): void {
 
   for (const loot of game.loot) drawLoot(loot, now);
   for (const enemy of game.enemies) if (!enemy.dead) drawEnemy(enemy, now);
+  for (const remote of game.onlinePlayers) drawRemotePlayer(remote, now);
   drawPlayer(player, now);
   for (const telegraph of game.telegraphs) drawTelegraph(telegraph, now);
   if (game.moveTarget) {
@@ -1543,6 +1578,39 @@ function drawPlayer(player: Player, now: number): void {
   ctx.font = "700 11px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(`Bạn · Cấp ${player.level}`, player.x, player.y - 49);
+  ctx.textAlign = "left";
+}
+
+function drawRemotePlayer(remote: OnlineSnapshot["players"][number], now: number): void {
+  ctx.save();
+  ctx.translate(remote.x, remote.y + Math.sin(now / 190 + remote.x) * 1.2);
+  ctx.fillStyle = "rgba(0,0,0,.3)";
+  ctx.beginPath();
+  ctx.ellipse(0, 17, 19, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#72b9e8";
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(14, -4);
+  ctx.lineTo(12, 16);
+  ctx.lineTo(-12, 16);
+  ctx.lineTo(-14, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#f0c5a4";
+  ctx.beginPath();
+  ctx.arc(0, -12, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#263449";
+  ctx.beginPath();
+  ctx.arc(0, -15, 9, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  drawBar(remote.x - 23, remote.y - 40, 46, 4, 1, "#72b9e8");
+  ctx.fillStyle = "#c5e4f2";
+  ctx.font = "600 10px 'DM Sans', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`${remote.name} · Cấp ${remote.level}`, remote.x, remote.y - 47);
   ctx.textAlign = "left";
 }
 
@@ -1798,6 +1866,17 @@ document.querySelector<HTMLButtonElement>("#save-btn")!.addEventListener("click"
 document.querySelector<HTMLButtonElement>("#load-btn")!.addEventListener("click", loadGame);
 document.querySelector<HTMLButtonElement>("#reset-btn")!.addEventListener("click", resetGame);
 document.querySelector<HTMLButtonElement>("#guild-btn")!.addEventListener("click", openGuildRoadmap);
+onlineButton.addEventListener("click", () => {
+  if (onlineClient.getStatus() === "online" || onlineClient.getStatus() === "connecting") {
+    onlineClient.disconnect();
+    return;
+  }
+  if (!game) {
+    showToast("Hãy gia nhập môn phái trước khi kết nối online.");
+    return;
+  }
+  void onlineClient.connect(`Tân nhân ${SECTS[game.player.sect].name}`);
+});
 
 renderSectCards();
 refreshUi(true);
