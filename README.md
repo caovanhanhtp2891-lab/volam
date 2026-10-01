@@ -50,4 +50,4 @@ pnpm --config.store-dir=/tmp/volam-pnpm-store run build
 - `K`: mở tab Võ công; click NPC Mộc sư huynh, Lão Thiết hoặc cổng Cổ Mộ để tương tác.
 - Click một điểm trên mặt đất để di chuyển tới điểm đó.
 
-Prototype đã có lát gameplay local gồm điểm võ học/nâng kỹ năng, NPC, nhiệm vụ nhận thưởng và phụ bản solo 3 phút với boss Cổ Mộ Thủ Vệ, nền online P3, cùng giao diện P6 portrait 9:16 responsive cho mobile. Bản P6 thêm HUD kiểu game dọc, minimap, joystick chạm, menu đáy, thanh kỹ năng lớn hơn, sprite nhân vật/quái/loot và hiệu ứng kỹ năng 2D; server authoritative cho chiến đấu, tổ đội online và bang hội vẫn là các mốc kế tiếp.
+Prototype đã có lát gameplay local gồm điểm võ học/nâng kỹ năng, NPC, nhiệm vụ nhận thưởng và phụ bản solo 3 phút với boss Cổ Mộ Thủ Vệ, nền online P3, cùng giao diện P6 portrait 9:16 responsive cho mobile. Bản P6 thêm HUD kiểu game dọc, minimap, tài nguyên, chat hệ thống, Auto chiến đấu, joystick chạm, menu đáy, thanh kỹ năng lớn hơn, sprite nhân vật/quái/loot và hiệu ứng kỹ năng 2D; server authoritative cho chiến đấu, tổ đội online và bang hội vẫn là các mốc kế tiếp.

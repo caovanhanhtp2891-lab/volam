@@ -149,6 +149,7 @@ interface GameState {
   dungeonCleared: boolean;
   dungeonRewardClaimed: boolean;
   onlinePlayers: OnlineSnapshot["players"];
+  autoBattle: boolean;
 }
 
 const WORLD_WIDTH = 1900;
@@ -281,10 +282,16 @@ app.innerHTML = `
             <div class="mobile-map-art"><i></i><b></b><em></em><strong></strong></div>
             <div class="mobile-map-channel">Kênh 1⌄</div>
           </div>
+          <div class="mobile-resource-strip" aria-label="Tài nguyên">
+            <span class="mobile-currency mobile-currency-gold">◆ <b id="mobile-gold">0</b></span>
+            <span class="mobile-currency mobile-currency-stone">✦ <b id="mobile-stones">0</b></span>
+          </div>
           <div class="mobile-action-rail" aria-label="Menu nhanh">
             <button class="mobile-action" type="button" data-mobile-tab="bag"><span>◈</span><small>Hành trang</small></button>
             <button class="mobile-action" type="button" data-mobile-tab="skills"><span>✦</span><small>Nhân vật</small></button>
+            <button class="mobile-action mobile-auto-button" id="mobile-auto" type="button"><span>⚔</span><small>Auto</small></button>
           </div>
+          <div class="mobile-chat" id="mobile-chat" aria-live="polite"></div>
           <div class="mobile-hud" id="mobile-hud" aria-label="Điều khiển trên điện thoại">
             <div class="joystick" id="joystick" aria-label="Cần điều khiển di chuyển"><div class="joystick-ring"><div class="joystick-knob" id="joystick-knob"></div></div></div>
             <button class="mobile-pickup" id="mobile-pickup" type="button"><span>✦</span><small>Nhặt</small></button>
@@ -379,6 +386,8 @@ const joystick = document.querySelector<HTMLDivElement>("#joystick")!;
 const joystickRing = document.querySelector<HTMLDivElement>(".joystick-ring")!;
 const joystickKnob = document.querySelector<HTMLDivElement>("#joystick-knob")!;
 const mobilePickup = document.querySelector<HTMLButtonElement>("#mobile-pickup")!;
+const mobileAuto = document.querySelector<HTMLButtonElement>("#mobile-auto")!;
+const mobileChat = document.querySelector<HTMLDivElement>("#mobile-chat")!;
 const connectionLabel = document.querySelector<HTMLSpanElement>("#connection-label")!;
 const connectionPill = document.querySelector<HTMLSpanElement>("#connection-pill")!;
 const onlineButton = document.querySelector<HTMLButtonElement>("#online-btn")!;
@@ -640,6 +649,7 @@ function createGame(sectId: SectId): GameState {
     dungeonCleared: false,
     dungeonRewardClaimed: false,
     onlinePlayers: [],
+    autoBattle: false,
   };
   state.worldEnemies = state.enemies;
   game = state;
@@ -1191,6 +1201,7 @@ function loadGame(): void {
       dungeonCleared: false,
       dungeonRewardClaimed: false,
       onlinePlayers: [],
+      autoBattle: false,
     };
     syncStats();
     sectOverlay.classList.add("hidden");
@@ -1284,6 +1295,10 @@ function update(dt: number, now: number): void {
   player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
   if (player.shieldUntil <= now) player.shield = 0;
   player.rage = clamp(player.rage + dt * 1.1, 0, 100);
+  if (game.autoBattle && !currentTarget()) {
+    const target = nearestEnemy(520);
+    if (target) game.targetId = target.id;
+  }
 
   const keyboardX = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
   const keyboardY = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
@@ -1913,6 +1928,8 @@ function refreshUi(force = false): void {
   if (!game) {
     document.querySelector("#character-name")!.textContent = "Lữ khách";
     document.querySelector("#character-sect")!.textContent = "Chưa gia nhập môn phái";
+    mobileChat.innerHTML = `<span class="mobile-chat-system">[Hệ thống]</span> Chọn môn phái để bắt đầu hành trình.`;
+    mobileAuto.classList.remove("active");
     return;
   }
   if (!force && performance.now() - lastUiUpdate < 120) return;
@@ -1933,6 +1950,9 @@ function refreshUi(force = false): void {
   setText("#gold-label", formatNumber(player.gold));
   setText("#stone-label", formatNumber(player.refiningStones));
   setText("#token-label", formatNumber(player.dungeonTokens));
+  setText("#mobile-gold", formatNumber(player.gold));
+  setText("#mobile-stones", formatNumber(player.refiningStones));
+  mobileAuto.classList.toggle("active", game.autoBattle);
   setText("#quest-kill-progress", `${Math.min(player.questKills, 5)} / 5 sơn tặc`);
   setText("#quest-boss-progress", `${player.bossDefeated ? "✓" : "○"} Lang Vương`);
   setText("#quest-title", player.questRewardClaimed ? "Dấu chân hoàn tất" : "Dấu chân trong Rừng Trúc");
@@ -1977,6 +1997,7 @@ function refreshUi(force = false): void {
   renderSkillBar();
   renderInventory();
   logList.innerHTML = game.logs.map((log) => `<div class="log-entry"><span>›</span>${escapeHtml(log)}</div>`).join("");
+  mobileChat.innerHTML = game.logs.slice(-3).map((log) => `<div><span class="mobile-chat-system">[Giang hồ]</span> ${escapeHtml(log)}</div>`).join("");
 }
 
 function skillGlyphMarkup(skill: SkillKey, sectId: SectId): string {
@@ -2215,6 +2236,18 @@ document.querySelectorAll<HTMLButtonElement>("[data-mobile-tab]").forEach((butto
 
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-guild]").forEach((button) => button.addEventListener("click", openGuildRoadmap));
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-settings]").forEach((button) => button.addEventListener("click", () => showToast("Cài đặt âm thanh và tài khoản sẽ mở ở mốc vận hành.")));
+mobileAuto.addEventListener("click", () => {
+  if (!game) return showToast("Hãy gia nhập môn phái trước.");
+  game.autoBattle = !game.autoBattle;
+  if (game.autoBattle) {
+    const target = currentTarget() ?? nearestEnemy(520);
+    if (target) game.targetId = target.id;
+    addLog(target ? "Đã bật Auto chiến đấu: tự áp sát và đánh mục tiêu gần." : "Đã bật Auto chiến đấu: chưa tìm thấy quái gần đây.");
+  } else {
+    addLog("Đã tắt Auto chiến đấu.");
+  }
+  refreshUi(true);
+});
 
 document.querySelector<HTMLButtonElement>("#save-btn")!.addEventListener("click", saveGame);
 document.querySelector<HTMLButtonElement>("#load-btn")!.addEventListener("click", loadGame);
