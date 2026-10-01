@@ -3,7 +3,8 @@ import "./style.css";
 type SectId = "kim" | "hoa" | "thuy";
 type ItemSlot = "weapon" | "armor";
 type Rarity = "Thường" | "Tốt" | "Hiếm" | "Cực phẩm";
-type PanelTab = "bag" | "smith";
+type PanelTab = "bag" | "smith" | "skills" | "dungeon";
+type SkillKey = "skill1" | "skill2" | "ultimate";
 
 interface Sect {
   id: SectId;
@@ -51,15 +52,29 @@ interface Player {
   shield: number;
   shieldUntil: number;
   attackCooldown: number;
-  cooldowns: Record<"skill1" | "skill2" | "ultimate", number>;
+  cooldowns: Record<SkillKey, number>;
+  skillPoints: number;
+  skillRanks: Record<SkillKey, number>;
   inventory: Item[];
   equipment: Partial<Record<ItemSlot, Item>>;
   gold: number;
   refiningStones: number;
   questKills: number;
   bossDefeated: boolean;
+  questRewardClaimed: boolean;
+  dungeonTokens: number;
   facingX: number;
   facingY: number;
+}
+
+interface Npc {
+  id: "guide" | "smith" | "dungeon";
+  name: string;
+  title: string;
+  x: number;
+  y: number;
+  color: string;
+  icon: string;
 }
 
 interface Enemy {
@@ -106,6 +121,7 @@ interface Telegraph {
 interface GameState {
   player: Player;
   enemies: Enemy[];
+  worldEnemies: Enemy[];
   loot: GroundLoot[];
   telegraphs: Telegraph[];
   logs: string[];
@@ -115,6 +131,10 @@ interface GameState {
   cameraY: number;
   screenFlash: number;
   lastBossDefeatedAt: number;
+  mapMode: "world" | "dungeon";
+  dungeonTimeLeft: number;
+  dungeonCleared: boolean;
+  dungeonRewardClaimed: boolean;
 }
 
 const WORLD_WIDTH = 1900;
@@ -211,15 +231,15 @@ app.innerHTML = `
           <div class="resource-row"><span>MP</span><strong id="mp-label">—</strong></div>
           <div class="meter mp-meter"><span id="mp-bar"></span></div>
           <div class="stat-grid" id="stat-grid"></div>
-          <div class="currency-row"><span><b class="coin-icon">◆</b> <strong id="gold-label">0</strong> bạc</span><span><b class="stone-icon">✦</b> <strong id="stone-label">0</strong> đá</span></div>
+          <div class="currency-row"><span><b class="coin-icon">◆</b> <strong id="gold-label">0</strong> bạc</span><span><b class="stone-icon">✦</b> <strong id="stone-label">0</strong> đá</span><span><b class="token-icon">◇</b> <strong id="token-label">0</strong> token</span></div>
         </section>
 
         <section class="panel quest-panel">
           <div class="section-kicker">NHIỆM VỤ CHÍNH</div>
-          <div class="quest-title">Dấu chân trong Rừng Trúc</div>
-          <div class="quest-text">Đánh bại 5 sơn tặc, tìm món đồ tốt hơn và hạ Lang Vương.</div>
+          <div class="quest-title" id="quest-title">Dấu chân trong Rừng Trúc</div>
+          <div class="quest-text" id="quest-text">Đánh bại 5 sơn tặc, tìm món đồ tốt hơn và hạ Lang Vương.</div>
           <div class="quest-progress"><span id="quest-kill-progress">0 / 5 sơn tặc</span><span id="quest-boss-progress">○ Lang Vương</span></div>
-          <div class="quest-reward"><span>Phần thưởng</span><strong>+100 XP · +300 bạc</strong></div>
+          <div class="quest-reward"><span>Phần thưởng</span><strong id="quest-reward">+100 XP · +300 bạc</strong></div>
         </section>
 
         <section class="panel controls-panel">
@@ -238,7 +258,7 @@ app.innerHTML = `
       <section class="game-column">
         <div class="canvas-frame">
           <canvas id="game-canvas" width="960" height="600" aria-label="Bản đồ game Giang Hồ Dị Truyện"></canvas>
-          <div class="canvas-badge"><span class="live-dot"></span> RỪNG TRÚC · KÊNH 01</div>
+          <div class="canvas-badge" id="canvas-badge"><span class="live-dot"></span> RỪNG TRÚC · KÊNH 01</div>
           <div class="canvas-tip" id="canvas-tip">Chọn môn phái để bắt đầu hành trình</div>
         </div>
         <div class="combat-bar">
@@ -260,6 +280,8 @@ app.innerHTML = `
           <div class="panel-tabs">
             <button class="tab-button active" data-tab="bag">TÚI ĐỒ <span id="bag-count">0/12</span></button>
             <button class="tab-button" data-tab="smith">THỢ RÈN</button>
+            <button class="tab-button" data-tab="skills">VÕ CÔNG</button>
+            <button class="tab-button" data-tab="dungeon">PHỤ BẢN</button>
           </div>
           <div id="inventory-content"></div>
         </section>
@@ -301,6 +323,7 @@ const logList = document.querySelector<HTMLDivElement>("#log-list")!;
 const toast = document.querySelector<HTMLDivElement>("#toast")!;
 const skillBar = document.querySelector<HTMLDivElement>("#skill-bar")!;
 const canvasTip = document.querySelector<HTMLDivElement>("#canvas-tip")!;
+const canvasBadge = document.querySelector<HTMLDivElement>("#canvas-badge")!;
 const combatStatusText = document.querySelector<HTMLSpanElement>("#combat-status-text")!;
 const keys = new Set<string>();
 let game: GameState | null = null;
@@ -321,6 +344,12 @@ const obstacles = [
   { x: 410, y: 530, w: 120, h: 110, type: "rock" },
   { x: 1030, y: 300, w: 125, h: 130, type: "rock" },
   { x: 1480, y: 420, w: 150, h: 100, type: "rock" },
+];
+
+const NPCS: Npc[] = [
+  { id: "guide", name: "Mộc sư huynh", title: "Người dẫn đường", x: 170, y: 300, color: "#72d1a0", icon: "?" },
+  { id: "smith", name: "Lão Thiết", title: "Thợ rèn", x: 170, y: 470, color: "#e9c875", icon: "⚒" },
+  { id: "dungeon", name: "Cổ Mộ Thí Luyện", title: "Cổng phụ bản · Cấp 3+", x: 1710, y: 300, color: "#a787e8", icon: "◇" },
 ];
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -464,6 +493,16 @@ function makeEnemies(): Enemy[] {
   ];
 }
 
+function makeDungeonEnemies(): Enemy[] {
+  return [
+    createEnemy("tomb-guard-1", "Cổ Mộ U Binh", "normal", 560, 690, 4, "#697fa9"),
+    createEnemy("tomb-guard-2", "Cổ Mộ U Binh", "normal", 760, 600, 4, "#697fa9"),
+    createEnemy("tomb-guard-3", "Độc Thi Trùng", "normal", 930, 780, 5, "#6f9b70"),
+    createEnemy("tomb-elite", "Mộ Tướng Trấn Quan", "elite", 1120, 610, 6, "#c78853"),
+    createEnemy("tomb-boss", "Cổ Mộ Thủ Vệ", "boss", 1430, 730, 8, "#5f7fd2"),
+  ];
+}
+
 function createGame(sectId: SectId): GameState {
   const sect = SECTS[sectId];
   const player: Player = {
@@ -484,6 +523,8 @@ function createGame(sectId: SectId): GameState {
     shieldUntil: 0,
     attackCooldown: 0,
     cooldowns: { skill1: 0, skill2: 0, ultimate: 0 },
+    skillPoints: 0,
+    skillRanks: { skill1: 1, skill2: 0, ultimate: 0 },
     inventory: [],
     equipment: {
       weapon: createStarterItem("weapon", sectId),
@@ -493,12 +534,15 @@ function createGame(sectId: SectId): GameState {
     refiningStones: 3,
     questKills: 0,
     bossDefeated: false,
+    questRewardClaimed: false,
+    dungeonTokens: 0,
     facingX: 1,
     facingY: 0,
   };
   const state: GameState = {
     player,
     enemies: makeEnemies(),
+    worldEnemies: [],
     loot: [],
     telegraphs: [],
     logs: [],
@@ -508,7 +552,12 @@ function createGame(sectId: SectId): GameState {
     cameraY: 0,
     screenFlash: 0,
     lastBossDefeatedAt: 0,
+    mapMode: "world",
+    dungeonTimeLeft: 0,
+    dungeonCleared: false,
+    dungeonRewardClaimed: false,
   };
+  state.worldEnemies = state.enemies;
   game = state;
   syncStats(true);
   addLog(`Bạn đã gia nhập ${sect.name}. Con đường võ lâm bắt đầu từ Rừng Trúc.`);
@@ -550,6 +599,111 @@ function effectiveDefense(): number {
   return game ? game.player.defense + equipmentDefense() : 0;
 }
 
+function skillScale(skill: SkillKey, base: number): number {
+  if (!game) return base;
+  const rank = game.player.skillRanks[skill] ?? 0;
+  return base + Math.max(0, rank - 1) * 0.14;
+}
+
+function upgradeSkill(skill: SkillKey): void {
+  if (!game) return;
+  const player = game.player;
+  const unlockLevel: Record<SkillKey, number> = { skill1: 1, skill2: 3, ultimate: 5 };
+  const maxRank = 5;
+  if (player.level < unlockLevel[skill]) {
+    addLog(`Võ công này mở ở cấp ${unlockLevel[skill]}.`);
+    return;
+  }
+  if (player.skillRanks[skill] >= maxRank) {
+    addLog("Võ công đã đạt bậc tối đa trong prototype.");
+    return;
+  }
+  if (player.skillPoints < 1) {
+    addLog("Chưa có điểm võ học. Lên cấp để nhận thêm điểm.");
+    return;
+  }
+  player.skillPoints -= 1;
+  player.skillRanks[skill] = Math.max(0, player.skillRanks[skill]) + 1;
+  addLog(`Đã nâng ${skill === "ultimate" ? SECTS[player.sect].ultimate : SECTS[player.sect].skills[skill === "skill1" ? 0 : 1]} lên bậc ${player.skillRanks[skill]}.`);
+  refreshUi(true);
+}
+
+function checkMainQuest(): void {
+  if (!game) return;
+  const player = game.player;
+  if (player.questKills >= 5 && player.bossDefeated && !player.questRewardClaimed) {
+    player.questRewardClaimed = true;
+    player.gold += 300;
+    rewardExperience(100);
+    addLog("Nhiệm vụ Dấu chân trong Rừng Trúc hoàn tất: +100 XP · +300 bạc.");
+  }
+}
+
+function enterDungeon(): void {
+  if (!game) return;
+  if (game.mapMode === "dungeon") {
+    addLog("Bạn đang ở trong phụ bản.");
+    return;
+  }
+  if (game.player.level < 3) {
+    addLog("Trúc Lâm Thí Luyện mở ở cấp 3.");
+    return;
+  }
+  game.worldEnemies = game.enemies;
+  game.enemies = makeDungeonEnemies();
+  game.mapMode = "dungeon";
+  game.dungeonTimeLeft = 180;
+  game.dungeonCleared = false;
+  game.dungeonRewardClaimed = false;
+  game.targetId = null;
+  game.moveTarget = null;
+  game.loot = [];
+  game.telegraphs = [];
+  game.player.x = 300;
+  game.player.y = 690;
+  canvasBadge.innerHTML = `<span class="live-dot"></span> CỔ MỘ BÍ ẨN · INSTANCE`;
+  canvasTip.textContent = "Trúc Lâm Thí Luyện · Hạ Cổ Mộ Thủ Vệ trước khi hết giờ";
+  addLog("Đã vào Trúc Lâm Thí Luyện. Bạn có 3 phút để hạ Cổ Mộ Thủ Vệ.");
+  refreshUi(true);
+}
+
+function leaveDungeon(): void {
+  if (!game || game.mapMode !== "dungeon") return;
+  if (game.dungeonCleared && !game.dungeonRewardClaimed) {
+    addLog("Hãy nhận phần thưởng phụ bản trước khi rời đi.");
+    return;
+  }
+  const cleared = game.dungeonCleared;
+  game.enemies = game.worldEnemies;
+  game.mapMode = "world";
+  game.dungeonTimeLeft = 0;
+  game.dungeonCleared = false;
+  game.dungeonRewardClaimed = false;
+  game.targetId = null;
+  game.moveTarget = null;
+  game.telegraphs = [];
+  game.loot = [];
+  game.player.x = cleared ? 430 : PLAYER_START.x;
+  game.player.y = cleared ? 530 : PLAYER_START.y;
+  canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
+  canvasTip.textContent = "Click quái để áp sát · E để nhặt đồ quanh bạn";
+  if (!cleared) addLog("Bạn đã rời phụ bản trước khi hoàn thành.");
+  refreshUi(true);
+}
+
+function claimDungeonReward(): void {
+  if (!game || game.mapMode !== "dungeon" || !game.dungeonCleared || game.dungeonRewardClaimed) return;
+  const player = game.player;
+  player.dungeonTokens += 1;
+  player.gold += 420;
+  player.refiningStones += 3;
+  rewardExperience(320);
+  if (player.inventory.length < 12) player.inventory.push(createItem(8, "Hiếm"));
+  game.dungeonRewardClaimed = true;
+  addLog("Đã nhận thưởng phụ bản: +320 XP · +420 bạc · +1 token · +3 đá.");
+  leaveDungeon();
+}
+
 function syncStats(fullHeal = false): void {
   if (!game) return;
   const player = game.player;
@@ -568,6 +722,7 @@ function syncStats(fullHeal = false): void {
 
 function isBlocked(x: number, y: number, radius: number): boolean {
   if (x - radius < 24 || x + radius > WORLD_WIDTH - 24 || y - radius < 24 || y + radius > WORLD_HEIGHT - 24) return true;
+  if (game?.mapMode === "dungeon") return false;
   return obstacles.some((obstacle) => {
     const nearestX = clamp(x, obstacle.x, obstacle.x + obstacle.w);
     const nearestY = clamp(y, obstacle.y, obstacle.y + obstacle.h);
@@ -664,13 +819,13 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
     if (player.cooldowns.ultimate > 0) return;
     player.rage = 0;
     player.cooldowns.ultimate = 15;
-    if (player.sect === "kim") dealAreaDamage(player.x, player.y, 210, 3.1, sect.ultimate);
+    if (player.sect === "kim") dealAreaDamage(player.x, player.y, 210, skillScale("ultimate", 3.1), sect.ultimate);
     if (player.sect === "hoa") {
       const target = currentTarget() ?? nearestEnemy(440);
-      if (target) dealAreaDamage(target.x, target.y, 180, 3.35, sect.ultimate);
+      if (target) dealAreaDamage(target.x, target.y, 180, skillScale("ultimate", 3.35), sect.ultimate);
     }
     if (player.sect === "thuy") {
-      dealAreaDamage(player.x, player.y, 180, 1.55, sect.ultimate);
+      dealAreaDamage(player.x, player.y, 180, skillScale("ultimate", 1.55), sect.ultimate);
       player.hp = clamp(player.hp + Math.floor(player.maxHp * 0.38), 0, player.maxHp);
     }
     game.screenFlash = 0.35;
@@ -688,14 +843,14 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
     if (player.sect === "kim") {
       if (!target || distance(player, target) > 155) return addLog("Phá Giáp Trảm cần một mục tiêu trong tầm.");
       target.defenseDownUntil = nowMs() + 4000;
-      dealDamage(target, 1.75, sect.skills[0]);
+      dealDamage(target, skillScale("skill1", 1.75), sect.skills[0]);
     } else if (player.sect === "hoa") {
       if (!target) return addLog("Chưa có mục tiêu để phóng hỏa cầu.");
-      dealAreaDamage(target.x, target.y, 105, 1.35, sect.skills[0]);
+      dealAreaDamage(target.x, target.y, 105, skillScale("skill1", 1.35), sect.skills[0]);
     } else {
       const heal = Math.floor(player.maxHp * 0.22);
       player.hp = clamp(player.hp + heal, 0, player.maxHp);
-      if (target && distance(player, target) <= 160) dealDamage(target, 0.82, sect.skills[0]);
+      if (target && distance(player, target) <= 160) dealDamage(target, skillScale("skill1", 0.82), sect.skills[0]);
       addLog(`${sect.skills[0]} hồi ${heal} HP.`);
     }
     player.rage = clamp(player.rage + 10, 0, 100);
@@ -710,13 +865,13 @@ function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
         player.x = dashX;
         player.y = dashY;
       }
-      dealDamage(target, 1.4, sect.skills[1]);
+      dealDamage(target, skillScale("skill2", 1.4), sect.skills[1]);
     } else if (player.sect === "hoa") {
-      dealAreaDamage(player.x, player.y, 135, 1.2, sect.skills[1]);
+      dealAreaDamage(player.x, player.y, 135, skillScale("skill2", 1.2), sect.skills[1]);
     } else {
       player.shield = Math.floor(player.maxHp * 0.28);
       player.shieldUntil = nowMs() + 5000;
-      if (target && distance(player, target) <= 150) dealDamage(target, 0.95, sect.skills[1]);
+      if (target && distance(player, target) <= 150) dealDamage(target, skillScale("skill2", 0.95), sect.skills[1]);
       addLog(`${sect.skills[1]} tạo khiên ${player.shield} điểm trong 5 giây.`);
     }
     player.rage = clamp(player.rage + 14, 0, 100);
@@ -732,6 +887,7 @@ function rewardExperience(amount: number): void {
     player.xp -= xpToNext(player.level);
     player.level += 1;
     leveled = true;
+    player.skillPoints += 1;
     player.attack += 3;
     player.defense += 2;
     player.maxHp += 34;
@@ -740,8 +896,15 @@ function rewardExperience(amount: number): void {
   if (leveled) {
     syncStats(true);
     addLog(`Bạn đã đạt cấp ${player.level}. Chỉ số được tăng và hồi đầy sinh lực.`);
-    if (player.level === 3) addLog(`Đã mở ${SECTS[player.sect].skills[1]} — nhấn phím 2.`);
-    if (player.level === 5) addLog(`Đã mở tuyệt chiêu ${SECTS[player.sect].ultimate} — tích đủ 100 nộ rồi nhấn phím 3.`);
+    addLog("Nhận 1 điểm võ học. Mở tab Võ công để nâng chiêu.");
+    if (player.level >= 3 && player.skillRanks.skill2 === 0) {
+      player.skillRanks.skill2 = 1;
+      addLog(`Đã mở ${SECTS[player.sect].skills[1]} — nhấn phím 2.`);
+    }
+    if (player.level >= 5 && player.skillRanks.ultimate === 0) {
+      player.skillRanks.ultimate = 1;
+      addLog(`Đã mở tuyệt chiêu ${SECTS[player.sect].ultimate} — tích đủ 100 nộ rồi nhấn phím 3.`);
+    }
   }
 }
 
@@ -752,12 +915,22 @@ function killEnemy(enemy: Enemy): void {
   const player = game.player;
   const xp = enemy.kind === "boss" ? 520 : enemy.kind === "elite" ? 150 : 42 + enemy.level * 8;
   rewardExperience(xp);
-  if (enemy.kind !== "boss") player.questKills += 1;
+  if (enemy.kind !== "boss" && game.mapMode === "world") {
+    player.questKills += 1;
+    checkMainQuest();
+  }
   if (game.targetId === enemy.id) game.targetId = null;
   if (enemy.kind === "boss") {
-    player.bossDefeated = true;
-    game.lastBossDefeatedAt = nowMs();
-    addLog("Lang Vương đã gục ngã! Bạn nhận được phần thưởng Cực phẩm.");
+    if (game.mapMode === "dungeon") {
+      game.dungeonCleared = true;
+      game.dungeonTimeLeft = 0;
+      addLog("Cổ Mộ Thủ Vệ đã gục ngã! Hãy mở tab Phụ bản để nhận thưởng.");
+    } else {
+      player.bossDefeated = true;
+      game.lastBossDefeatedAt = nowMs();
+      addLog("Lang Vương đã gục ngã! Bạn nhận được phần thưởng Cực phẩm.");
+      checkMainQuest();
+    }
   } else {
     addLog(`${enemy.name} bị đánh bại. +${xp} XP.`);
   }
@@ -874,6 +1047,7 @@ function enhanceItem(index: number, equippedSlot?: ItemSlot): void {
 
 function saveGame(): void {
   if (!game) return addLog("Hãy chọn môn phái trước khi lưu.");
+  if (game.mapMode === "dungeon") return addLog("Hãy hoàn thành hoặc rời phụ bản trước khi lưu.");
   const snapshot = {
     player: game.player,
     enemies: game.enemies.map((enemy) => ({ ...enemy, dead: false, respawnAt: 0 })),
@@ -888,9 +1062,15 @@ function loadGame(): void {
   try {
     const snapshot = JSON.parse(raw) as { player: Player; enemies: Enemy[] };
     if (!snapshot.player || !SECTS[snapshot.player.sect]) throw new Error("save-invalid");
+    snapshot.player.skillPoints ??= 0;
+    snapshot.player.skillRanks ??= { skill1: 1, skill2: 0, ultimate: 0 };
+    snapshot.player.questRewardClaimed ??= false;
+    snapshot.player.dungeonTokens ??= 0;
+    const worldEnemies = makeEnemies();
     game = {
       player: snapshot.player,
-      enemies: makeEnemies(),
+      enemies: worldEnemies,
+      worldEnemies,
       loot: [],
       telegraphs: [],
       logs: [],
@@ -900,9 +1080,14 @@ function loadGame(): void {
       cameraY: 0,
       screenFlash: 0,
       lastBossDefeatedAt: 0,
+      mapMode: "world",
+      dungeonTimeLeft: 0,
+      dungeonCleared: false,
+      dungeonRewardClaimed: false,
     };
     syncStats();
     sectOverlay.classList.add("hidden");
+    canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
     addLog("Đã tải tiến trình. Hãy tiếp tục hành trình tại Rừng Trúc.");
     refreshUi(true);
   } catch {
@@ -913,6 +1098,7 @@ function loadGame(): void {
 function resetGame(): void {
   game = null;
   sectOverlay.classList.remove("hidden");
+  canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
   canvasTip.textContent = "Chọn môn phái để bắt đầu hành trình";
   refreshUi(true);
 }
@@ -920,6 +1106,30 @@ function resetGame(): void {
 function openGuildRoadmap(): void {
   addLog("Bang hội sẽ mở ở giai đoạn P7: tạo bang, gia nhập, đóng góp và boss bang.");
   showToast("Hệ thống bang hội đang nằm trong lộ trình V1.");
+}
+
+function interactNpc(npc: Npc): void {
+  if (!game || game.mapMode !== "world") return;
+  if (distance(game.player, npc) > 105) {
+    game.moveTarget = { x: npc.x, y: npc.y };
+    game.targetId = null;
+    addLog(`Đang đi tới ${npc.name}. Click lại khi đứng gần để tương tác.`);
+    return;
+  }
+  if (npc.id === "guide") {
+    addLog(game.player.questRewardClaimed ? "Mộc sư huynh: Hãy luyện thêm võ công trước khi vào Cổ Mộ." : "Mộc sư huynh: Hạ 5 sơn tặc, rồi Lang Vương sẽ lộ diện.");
+    return;
+  }
+  if (npc.id === "smith") {
+    activeTab = "smith";
+    addLog("Lão Thiết: Trang bị tốt phải được tôi luyện đúng lúc.");
+    refreshUi(true);
+    return;
+  }
+  activeTab = "dungeon";
+  if (game.player.level >= 3) addLog("Cổ Mộ Thí Luyện: Phụ bản solo giới hạn 3 phút.");
+  else addLog("Cổ Mộ Thí Luyện: Hãy đạt cấp 3 rồi quay lại.");
+  refreshUi(true);
 }
 
 function screenToWorld(event: MouseEvent): { x: number; y: number } {
@@ -937,6 +1147,11 @@ function selectAt(world: { x: number; y: number }): void {
     game.targetId = hit.id;
     game.moveTarget = null;
     addLog(`Mục tiêu: ${hit.name}.`);
+    return;
+  }
+  const npc = game.mapMode === "world" ? NPCS.find((candidate) => distance(world, candidate) <= 32) : undefined;
+  if (npc) {
+    interactNpc(npc);
   } else {
     game.targetId = null;
     game.moveTarget = { x: clamp(world.x, 40, WORLD_WIDTH - 40), y: clamp(world.y, 40, WORLD_HEIGHT - 40) };
@@ -946,6 +1161,14 @@ function selectAt(world: { x: number; y: number }): void {
 function update(dt: number, now: number): void {
   if (!game) return;
   const player = game.player;
+  if (game.mapMode === "dungeon" && !game.dungeonCleared) {
+    game.dungeonTimeLeft = Math.max(0, game.dungeonTimeLeft - dt);
+    if (game.dungeonTimeLeft <= 0) {
+      addLog("Hết giờ! Cổ Mộ Thí Luyện đã đóng lại.");
+      leaveDungeon();
+      return;
+    }
+  }
   player.attackCooldown = Math.max(0, player.attackCooldown - dt);
   player.cooldowns.skill1 = Math.max(0, player.cooldowns.skill1 - dt);
   player.cooldowns.skill2 = Math.max(0, player.cooldowns.skill2 - dt);
@@ -1059,54 +1282,74 @@ function drawWorld(now: number): void {
   const { player } = game;
   ctx.save();
   ctx.translate(-game.cameraX, -game.cameraY);
-  ctx.fillStyle = "#183936";
-  ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  ctx.fillStyle = "rgba(255,255,255,.025)";
-  for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
-  for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
-  ctx.fillStyle = "#224b40";
-  ctx.fillRect(245, 230, 230, 300);
-  ctx.fillRect(1190, 250, 180, 270);
-  ctx.fillStyle = "rgba(198, 155, 91, .21)";
-  ctx.fillRect(242, 480, 1180, 48);
-  ctx.fillRect(360, 330, 48, 560);
-  ctx.fillStyle = "rgba(111, 198, 189, .13)";
-  ctx.beginPath();
-  ctx.arc(1670, 920, 190, 0, Math.PI * 2);
-  ctx.fill();
+  if (game.mapMode === "dungeon") {
+    ctx.fillStyle = "#181b31";
+    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.fillStyle = "rgba(194, 177, 232, .045)";
+    for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
+    for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
+    ctx.fillStyle = "#272b4a";
+    ctx.fillRect(160, 500, 1450, 470);
+    ctx.strokeStyle = "rgba(190, 161, 238, .3)";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(160, 500, 1450, 470);
+    ctx.fillStyle = "#d4c7ef";
+    ctx.font = "600 14px 'DM Sans', sans-serif";
+    ctx.fillText("TRÚC LÂM THÍ LUYỆN · CỔ MỘ BÍ ẨN", 270, 550);
+    ctx.fillStyle = "rgba(218, 203, 247, .56)";
+    ctx.font = "12px 'DM Sans', sans-serif";
+    ctx.fillText("Hạ Cổ Mộ Thủ Vệ và nhận token phụ bản", 270, 575);
+  } else {
+    ctx.fillStyle = "#183936";
+    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.fillStyle = "rgba(255,255,255,.025)";
+    for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
+    for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
+    ctx.fillStyle = "#224b40";
+    ctx.fillRect(245, 230, 230, 300);
+    ctx.fillRect(1190, 250, 180, 270);
+    ctx.fillStyle = "rgba(198, 155, 91, .21)";
+    ctx.fillRect(242, 480, 1180, 48);
+    ctx.fillRect(360, 330, 48, 560);
+    ctx.fillStyle = "rgba(111, 198, 189, .13)";
+    ctx.beginPath();
+    ctx.arc(1670, 920, 190, 0, Math.PI * 2);
+    ctx.fill();
 
-  for (const obstacle of obstacles) {
-    if (obstacle.type === "rock") {
-      ctx.fillStyle = "#415e60";
-      drawRoundedRect(ctx, obstacle.x, obstacle.y, obstacle.w, obstacle.h, 18);
-      ctx.fill();
-      ctx.fillStyle = "rgba(211,238,221,.14)";
-      drawRoundedRect(ctx, obstacle.x + 12, obstacle.y + 10, obstacle.w * 0.45, 12, 6);
-      ctx.fill();
-    } else {
-      for (let x = obstacle.x + 24; x < obstacle.x + obstacle.w; x += 38) {
-        for (let y = obstacle.y + 25; y < obstacle.y + obstacle.h; y += 38) {
-          ctx.fillStyle = "#1b5a43";
-          ctx.beginPath();
-          ctx.arc(x, y, 22, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#2c7753";
-          ctx.beginPath();
-          ctx.arc(x - 6, y - 7, 12, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#6a4933";
-          ctx.fillRect(x - 3, y + 12, 6, 13);
+    for (const obstacle of obstacles) {
+      if (obstacle.type === "rock") {
+        ctx.fillStyle = "#415e60";
+        drawRoundedRect(ctx, obstacle.x, obstacle.y, obstacle.w, obstacle.h, 18);
+        ctx.fill();
+        ctx.fillStyle = "rgba(211,238,221,.14)";
+        drawRoundedRect(ctx, obstacle.x + 12, obstacle.y + 10, obstacle.w * 0.45, 12, 6);
+        ctx.fill();
+      } else {
+        for (let x = obstacle.x + 24; x < obstacle.x + obstacle.w; x += 38) {
+          for (let y = obstacle.y + 25; y < obstacle.y + obstacle.h; y += 38) {
+            ctx.fillStyle = "#1b5a43";
+            ctx.beginPath();
+            ctx.arc(x, y, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#2c7753";
+            ctx.beginPath();
+            ctx.arc(x - 6, y - 7, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#6a4933";
+            ctx.fillRect(x - 3, y + 12, 6, 13);
+          }
         }
       }
     }
-  }
 
-  ctx.fillStyle = "#cfb374";
-  ctx.font = "600 14px 'DM Sans', sans-serif";
-  ctx.fillText("THANH KHÊ TRẤN", 268, 260);
-  ctx.fillStyle = "rgba(222, 239, 220, .55)";
-  ctx.font = "12px 'DM Sans', sans-serif";
-  ctx.fillText("Cổng phía đông · Lang Vương", 1320, 1030);
+    ctx.fillStyle = "#cfb374";
+    ctx.font = "600 14px 'DM Sans', sans-serif";
+    ctx.fillText("THANH KHÊ TRẤN", 268, 260);
+    ctx.fillStyle = "rgba(222, 239, 220, .55)";
+    ctx.font = "12px 'DM Sans', sans-serif";
+    ctx.fillText("Cổng phía đông · Lang Vương", 1320, 1030);
+    for (const npc of NPCS) drawNpc(npc, now);
+  }
 
   for (const loot of game.loot) drawLoot(loot, now);
   for (const enemy of game.enemies) if (!enemy.dead) drawEnemy(enemy, now);
@@ -1132,6 +1375,41 @@ function drawWorld(now: number): void {
     ctx.fillStyle = `rgba(255, 225, 160, ${game.screenFlash * 0.5})`;
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   }
+}
+
+function drawNpc(npc: Npc, now: number): void {
+  const pulse = 1 + Math.sin(now / 240 + npc.x) * 0.04;
+  ctx.save();
+  ctx.translate(npc.x, npc.y);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = "rgba(0,0,0,.25)";
+  ctx.beginPath();
+  ctx.ellipse(0, 19, 20, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = npc.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 17, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f2d0ad";
+  ctx.beginPath();
+  ctx.arc(0, -5, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#232b3b";
+  ctx.beginPath();
+  ctx.arc(0, -8, 8, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#10212c";
+  ctx.font = "700 13px 'DM Sans', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(npc.icon, 0, 5);
+  ctx.fillStyle = "#e2eadc";
+  ctx.font = "600 11px 'DM Sans', sans-serif";
+  ctx.fillText(npc.name, 0, -29);
+  ctx.fillStyle = "rgba(210, 224, 214, .65)";
+  ctx.font = "9px 'DM Sans', sans-serif";
+  ctx.fillText(npc.title, 0, -17);
+  ctx.textAlign = "left";
+  ctx.restore();
 }
 
 function drawTelegraph(telegraph: Telegraph, now: number): void {
@@ -1291,8 +1569,12 @@ function refreshUi(force = false): void {
   setText("#mp-label", `${formatNumber(player.mp)} / ${formatNumber(player.maxMp)}`);
   setText("#gold-label", formatNumber(player.gold));
   setText("#stone-label", formatNumber(player.refiningStones));
+  setText("#token-label", formatNumber(player.dungeonTokens));
   setText("#quest-kill-progress", `${Math.min(player.questKills, 5)} / 5 sơn tặc`);
   setText("#quest-boss-progress", `${player.bossDefeated ? "✓" : "○"} Lang Vương`);
+  setText("#quest-title", player.questRewardClaimed ? "Dấu chân hoàn tất" : "Dấu chân trong Rừng Trúc");
+  setText("#quest-text", player.questRewardClaimed ? "Mộc sư huynh đã ghi nhận chiến công của bạn. Cổ Mộ Thí Luyện đã mở." : "Đánh bại 5 sơn tặc, tìm món đồ tốt hơn và hạ Lang Vương.");
+  setText("#quest-reward", player.questRewardClaimed ? "Đã nhận thưởng" : "+100 XP · +300 bạc");
   setText("#bag-count", `${player.inventory.length}/12`);
   const avatar = document.querySelector<HTMLElement>("#avatar-orb");
   if (avatar) {
@@ -1378,6 +1660,39 @@ function renderInventory(): void {
     `;
     return;
   }
+  if (activeTab === "skills") {
+    const sect = SECTS[player.sect];
+    const skillRows: Array<{ key: SkillKey; name: string; description: string; unlock: number; icon: string }> = [
+      { key: "skill1", name: sect.skills[0], description: "Chiêu chủ lực, tăng sát thương theo bậc.", unlock: 1, icon: "✧" },
+      { key: "skill2", name: sect.skills[1], description: "Kỹ năng mở rộng cho nhịp chiến đấu của môn phái.", unlock: 3, icon: "➶" },
+      { key: "ultimate", name: sect.ultimate, description: "Tuyệt chiêu dùng nộ, tạo khác biệt ở boss.", unlock: 5, icon: "✦" },
+    ];
+    inventoryContent.innerHTML = `
+      <div class="skill-points-card"><span class="skill-points-icon">✦</span><div><strong>${player.skillPoints} điểm võ học</strong><p>Mỗi lần lên cấp nhận 1 điểm. Tối đa bậc 5.</p></div></div>
+      <div class="skill-list">${skillRows.map((skill) => {
+        const rank = player.skillRanks[skill.key] ?? 0;
+        const unlocked = player.level >= skill.unlock;
+        return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skill.icon}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${skill.description}</span><small>${unlocked ? `Bậc ${rank}/5 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 5 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 5 ? "TỐI ĐA" : "NÂNG +1"}</button></div>`;
+      }).join("")}</div>
+    `;
+    return;
+  }
+  if (activeTab === "dungeon") {
+    if (game.mapMode === "dungeon") {
+      const minutes = Math.floor(game.dungeonTimeLeft / 60).toString().padStart(2, "0");
+      const seconds = Math.floor(game.dungeonTimeLeft % 60).toString().padStart(2, "0");
+      inventoryContent.innerHTML = game.dungeonCleared ? `
+        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>Phụ bản hoàn thành</strong><p>Cổ Mộ Thủ Vệ đã bị đánh bại. Nhận thưởng để quay về Rừng Trúc.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
+      ` : `
+        <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>Trúc Lâm Thí Luyện</strong><p>Hạ Cổ Mộ Thủ Vệ trước khi đồng hồ về 0.</p><div class="dungeon-timer">${minutes}:${seconds}</div><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
+      `;
+    } else {
+      inventoryContent.innerHTML = `
+        <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>Trúc Lâm Thí Luyện</strong><p>Phụ bản solo cấp 3+. Dọn 3 U Binh, vượt Mộ Tướng và hạ Cổ Mộ Thủ Vệ trong 3 phút.</p><div class="dungeon-reward-line"><span>Thưởng</span><b>+320 XP · +420 bạc · +1 token</b></div><button class="outline-button dungeon-btn" data-dungeon-action="enter" ${player.level < 3 ? "disabled" : ""}>${player.level < 3 ? "Cần cấp 3" : "Vào phụ bản"}</button></div>
+      `;
+    }
+    return;
+  }
   const equipped = (["weapon", "armor"] as ItemSlot[]).map((slot) => {
     const item = player.equipment[slot];
     if (!item) return `<div class="equipped-empty">${slot === "weapon" ? "Vũ khí" : "Áo giáp"}: trống</div>`;
@@ -1426,6 +1741,11 @@ document.addEventListener("keydown", (event) => {
     document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     refreshUi(true);
   }
+  if (key === "k") {
+    activeTab = "skills";
+    document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    refreshUi(true);
+  }
   if (key === "j") {
     document.querySelector(".log-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     showToast("Nhật ký nhiệm vụ đang hiển thị bên dưới bản đồ.");
@@ -1448,8 +1768,23 @@ inventoryContent.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   const equipButton = target.closest<HTMLButtonElement>(".equip-btn");
   const enhanceButton = target.closest<HTMLButtonElement>(".enhance-btn");
+  const skillButton = target.closest<HTMLButtonElement>(".skill-upgrade");
+  const dungeonButton = target.closest<HTMLButtonElement>(".dungeon-btn");
   if (equipButton) equipItem(Number(equipButton.dataset.index));
   if (enhanceButton) enhanceItem(Number(enhanceButton.dataset.index), enhanceButton.dataset.equipped as ItemSlot | undefined);
+  if (skillButton) upgradeSkill(skillButton.dataset.skillRank as SkillKey);
+  if (dungeonButton) {
+    const action = dungeonButton.dataset.dungeonAction;
+    if (action === "enter") enterDungeon();
+    if (action === "leave") leaveDungeon();
+    if (action === "claim") claimDungeonReward();
+  }
+});
+
+skillBar.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>(".skill-button");
+  const skill = button?.dataset.skill as SkillKey | undefined;
+  if (skill) castSkill(skill);
 });
 
 document.querySelectorAll<HTMLButtonElement>(".tab-button").forEach((button) => {

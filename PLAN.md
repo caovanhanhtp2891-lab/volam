@@ -1,7 +1,7 @@
 # PLAN — Game web kiếm hiệp 2D
 
 > Tài liệu thiết kế và kế hoạch phát triển cho repository `volam`.
-> Ngày lập: 01/10/2026. Trạng thái: kế hoạch ban đầu, chưa triển khai game.
+> Ngày lập: 01/10/2026. Trạng thái: đang triển khai prototype P2/P5 local; server online, tổ đội và bang hội vẫn nằm ở các milestone sau.
 > Tên làm việc: **Giang Hồ Dị Truyện**; có thể đổi trước khi phát hành.
 
 Tài liệu này là bản thiết kế để bắt đầu lập trình. Các hệ thống gameplay và tiêu chí nghiệm thu là mục tiêu triển khai; số liệu cân bằng, thời gian và hiệu năng sẽ được cập nhật sau khi có bản chơi thử.
