@@ -330,7 +330,7 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .canvas-frame { height: 100%; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: #102c2d; }
   #game-canvas { width: 100%; height: 100%; aspect-ratio: auto; cursor: default; }
   .canvas-badge { top: 48px; left: 10px; max-width: 42%; padding: 5px 7px; font-size: 8px; }
-  .mobile-map-card { position: absolute; z-index: 5; top: 47px; right: 9px; display: block; width: 124px; padding: 5px; border: 2px solid rgba(233,200,117,.6); border-radius: 9px; color: #fff0c3; background: rgba(24,27,23,.74); box-shadow: 0 8px 22px rgba(0,0,0,.25); backdrop-filter: blur(5px); }
+  .mobile-map-card { position: absolute; z-index: 5; top: 47px; right: 7px; display: block; width: 108px; padding: 4px; border: 1px solid rgba(233,200,117,.6); border-radius: 8px; color: #fff0c3; background: rgba(24,27,23,.74); box-shadow: 0 6px 15px rgba(0,0,0,.25); backdrop-filter: blur(5px); }
   .mobile-resource-strip { position: absolute; z-index: 7; top: 9px; left: 50%; display: flex; gap: 5px; padding: 4px 6px; border: 1px solid rgba(233,200,117,.28); border-radius: 15px; background: rgba(8,20,28,.72); box-shadow: 0 5px 15px rgba(0,0,0,.22); transform: translateX(-50%); }
   .mobile-currency { white-space: nowrap; font: 700 10px Georgia, serif; }
   .mobile-currency-gold { color: #f6d37d; }
@@ -338,7 +338,7 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .mobile-currency b { color: #f4f0da; font-size: 9px; }
   .mobile-map-title { display: flex; align-items: center; justify-content: space-between; font: 700 8px Georgia, serif; letter-spacing: .04em; }
   .mobile-map-title span { color: #ffd878; font-size: 15px; }
-  .mobile-map-art { position: relative; height: 72px; margin-top: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; background: linear-gradient(145deg, #6a9d68 0 34%, #d1b676 35% 57%, #508d71 58% 100%); }
+  .mobile-map-art { position: relative; height: 58px; margin-top: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 5px; background: linear-gradient(145deg, #6a9d68 0 34%, #d1b676 35% 57%, #508d71 58% 100%); }
   .mobile-map-art::before { position: absolute; width: 140px; height: 17px; top: 29px; left: -8px; background: rgba(243,213,140,.78); content: ""; transform: rotate(-23deg); }
   .mobile-map-art::after { position: absolute; width: 70px; height: 20px; right: -13px; bottom: -5px; border-radius: 50%; background: rgba(74,130,169,.72); content: ""; }
   .mobile-map-art i, .mobile-map-art b, .mobile-map-art em, .mobile-map-art strong { position: absolute; z-index: 1; display: block; border-radius: 50%; }
@@ -346,52 +346,58 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .mobile-map-art b { width: 8px; height: 8px; top: 35px; left: 61px; background: #65bcfa; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
   .mobile-map-art em { width: 13px; height: 5px; right: 14px; top: 8px; border-radius: 4px; background: #3e624a; transform: rotate(-28deg); }
   .mobile-map-art strong { width: 12px; height: 5px; left: 8px; bottom: 8px; border-radius: 4px; background: #3e624a; transform: rotate(24deg); }
-  .mobile-map-channel { margin: 3px -1px -1px; padding: 4px 6px 2px; border-radius: 5px; color: #fff0c3; background: rgba(8,18,20,.76); font: 700 9px Georgia, serif; text-align: center; }
-  .mobile-action-rail { position: absolute; z-index: 5; top: 205px; right: 5px; display: grid; gap: 8px; }
-  .mobile-action { width: 62px; height: 62px; display: grid; place-items: center; border: 2px solid rgba(233,200,117,.58); border-radius: 50%; color: #f8e8bb; background: radial-gradient(circle at 32% 24%, #735a38, #171c20 68%); box-shadow: 0 8px 17px rgba(0,0,0,.34); cursor: pointer; }
-  .mobile-action span { color: #e9c875; font-size: 23px; line-height: 20px; }
-  .mobile-action small { max-width: 55px; overflow: hidden; font: 700 8px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
-  .mobile-chat { position: absolute; z-index: 5; right: auto; bottom: 204px; left: 8px; display: block; width: min(218px, calc(100% - 90px)); max-height: 54px; overflow: hidden; padding: 6px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; color: #d9e6d8; background: rgba(6,18,26,.62); box-shadow: 0 6px 18px rgba(0,0,0,.22); font-size: 8px; line-height: 1.4; pointer-events: none; }
+  .mobile-map-channel { margin: 3px -1px -1px; padding: 3px 4px 2px; border-radius: 5px; color: #fff0c3; background: rgba(8,18,20,.76); font: 700 8px Georgia, serif; text-align: center; }
+  .mobile-action-rail { position: absolute; z-index: 5; top: 175px; right: 4px; display: grid; gap: 5px; }
+  .mobile-action { width: 51px; height: 51px; display: grid; place-items: center; border: 1px solid rgba(233,200,117,.58); border-radius: 50%; color: #f8e8bb; background: radial-gradient(circle at 32% 24%, #735a38, #171c20 68%); box-shadow: 0 5px 11px rgba(0,0,0,.34); cursor: pointer; }
+  .mobile-action span { color: #e9c875; font-size: 19px; line-height: 17px; }
+  .mobile-action small { max-width: 47px; overflow: hidden; font: 700 7px Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-chat { position: absolute; z-index: 5; right: auto; bottom: 172px; left: 8px; display: block; width: min(190px, calc(100% - 82px)); max-height: 42px; overflow: hidden; padding: 5px 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; color: #d9e6d8; background: rgba(6,18,26,.62); box-shadow: 0 5px 13px rgba(0,0,0,.22); font-size: 7px; line-height: 1.35; pointer-events: none; }
   .mobile-chat div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-chat-system { color: #75e39d; font-weight: 700; }
-  .mobile-hud { display: flex; bottom: 75px; padding: 13px 10px; }
-  .joystick { width: 124px; height: 124px; }
-  .joystick-ring { width: 98px; height: 98px; }
-  .mobile-pickup { margin-right: 74px; }
-  .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: 72px; left: 8px; display: flex; flex-direction: row; align-items: flex-end; padding: 0; border: 0; background: transparent; pointer-events: none; }
-  .combat-status { position: absolute; right: 0; bottom: 119px; max-width: 48%; padding: 5px 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; color: #e5eee6; background: rgba(5,18,25,.65); pointer-events: none; }
-  .skill-bar { width: 100%; justify-content: flex-end; gap: 7px; pointer-events: auto; }
-  .skill-button { width: 61px; min-height: 61px; display: grid; grid-template-columns: 1fr; grid-template-rows: 39px 12px 10px; justify-items: center; padding: 4px 2px; border: 2px solid rgba(233,200,117,.52); border-radius: 50%; background: radial-gradient(circle at 30% 20%, rgba(75,143,223,.72), rgba(7,21,48,.95) 68%); box-shadow: 0 6px 15px rgba(0,0,0,.35); text-align: center; }
-  .skill-button:last-child { width: 70px; height: 70px; margin-top: -9px; border-color: rgba(255,210,101,.88); background: radial-gradient(circle at 35% 22%, #fff0a5, #d37d32 23%, #173b67 63%, #081426 75%); }
-  .skill-number { top: 4px; left: 9px; color: #fff2c5; font-size: 9px; }
-  .skill-glyph { grid-row: 1; width: 34px; height: 34px; margin: 0; border-radius: 50%; border-color: rgba(255,255,255,.38); }
-  .skill-name { width: 100%; color: #fff4d0; font-size: 7px; }
-  .skill-cooldown { width: 100%; color: #bbd5dc; font-size: 7px; }
+  .mobile-hud { display: flex; bottom: 59px; padding: 7px 8px; }
+  .joystick { width: 94px; height: 94px; }
+  .joystick-ring { width: 72px; height: 72px; }
+  .joystick-knob { width: 31px; height: 31px; }
+  .mobile-pickup { width: 46px; height: 46px; margin-right: 47px; }
+  .mobile-pickup span { font-size: 16px; line-height: 15px; }
+  .mobile-pickup small { font-size: 7px; }
+  .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: 57px; left: 8px; display: flex; flex-direction: row; align-items: flex-end; padding: 0; border: 0; background: transparent; pointer-events: none; }
+  .combat-status { position: absolute; right: 0; bottom: 100px; max-width: 48%; padding: 4px 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; color: #e5eee6; background: rgba(5,18,25,.65); font-size: 8px; pointer-events: none; }
+  .skill-bar { width: 100%; justify-content: flex-end; gap: 4px; pointer-events: auto; }
+  .skill-button { width: 49px; min-height: 49px; display: grid; grid-template-columns: 1fr; grid-template-rows: 31px 9px 8px; justify-items: center; padding: 2px 1px; border: 1px solid rgba(233,200,117,.52); border-radius: 50%; background: radial-gradient(circle at 30% 20%, rgba(75,143,223,.72), rgba(7,21,48,.95) 68%); box-shadow: 0 4px 10px rgba(0,0,0,.35); text-align: center; }
+  .skill-button:last-child { width: 56px; height: 56px; min-height: 56px; margin-top: -5px; border-color: rgba(255,210,101,.88); background: radial-gradient(circle at 35% 22%, #fff0a5, #d37d32 23%, #173b67 63%, #081426 75%); }
+  .skill-number { top: 3px; left: 7px; color: #fff2c5; font-size: 7px; }
+  .skill-glyph { grid-row: 1; width: 26px; height: 26px; margin: 0; border-radius: 50%; border-color: rgba(255,255,255,.38); }
+  .skill-name { width: 100%; color: #fff4d0; font-size: 6px; }
+  .skill-cooldown { width: 100%; color: #bbd5dc; font-size: 6px; }
   .log-panel { display: none; }
-  .mobile-bottom-nav { position: absolute; z-index: 7; right: 8px; bottom: max(3px, env(safe-area-inset-bottom)); left: 8px; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 58px; margin: 0; padding: 5px 3px; }
+  .mobile-bottom-nav { position: absolute; z-index: 7; right: 8px; bottom: max(3px, env(safe-area-inset-bottom)); left: 8px; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 47px; margin: 0; padding: 3px 2px; }
+  .mobile-nav-button span { font-size: 16px; line-height: 16px; }
+  .mobile-nav-button small { font-size: 7px; }
   .mobile-sheet-handle { display: flex; height: 24px; align-items: center; justify-content: center; border-bottom: 1px solid var(--line); }
   .mobile-sheet-handle > span { width: 38px; height: 4px; border-radius: 8px; background: rgba(211,229,219,.34); }
   .mobile-sheet-close { position: absolute; top: 1px; right: 8px; width: 34px; height: 30px; color: #d6e6dc; }
   .mobile-sheet-backdrop.show { position: fixed; z-index: 24; inset: 0; display: block; background: rgba(2,8,14,.62); backdrop-filter: blur(3px); }
   .left-rail, .right-rail { display: contents; }
-  .character-panel { position: absolute; z-index: 5; top: 47px; left: 9px; width: 190px; padding: 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; background: rgba(7,20,28,.68); box-shadow: 0 8px 21px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
+  .character-panel { position: absolute; z-index: 5; top: 47px; left: 9px; width: 174px; padding: 5px; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(7,20,28,.68); box-shadow: 0 6px 15px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
   .character-panel .section-kicker, .character-panel .stat-grid, .character-panel .currency-row { display: none; }
-  .character-heading { gap: 7px; margin: 0 0 5px; }
-  .avatar-orb { width: 38px; height: 38px; flex: 0 0 auto; }
-  .character-name { font-size: 11px; }
-  .character-sect { max-width: 135px; font-size: 8px; }
-  .level-row { margin-bottom: 3px; font-size: 9px; }
-  .level-row span:last-child { font-size: 8px; }
+  .character-heading { gap: 5px; margin: 0 0 3px; }
+  .avatar-orb { width: 32px; height: 32px; flex: 0 0 auto; }
+  .character-name { font-size: 10px; }
+  .character-sect { max-width: 125px; font-size: 7px; }
+  .level-row { margin-bottom: 2px; font-size: 8px; }
+  .level-row span:last-child { font-size: 7px; }
   .resource-row { display: none; }
-  .character-panel .meter { height: 5px; margin-top: 3px; }
+  .character-panel .meter { height: 4px; margin-top: 2px; }
   .character-panel .xp-meter { display: block; }
-  .quest-panel { position: absolute; z-index: 5; top: 143px; left: 9px; width: 195px; padding: 8px; border: 1px solid rgba(233,200,117,.3); border-radius: 9px; background: rgba(12,23,27,.7); box-shadow: 0 8px 21px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
-  .quest-panel .section-kicker { font-size: 8px; }
-  .quest-title { margin: 5px 0 3px; font-size: 10px; }
-  .quest-text { max-height: 27px; overflow: hidden; font-size: 8px; line-height: 1.35; }
-  .quest-progress { margin-top: 5px; font-size: 8px; }
+  .quest-panel { position: absolute; z-index: 5; top: 124px; left: 9px; width: 176px; padding: 6px; border: 1px solid rgba(233,200,117,.3); border-radius: 8px; background: rgba(12,23,27,.7); box-shadow: 0 6px 15px rgba(0,0,0,.2); backdrop-filter: blur(5px); pointer-events: none; }
+  .quest-panel .section-kicker { font-size: 7px; }
+  .quest-title { margin: 4px 0 2px; font-size: 9px; }
+  .quest-text { max-height: 24px; overflow: hidden; font-size: 7px; line-height: 1.3; }
+  .quest-progress { margin-top: 4px; font-size: 7px; }
   .quest-reward { display: none; }
-  .target-panel { position: absolute; z-index: 5; top: 205px; right: 5px; width: 135px; min-height: 0; padding: 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(7,18,25,.58); pointer-events: none; }
+  .target-panel { position: absolute; z-index: 5; top: 175px; right: 4px; width: 116px; min-height: 0; padding: 5px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(7,18,25,.58); pointer-events: none; }
+  .target-panel:not(.has-target) { display: none; }
   .target-panel .section-kicker { font-size: 7px; }
   .target-heading { gap: 5px; margin: 4px 0; }
   .target-orb { width: 21px; height: 21px; }
@@ -406,12 +412,12 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 }
 
 @media (max-width: 360px) and (orientation: portrait) {
-  .character-panel { width: 174px; }
-  .character-sect { max-width: 120px; }
-  .mobile-map-card { width: 111px; }
-  .mobile-action { width: 56px; height: 56px; }
-  .mobile-action-rail { top: 205px; }
+  .character-panel { width: 166px; }
+  .character-sect { max-width: 112px; }
+  .mobile-map-card { width: 104px; }
+  .mobile-action { width: 49px; height: 49px; }
+  .mobile-action-rail { top: 175px; }
   .skill-bar { gap: 4px; }
-  .skill-button { width: 56px; height: 56px; min-height: 56px; }
-  .skill-button:last-child { width: 64px; height: 64px; }
+  .skill-button { width: 45px; height: 45px; min-height: 45px; }
+  .skill-button:last-child { width: 52px; height: 52px; min-height: 52px; }
 }

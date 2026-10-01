@@ -390,6 +390,7 @@ const sectOverlay = document.querySelector<HTMLDivElement>("#sect-overlay")!;
 const sectCards = document.querySelector<HTMLDivElement>("#sect-cards")!;
 const inventoryContent = document.querySelector<HTMLDivElement>("#inventory-content")!;
 const targetContent = document.querySelector<HTMLDivElement>("#target-content")!;
+const targetPanel = document.querySelector<HTMLElement>(".target-panel")!;
 const logList = document.querySelector<HTMLDivElement>("#log-list")!;
 const toast = document.querySelector<HTMLDivElement>("#toast")!;
 const skillBar = document.querySelector<HTMLDivElement>("#skill-bar")!;
@@ -1988,6 +1989,7 @@ function refreshUi(force = false): void {
     document.querySelector("#character-sect")!.textContent = "Chưa gia nhập môn phái";
     mobileChat.innerHTML = `<span class="mobile-chat-system">[Hệ thống]</span> Chọn môn phái để bắt đầu hành trình.`;
     mobileAuto.classList.remove("active");
+    targetPanel.classList.remove("has-target");
     return;
   }
   if (!force && performance.now() - lastUiUpdate < 120) return;
@@ -1995,6 +1997,7 @@ function refreshUi(force = false): void {
   const player = game.player;
   const sect = SECTS[player.sect];
   const target = currentTarget();
+  targetPanel.classList.toggle("has-target", Boolean(target));
   const setText = (selector: string, value: string) => {
     const element = document.querySelector(selector);
     if (element) element.textContent = value;
