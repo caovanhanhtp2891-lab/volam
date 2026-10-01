@@ -315,7 +315,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
-  .app-shell { min-height: 100dvh; padding: 0 0 max(8px, env(safe-area-inset-bottom)); }
+  html, body, #app { height: 100%; min-height: 0; overflow: hidden; }
+  .app-shell { height: 100dvh; min-height: 0; overflow: hidden; padding: 0 0 max(8px, env(safe-area-inset-bottom)); }
   .topbar { position: absolute; z-index: 8; top: max(5px, env(safe-area-inset-top)); right: 8px; left: 8px; width: auto; margin: 0; pointer-events: none; }
   .brand-lockup, .top-actions { pointer-events: auto; }
   .brand-lockup { padding: 4px 7px 4px 4px; border: 1px solid rgba(255,255,255,.11); border-radius: 24px; background: rgba(7,19,29,.64); backdrop-filter: blur(8px); }
@@ -324,10 +325,10 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .top-actions { margin-left: auto; }
   .top-actions .ghost-button { border-color: rgba(233,200,117,.35); border-radius: 18px; color: #ffe4a1; background: rgba(11,24,33,.7); }
   .top-actions .ghost-button:not(#online-btn) { display: none; }
-  .game-layout { position: relative; display: block; width: 100%; margin: 0; }
-  .game-column { position: relative; z-index: 1; display: block; width: 100%; }
-  .canvas-frame { min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; background: #102c2d; }
-  #game-canvas { width: 100%; height: auto; aspect-ratio: 9 / 16; cursor: default; }
+  .game-layout { position: relative; display: block; width: 100%; height: 100%; min-height: 0; margin: 0; overflow: hidden; }
+  .game-column { position: relative; z-index: 1; display: block; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+  .canvas-frame { height: 100%; min-height: 0; border: 0; border-radius: 0; box-shadow: none; background: #102c2d; }
+  #game-canvas { width: 100%; height: 100%; aspect-ratio: auto; cursor: default; }
   .canvas-badge { top: 48px; left: 10px; max-width: 42%; padding: 5px 7px; font-size: 8px; }
   .mobile-map-card { position: absolute; z-index: 5; top: 47px; right: 9px; display: block; width: 124px; padding: 5px; border: 2px solid rgba(233,200,117,.6); border-radius: 9px; color: #fff0c3; background: rgba(24,27,23,.74); box-shadow: 0 8px 22px rgba(0,0,0,.25); backdrop-filter: blur(5px); }
   .mobile-resource-strip { position: absolute; z-index: 7; top: 9px; left: 50%; display: flex; gap: 5px; padding: 4px 6px; border: 1px solid rgba(233,200,117,.28); border-radius: 15px; background: rgba(8,20,28,.72); box-shadow: 0 5px 15px rgba(0,0,0,.22); transform: translateX(-50%); }
@@ -353,11 +354,11 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .mobile-chat { position: absolute; z-index: 5; right: auto; bottom: 204px; left: 8px; display: block; width: min(218px, calc(100% - 90px)); max-height: 54px; overflow: hidden; padding: 6px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; color: #d9e6d8; background: rgba(6,18,26,.62); box-shadow: 0 6px 18px rgba(0,0,0,.22); font-size: 8px; line-height: 1.4; pointer-events: none; }
   .mobile-chat div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-chat-system { color: #75e39d; font-weight: 700; }
-  .mobile-hud { display: flex; bottom: 86px; padding: 13px 10px; }
+  .mobile-hud { display: flex; bottom: 75px; padding: 13px 10px; }
   .joystick { width: 124px; height: 124px; }
   .joystick-ring { width: 98px; height: 98px; }
   .mobile-pickup { margin-right: 74px; }
-  .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: 8px; left: 8px; display: flex; flex-direction: row; align-items: flex-end; padding: 0; border: 0; background: transparent; pointer-events: none; }
+  .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: 72px; left: 8px; display: flex; flex-direction: row; align-items: flex-end; padding: 0; border: 0; background: transparent; pointer-events: none; }
   .combat-status { position: absolute; right: 0; bottom: 119px; max-width: 48%; padding: 5px 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; color: #e5eee6; background: rgba(5,18,25,.65); pointer-events: none; }
   .skill-bar { width: 100%; justify-content: flex-end; gap: 7px; pointer-events: auto; }
   .skill-button { width: 61px; min-height: 61px; display: grid; grid-template-columns: 1fr; grid-template-rows: 39px 12px 10px; justify-items: center; padding: 4px 2px; border: 2px solid rgba(233,200,117,.52); border-radius: 50%; background: radial-gradient(circle at 30% 20%, rgba(75,143,223,.72), rgba(7,21,48,.95) 68%); box-shadow: 0 6px 15px rgba(0,0,0,.35); text-align: center; }
@@ -367,7 +368,7 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .skill-name { width: 100%; color: #fff4d0; font-size: 7px; }
   .skill-cooldown { width: 100%; color: #bbd5dc; font-size: 7px; }
   .log-panel { display: none; }
-  .mobile-bottom-nav { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 58px; margin: 8px; padding: 5px 3px; }
+  .mobile-bottom-nav { position: absolute; z-index: 7; right: 8px; bottom: max(3px, env(safe-area-inset-bottom)); left: 8px; display: grid; grid-template-columns: repeat(5, 1fr); min-height: 58px; margin: 0; padding: 5px 3px; }
   .mobile-sheet-handle { display: flex; height: 24px; align-items: center; justify-content: center; border-bottom: 1px solid var(--line); }
   .mobile-sheet-handle > span { width: 38px; height: 4px; border-radius: 8px; background: rgba(211,229,219,.34); }
   .mobile-sheet-close { position: absolute; top: 1px; right: 8px; width: 34px; height: 30px; color: #d6e6dc; }
@@ -397,8 +398,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .target-heading strong { font-size: 8px; }
   .target-heading span, .target-meta, .target-hp-row { font-size: 7px; }
   .target-empty { min-height: 24px; padding: 2px; font-size: 8px; }
-  .inventory-panel { width: 100%; margin-top: 8px; }
-  .inventory-panel.mobile-sheet-open { position: fixed; z-index: 25; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); left: 8px; width: auto; max-height: min(72dvh, 610px); margin: 0; overflow: auto; border-color: rgba(233,200,117,.34); box-shadow: 0 22px 70px rgba(0,0,0,.58); }
+  .inventory-panel { display: none; width: 100%; margin-top: 8px; }
+  .inventory-panel.mobile-sheet-open { position: fixed; z-index: 25; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); left: 8px; display: block; width: auto; max-height: min(72dvh, 610px); margin: 0; overflow: auto; border-color: rgba(233,200,117,.34); box-shadow: 0 22px 70px rgba(0,0,0,.58); }
   .inventory-panel.mobile-sheet-open .panel-tabs { position: sticky; z-index: 2; top: 0; background: rgba(11,28,39,.98); }
   .guild-teaser, .controls-panel { display: none; }
   .sect-overlay { padding: 12px; }
