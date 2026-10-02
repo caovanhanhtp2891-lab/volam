@@ -2,11 +2,12 @@ import "./style.css";
 import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
 import { drawSprite, spriteMarkup, type SpriteId } from "./art";
 import { createMapArt } from "./map-art";
+import { BAG_CAPACITY, DUNGEONS, POTIONS, MAX_POTIONS, buyPotion, usePotion, normalizeSupplies, itemSalePrice, storeRewardItems, recoverPendingItems, canEnterDungeon, type PotionKind, type DungeonId } from "./progression";
 
 type SectId = "kim" | "hoa" | "thuy";
 type ItemSlot = "weapon" | "armor";
 type Rarity = "Thường" | "Tốt" | "Hiếm" | "Cực phẩm";
-type PanelTab = "bag" | "smith" | "skills" | "dungeon";
+type PanelTab = "bag" | "smith" | "skills" | "dungeon" | "shop";
 type SkillKey = "skill1" | "skill2" | "ultimate";
 
 interface Sect {
@@ -66,12 +67,16 @@ interface Player {
   bossDefeated: boolean;
   questRewardClaimed: boolean;
   dungeonTokens: number;
+  dungeonClears: Record<DungeonId, number>;
+  potions: Record<PotionKind, number>;
+  potionCooldown: number;
+  pendingItems: Item[];
   facingX: number;
   facingY: number;
 }
 
 interface Npc {
-  id: "guide" | "smith" | "dungeon";
+  id: "guide" | "smith" | "dungeon" | "merchant";
   name: string;
   title: string;
   x: number;
@@ -146,6 +151,7 @@ interface GameState {
   player: Player;
   enemies: Enemy[];
   worldEnemies: Enemy[];
+  worldLoot: GroundLoot[];
   loot: GroundLoot[];
   telegraphs: Telegraph[];
   effects: SkillEffect[];
@@ -161,6 +167,8 @@ interface GameState {
   dungeonTimeLeft: number;
   dungeonCleared: boolean;
   dungeonRewardClaimed: boolean;
+  dungeonId: DungeonId | null;
+  dungeonWave: number;
   onlinePlayers: OnlineSnapshot["players"];
   autoBattle: boolean;
 }
@@ -283,6 +291,7 @@ app.innerHTML = `
             <span><kbd>Click</kbd> Chọn mục tiêu</span>
             <span><kbd>1 2 3</kbd> Võ công</span>
             <span><kbd>E</kbd> Nhặt đồ</span>
+            <span><kbd>Q / R</kbd> Bình HP / MP</span>
             <span><kbd>B</kbd> Túi đồ</span>
             <span><kbd>J</kbd> Nhật ký</span>
           </div>
@@ -316,6 +325,10 @@ app.innerHTML = `
         </div>
         <div class="combat-bar">
           <div class="combat-status"><span class="target-dot"></span><span id="combat-status-text">Chưa có mục tiêu</span></div>
+          <div class="potion-shortcuts" aria-label="Bình hồi phục">
+            <button class="potion-button potion-hp" data-use-potion="hp" aria-label="Dùng bình HP (Q)"><span>HP</span><small>0</small></button>
+            <button class="potion-button potion-mp" data-use-potion="mp" aria-label="Dùng bình MP (R)"><span>MP</span><small>0</small></button>
+          </div>
           <div class="skill-bar" id="skill-bar"></div>
         </div>
         <div class="log-panel">
@@ -343,6 +356,7 @@ app.innerHTML = `
             <button class="tab-button" data-tab="smith">THỢ RÈN</button>
             <button class="tab-button" data-tab="skills">VÕ CÔNG</button>
             <button class="tab-button" data-tab="dungeon">PHỤ BẢN</button>
+            <button class="tab-button" data-tab="shop">TIỆM</button>
           </div>
           <div id="inventory-content"></div>
         </section>
@@ -431,6 +445,8 @@ let lastMiniMapDraw = 0;
 let lastUiUpdate = 0;
 let toastTimer = 0;
 let renderedSkillSect: SectId | null = null;
+let pendingSaleId: string | null = null;
+let inventoryRenderKey = "";
 const touchInput = { x: 0, y: 0 };
 let joystickPointerId: number | null = null;
 
@@ -472,12 +488,13 @@ const obstacles = [
 ];
 
 const worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
-let dungeonArt: HTMLCanvasElement | null = null;
+const dungeonArts: Partial<Record<DungeonId, HTMLCanvasElement>> = {};
 
 const NPCS: Npc[] = [
   { id: "guide", name: "Mộc sư huynh", title: "Người dẫn đường", x: 170, y: 300, color: "#72d1a0", icon: "?" },
   { id: "smith", name: "Lão Thiết", title: "Thợ rèn", x: 170, y: 470, color: "#e9c875", icon: "⚒" },
-  { id: "dungeon", name: "Cổ Mộ Thí Luyện", title: "Cổng phụ bản · Cấp 3+", x: 1710, y: 300, color: "#a787e8", icon: "◇" },
+  { id: "merchant", name: "Châu thương nhân", title: "Bình HP/MP · Mua bán", x: 280, y: 540, color: "#e6bd6e", icon: "◆" },
+  { id: "dungeon", name: "Sứ giả thí luyện", title: "2 phụ bản solo · Cấp 3+", x: 1710, y: 300, color: "#a787e8", icon: "◇" },
 ];
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -621,14 +638,8 @@ function makeEnemies(): Enemy[] {
   ];
 }
 
-function makeDungeonEnemies(): Enemy[] {
-  return [
-    createEnemy("tomb-guard-1", "Cổ Mộ U Binh", "normal", 560, 690, 4, "#697fa9"),
-    createEnemy("tomb-guard-2", "Cổ Mộ U Binh", "normal", 760, 600, 4, "#697fa9"),
-    createEnemy("tomb-guard-3", "Độc Thi Trùng", "normal", 930, 780, 5, "#6f9b70"),
-    createEnemy("tomb-elite", "Mộ Tướng Trấn Quan", "elite", 1120, 610, 6, "#c78853"),
-    createEnemy("tomb-boss", "Cổ Mộ Thủ Vệ", "boss", 1430, 730, 8, "#5f7fd2"),
-  ];
+function makeDungeonEnemies(id: DungeonId, wave: number): Enemy[] {
+  return DUNGEONS[id].waves[wave].map((enemy) => createEnemy(enemy.id, enemy.name, enemy.kind, enemy.x, enemy.y, enemy.level, enemy.color));
 }
 
 function createGame(sectId: SectId): GameState {
@@ -664,6 +675,9 @@ function createGame(sectId: SectId): GameState {
     bossDefeated: false,
     questRewardClaimed: false,
     dungeonTokens: 0,
+    dungeonClears: { tomb: 0, bamboo: 0 },
+    ...normalizeSupplies({}),
+    pendingItems: [],
     facingX: 1,
     facingY: 0,
   };
@@ -671,6 +685,7 @@ function createGame(sectId: SectId): GameState {
     player,
     enemies: makeEnemies(),
     worldEnemies: [],
+    worldLoot: [],
     loot: [],
     telegraphs: [],
     effects: [],
@@ -686,6 +701,8 @@ function createGame(sectId: SectId): GameState {
     dungeonTimeLeft: 0,
     dungeonCleared: false,
     dungeonRewardClaimed: false,
+    dungeonId: null,
+    dungeonWave: 0,
     onlinePlayers: [],
     autoBattle: false,
   };
@@ -782,20 +799,26 @@ function checkMainQuest(): void {
   }
 }
 
-function enterDungeon(): void {
+function enterDungeon(id: DungeonId): void {
   if (!game) return;
+  const dungeon = DUNGEONS[id];
+  if (!dungeon) return;
   if (game.mapMode === "dungeon") {
     addLog("Bạn đang ở trong phụ bản.");
     return;
   }
-  if (game.player.level < 3) {
-    addLog("Trúc Lâm Thí Luyện mở ở cấp 3.");
+  if (!canEnterDungeon(id, game.player.level, game.player.dungeonClears)) {
+    addLog(`Cần cấp ${dungeon.minLevel}${dungeon.prerequisite ? ` và hoàn thành ${DUNGEONS[dungeon.prerequisite].name}` : ""} để vào ${dungeon.name}.`);
     return;
   }
+  persistGame();
   game.worldEnemies = game.enemies;
-  game.enemies = makeDungeonEnemies();
+  game.worldLoot = game.loot;
+  game.dungeonId = id;
+  game.dungeonWave = 0;
+  game.enemies = makeDungeonEnemies(id, 0);
   game.mapMode = "dungeon";
-  game.dungeonTimeLeft = 180;
+  game.dungeonTimeLeft = dungeon.timeLimit;
   game.dungeonCleared = false;
   game.dungeonRewardClaimed = false;
   game.targetId = null;
@@ -803,12 +826,36 @@ function enterDungeon(): void {
   game.loot = [];
   game.telegraphs = [];
   game.effects = [];
+  game.floatingTexts = [];
+  resetJoystick();
+  keys.clear();
   game.player.x = 300;
   game.player.y = 690;
-  canvasBadge.innerHTML = `<span class="live-dot"></span> CỔ MỘ BÍ ẨN · INSTANCE`;
-  canvasTip.textContent = "Trúc Lâm Thí Luyện · Hạ Cổ Mộ Thủ Vệ trước khi hết giờ";
-  addLog("Đã vào Trúc Lâm Thí Luyện. Bạn có 3 phút để hạ Cổ Mộ Thủ Vệ.");
+  canvasBadge.innerHTML = `<span class="live-dot"></span> ${dungeon.shortName} · SOLO`;
+  canvasTip.textContent = `${dungeon.name} · Đợt 1/${dungeon.waves.length}`;
+  addLog(`Đã vào ${dungeon.name}. Dọn hết từng đợt trong ${dungeon.timeLimit / 60} phút, quái không hồi sinh.`);
+  closeMobileSheet();
   refreshUi(true);
+}
+
+function advanceDungeonWave(): void {
+  if (!game || game.mapMode !== "dungeon" || !game.dungeonId || game.dungeonCleared || game.enemies.some((enemy) => !enemy.dead)) return;
+  const dungeon = DUNGEONS[game.dungeonId];
+  if (game.dungeonWave + 1 >= dungeon.waves.length) {
+    game.dungeonCleared = true;
+    game.dungeonTimeLeft = 0;
+    game.telegraphs = [];
+    game.targetId = null;
+    game.moveTarget = null;
+    addLog(`${dungeon.name} hoàn thành! Mở Phụ bản để nhận thưởng. Đồ chưa nhặt sẽ được thu hồi.`);
+    return;
+  }
+  game.dungeonWave += 1;
+  game.enemies = makeDungeonEnemies(game.dungeonId, game.dungeonWave);
+  game.targetId = null;
+  game.telegraphs = [];
+  canvasTip.textContent = `${dungeon.name} · Đợt ${game.dungeonWave + 1}/${dungeon.waves.length}`;
+  addLog(`Đợt ${game.dungeonWave + 1}/${dungeon.waves.length}: ${game.enemies.map((enemy) => enemy.name).join(", ")}.`);
 }
 
 function leaveDungeon(): void {
@@ -823,13 +870,19 @@ function leaveDungeon(): void {
   game.dungeonTimeLeft = 0;
   game.dungeonCleared = false;
   game.dungeonRewardClaimed = false;
+  game.dungeonId = null;
+  game.dungeonWave = 0;
   game.targetId = null;
   game.moveTarget = null;
   game.telegraphs = [];
-  game.loot = [];
+  game.loot = game.worldLoot;
+  game.worldLoot = [];
   game.effects = [];
-  game.player.x = cleared ? 430 : PLAYER_START.x;
-  game.player.y = cleared ? 530 : PLAYER_START.y;
+  game.floatingTexts = [];
+  resetJoystick();
+  keys.clear();
+  game.player.x = PLAYER_START.x;
+  game.player.y = PLAYER_START.y;
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
   canvasTip.textContent = "Click quái để áp sát · E để nhặt đồ quanh bạn";
   if (!cleared) addLog("Bạn đã rời phụ bản trước khi hoàn thành.");
@@ -837,16 +890,82 @@ function leaveDungeon(): void {
 }
 
 function claimDungeonReward(): void {
-  if (!game || game.mapMode !== "dungeon" || !game.dungeonCleared || game.dungeonRewardClaimed) return;
+  if (!game || game.mapMode !== "dungeon" || !game.dungeonId || !game.dungeonCleared || game.dungeonRewardClaimed) return;
   const player = game.player;
-  player.dungeonTokens += 1;
-  player.gold += 420;
-  player.refiningStones += 3;
-  rewardExperience(320);
-  if (player.inventory.length < 12) player.inventory.push(createItem(8, "Hiếm"));
+  const dungeon = DUNGEONS[game.dungeonId];
+  // Set the guard before awarding anything; repeated clicks cannot claim twice.
   game.dungeonRewardClaimed = true;
-  addLog("Đã nhận thưởng phụ bản: +320 XP · +420 bạc · +1 token · +3 đá.");
+  player.dungeonClears[dungeon.id] += 1;
+  player.dungeonTokens += dungeon.reward.tokens;
+  player.gold += dungeon.reward.gold;
+  player.refiningStones += dungeon.reward.stones;
+  rewardExperience(dungeon.reward.xp);
+  const recovered: Item[] = [createItem(dungeon.reward.itemLevel, "Hiếm")];
+  for (const loot of game.loot) {
+    player.gold += loot.gold;
+    player.refiningStones += loot.stones;
+    if (loot.item) recovered.push(loot.item);
+  }
+  storeRewardItems(player, recovered);
+  addLog(`Nhận thưởng ${dungeon.name}: +${dungeon.reward.xp} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá. Đã thu hồi đồ chưa nhặt.`);
+  if (player.pendingItems.length) addLog(`${player.pendingItems.length} món đang chờ trong Túi đồ → Đồ chờ nhận, không bị mất khi túi đầy.`);
   leaveDungeon();
+  persistGame();
+}
+
+function drinkPotion(kind: PotionKind): void {
+  if (!game || !Object.hasOwn(POTIONS, kind)) return;
+  const player = game.player;
+  const before = kind === "hp" ? player.hp : player.mp;
+  const result = usePotion(player, kind);
+  if (result === "used") {
+    const amount = Math.floor((kind === "hp" ? player.hp : player.mp) - before);
+    addFloatingText(player.x, player.y - 38, `+${amount} ${POTIONS[kind].label}`, POTIONS[kind].color, 16);
+    addLog(`${POTIONS[kind].name}: hồi ${amount} ${POTIONS[kind].label}.`);
+    persistGame();
+  } else if (result === "cooldown") addLog(`Bình hồi phục dùng chung hồi chiêu: còn ${Math.ceil(player.potionCooldown)} giây.`);
+  else if (result === "empty") addLog(`Hết ${POTIONS[kind].name}. Mở Túi đồ → Tiệm để mua.`);
+  else if (result === "full") addLog(`${POTIONS[kind].label} đã đầy, không tiêu hao bình.`);
+  refreshUi(true);
+}
+
+function purchasePotion(kind: PotionKind, quantity: number): void {
+  if (!game || !Object.hasOwn(POTIONS, kind)) return;
+  if (game.mapMode !== "world") return addLog("Tiệm chỉ mở ở Rừng Trúc. Hãy chuẩn bị bình trước khi vào phụ bản.");
+  const result = buyPotion(game.player, kind, quantity);
+  if (result === "bought") {
+    addLog(`Mua ${quantity} ${POTIONS[kind].name}: -${POTIONS[kind].price * quantity} bạc.`);
+    persistGame();
+  } else if (result === "poor") addLog("Không đủ bạc. Hãy bán trang bị thừa hoặc săn thêm quái.");
+  else if (result === "full") addLog(`Mỗi loại bình chỉ chứa tối đa ${MAX_POTIONS}.`);
+  refreshUi(true);
+}
+
+function sellItem(id: string): void {
+  if (!game) return;
+  if (game.mapMode !== "world") return addLog("Hãy về Rừng Trúc trước khi bán trang bị.");
+  const index = game.player.inventory.findIndex((item) => item.id === id);
+  if (index < 0) return;
+  if (pendingSaleId !== id) {
+    pendingSaleId = id;
+    refreshUi(true);
+    return;
+  }
+  const item = game.player.inventory.splice(index, 1)[0];
+  const gold = itemSalePrice(item);
+  game.player.gold += gold;
+  pendingSaleId = null;
+  addLog(`Đã bán ${item.name}${item.enhance ? ` +${item.enhance}` : ""}: +${gold} bạc.`);
+  persistGame();
+  refreshUi(true);
+}
+
+function collectPendingItems(): void {
+  if (!game) return;
+  const count = recoverPendingItems(game.player);
+  addLog(count ? `Đã nhận ${count} món từ đồ chờ nhận.` : "Túi đã đầy. Bán bớt trang bị để nhận đồ chờ.");
+  persistGame();
+  refreshUi(true);
 }
 
 function syncStats(fullHeal = false): void {
@@ -1077,20 +1196,18 @@ function rewardExperience(amount: number): void {
 function killEnemy(enemy: Enemy): void {
   if (!game || enemy.dead) return;
   enemy.dead = true;
-  enemy.respawnAt = enemy.kind === "boss" ? Number.POSITIVE_INFINITY : nowMs() + 8000;
+  enemy.respawnAt = game.mapMode === "dungeon" || enemy.kind === "boss" ? Number.POSITIVE_INFINITY : nowMs() + 8000;
   const player = game.player;
   const xp = enemy.kind === "boss" ? 520 : enemy.kind === "elite" ? 150 : 42 + enemy.level * 8;
   rewardExperience(xp);
-  if (enemy.kind !== "boss" && game.mapMode === "world") {
+  if (enemy.id.startsWith("bandit-") && game.mapMode === "world") {
     player.questKills += 1;
     checkMainQuest();
   }
   if (game.targetId === enemy.id) game.targetId = null;
   if (enemy.kind === "boss") {
     if (game.mapMode === "dungeon") {
-      game.dungeonCleared = true;
-      game.dungeonTimeLeft = 0;
-      addLog("Cổ Mộ Thủ Vệ đã gục ngã! Hãy mở tab Phụ bản để nhận thưởng.");
+      addLog(`${enemy.name} đã gục ngã!`);
     } else {
       player.bossDefeated = true;
       game.lastBossDefeatedAt = nowMs();
@@ -1110,7 +1227,7 @@ function killEnemy(enemy: Enemy): void {
       item: createItem(Math.max(1, enemy.level), forced),
       gold: enemy.kind === "boss" ? 300 : enemy.kind === "elite" ? 90 : randomInt(8, 22),
       stones: enemy.kind === "boss" ? 5 : enemy.kind === "elite" ? 2 : 0,
-      expiresAt: nowMs() + (enemy.kind === "boss" ? 240000 : 90000),
+      expiresAt: game.mapMode === "dungeon" ? Number.POSITIVE_INFINITY : nowMs() + (enemy.kind === "boss" ? 240000 : 90000),
     });
   } else {
     game.loot.push({
@@ -1119,7 +1236,7 @@ function killEnemy(enemy: Enemy): void {
       y: enemy.y,
       gold: enemy.kind === "elite" ? 60 : randomInt(5, 15),
       stones: enemy.kind === "elite" ? 1 : 0,
-      expiresAt: nowMs() + 90000,
+      expiresAt: game.mapMode === "dungeon" ? Number.POSITIVE_INFINITY : nowMs() + 90000,
     });
   }
 }
@@ -1138,14 +1255,18 @@ function damagePlayer(amount: number, source: string): void {
   addFloatingText(player.x + randomBetween(-7, 7), player.y - 39, remaining > 0 ? `-${remaining}` : "ĐỠ", remaining > 0 ? "#ff9c88" : "#9ed9f4", remaining > 0 ? 18 : 14);
   if (remaining > 0) addLog(`${source} gây ${remaining} sát thương.`);
   if (player.hp <= 0) {
+    const inDungeon = game.mapMode === "dungeon";
     player.x = PLAYER_START.x;
     player.y = PLAYER_START.y;
     player.hp = player.maxHp;
     player.mp = player.maxMp;
     player.rage = 0;
     game.targetId = null;
+    game.moveTarget = null;
+    game.autoBattle = false;
     game.telegraphs = [];
     addLog("Bạn đã ngã xuống và được đưa về điểm hồi sinh. Không mất trang bị.");
+    if (inDungeon) leaveDungeon();
   }
 }
 
@@ -1159,7 +1280,7 @@ function pickupNearby(): void {
   }
   let picked = 0;
   for (const loot of nearby) {
-    if (loot.item && player.inventory.length >= 12) {
+    if (loot.item && player.inventory.length >= BAG_CAPACITY) {
       addLog("Túi đồ đã đầy. Hãy mặc, bán hoặc cường hóa đồ trước.");
       break;
     }
@@ -1180,6 +1301,7 @@ function equipItem(index: number): void {
   if (!game) return;
   const item = game.player.inventory[index];
   if (!item) return;
+  pendingSaleId = null;
   const old = game.player.equipment[item.slot];
   game.player.equipment[item.slot] = item;
   game.player.inventory.splice(index, 1);
@@ -1212,32 +1334,47 @@ function enhanceItem(index: number, equippedSlot?: ItemSlot): void {
   refreshUi(true);
 }
 
-function saveGame(): void {
-  if (!game) return addLog("Hãy chọn môn phái trước khi lưu.");
-  if (game.mapMode === "dungeon") return addLog("Hãy hoàn thành hoặc rời phụ bản trước khi lưu.");
+function persistGame(): boolean {
+  if (!game || game.mapMode !== "world") return false;
   const snapshot = {
     player: game.player,
     enemies: game.enemies.map((enemy) => ({ ...enemy, dead: false, respawnAt: 0 })),
   };
-  localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
-  addLog("Đã lưu tiến trình vào trình duyệt này.");
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
+    return true;
+  } catch {
+    showToast("Trình duyệt không lưu được tiến trình. Đừng đóng trang; hãy kiểm tra dung lượng lưu trữ.");
+    return false;
+  }
+}
+
+function saveGame(): void {
+  if (!game) return showToast("Hãy chọn môn phái trước khi lưu.");
+  if (game.mapMode === "dungeon") return addLog("Hãy hoàn thành hoặc rời phụ bản trước khi lưu.");
+  if (persistGame()) addLog("Đã lưu tiến trình vào trình duyệt này.");
 }
 
 function loadGame(): void {
-  const raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) return showToast("Chưa có tiến trình nào được lưu.");
+  if (game?.mapMode === "dungeon") return addLog("Hãy hoàn thành hoặc rời phụ bản trước khi tải tiến trình.");
   try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return showToast("Chưa có tiến trình nào được lưu.");
     const snapshot = JSON.parse(raw) as { player: Player; enemies: Enemy[] };
     if (!snapshot.player || !SECTS[snapshot.player.sect]) throw new Error("save-invalid");
     snapshot.player.skillPoints ??= 0;
     snapshot.player.skillRanks ??= { skill1: 1, skill2: 0, ultimate: 0 };
     snapshot.player.questRewardClaimed ??= false;
     snapshot.player.dungeonTokens ??= 0;
+    Object.assign(snapshot.player, normalizeSupplies(snapshot.player));
+    snapshot.player.pendingItems ??= [];
+    snapshot.player.dungeonClears ??= { tomb: snapshot.player.dungeonTokens > 0 ? 1 : 0, bamboo: 0 };
     const worldEnemies = makeEnemies();
     game = {
       player: snapshot.player,
       enemies: worldEnemies,
       worldEnemies,
+      worldLoot: [],
       loot: [],
       telegraphs: [],
       effects: [],
@@ -1253,10 +1390,16 @@ function loadGame(): void {
       dungeonTimeLeft: 0,
       dungeonCleared: false,
       dungeonRewardClaimed: false,
+      dungeonId: null,
+      dungeonWave: 0,
       onlinePlayers: [],
       autoBattle: false,
     };
     syncStats();
+    pendingSaleId = null;
+    resetJoystick();
+    keys.clear();
+    closeMobileSheet();
     sectOverlay.classList.add("hidden");
     canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
     addLog("Đã tải tiến trình. Hãy tiếp tục hành trình tại Rừng Trúc.");
@@ -1271,6 +1414,8 @@ function resetGame(): void {
   resetJoystick();
   closeMobileSheet();
   game = null;
+  pendingSaleId = null;
+  keys.clear();
   sectOverlay.classList.remove("hidden");
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
   canvasTip.textContent = "Chọn môn phái để bắt đầu hành trình";
@@ -1295,15 +1440,16 @@ function interactNpc(npc: Npc): void {
     return;
   }
   if (npc.id === "smith") {
-    activeTab = "smith";
     addLog("Lão Thiết: Trang bị tốt phải được tôi luyện đúng lúc.");
-    refreshUi(true);
+    openMobileSheet("smith");
     return;
   }
-  activeTab = "dungeon";
-  if (game.player.level >= 3) addLog("Cổ Mộ Thí Luyện: Phụ bản solo giới hạn 3 phút.");
-  else addLog("Cổ Mộ Thí Luyện: Hãy đạt cấp 3 rồi quay lại.");
-  refreshUi(true);
+  if (npc.id === "merchant") {
+    openMobileSheet("shop");
+    addLog("Châu thương nhân: Chuẩn bị bình HP/MP trước khi thử thách boss nhé!");
+    return;
+  }
+  openMobileSheet("dungeon");
 }
 
 function screenToWorld(event: MouseEvent): { x: number; y: number } {
@@ -1338,7 +1484,7 @@ function update(dt: number, now: number): void {
   if (game.mapMode === "dungeon" && !game.dungeonCleared) {
     game.dungeonTimeLeft = Math.max(0, game.dungeonTimeLeft - dt);
     if (game.dungeonTimeLeft <= 0) {
-      addLog("Hết giờ! Cổ Mộ Thí Luyện đã đóng lại.");
+      addLog(`Hết giờ! ${DUNGEONS[game.dungeonId!].name} đã đóng lại. Lượt này không có thưởng hoàn thành.`);
       leaveDungeon();
       return;
     }
@@ -1347,6 +1493,7 @@ function update(dt: number, now: number): void {
   player.cooldowns.skill1 = Math.max(0, player.cooldowns.skill1 - dt);
   player.cooldowns.skill2 = Math.max(0, player.cooldowns.skill2 - dt);
   player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
+  player.potionCooldown = Math.max(0, player.potionCooldown - dt);
   if (player.shieldUntil <= now) player.shield = 0;
   player.rage = clamp(player.rage + dt * 1.1, 0, 100);
   if (game.autoBattle && !currentTarget()) {
@@ -1375,9 +1522,10 @@ function update(dt: number, now: number): void {
     }
   }
 
-  for (const enemy of game.enemies) {
+  const encounterEnemies = game.enemies;
+  for (const enemy of encounterEnemies) {
     if (enemy.dead) {
-      if (now >= enemy.respawnAt && enemy.kind !== "boss") {
+      if (game.mapMode === "world" && now >= enemy.respawnAt && enemy.kind !== "boss") {
         enemy.dead = false;
         enemy.hp = enemy.maxHp;
         enemy.attackCooldown = 1;
@@ -1391,8 +1539,12 @@ function update(dt: number, now: number): void {
     if (enemy.kind === "boss") {
       enemy.bossCooldown -= dt;
       if (d < 520 && enemy.bossCooldown <= 0) {
-        game.telegraphs.push({ x: player.x, y: player.y, radius: 92, triggerAt: now + 950, damage: enemy.attack * 1.4, label: "Lang Vương · Liệt Trảo" });
-        enemy.bossCooldown = 4.4;
+        const dungeonBoss = game.mapMode === "dungeon";
+        const enraged = dungeonBoss && enemy.hp <= enemy.maxHp * .5;
+        const attackName = game.dungeonId === "tomb" ? "Địa Chấn" : "Liệt Trảo";
+        game.telegraphs.push({ x: player.x, y: player.y, radius: 92, triggerAt: now + 1100, damage: enemy.attack * 1.4, label: `${enemy.name} · ${attackName}` });
+        if (enraged) game.telegraphs.push({ x: enemy.x, y: enemy.y, radius: 130, triggerAt: now + 1550, damage: enemy.attack * 1.2, label: `${enemy.name} · Cuồng Nộ` });
+        enemy.bossCooldown = enraged ? 3.6 : 4.4;
       }
       if (d > 175 && d < 550) {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -1413,6 +1565,7 @@ function update(dt: number, now: number): void {
         if (enemy.attackCooldown <= 0) {
           enemy.attackCooldown = enemy.kind === "elite" ? 1.2 : 1.55;
           damagePlayer(enemy.attack, enemy.name);
+          if (game.enemies !== encounterEnemies) return;
         }
       }
     }
@@ -1421,10 +1574,15 @@ function update(dt: number, now: number): void {
   const remainingTelegraphs: Telegraph[] = [];
   for (const telegraph of game.telegraphs) {
     if (now >= telegraph.triggerAt) {
-      if (distance(player, telegraph) <= telegraph.radius + player.radius) damagePlayer(telegraph.damage, telegraph.label);
+      if (distance(player, telegraph) <= telegraph.radius + player.radius) {
+        const modeBeforeHit = game.mapMode;
+        damagePlayer(telegraph.damage, telegraph.label);
+        if (game.mapMode !== modeBeforeHit) return;
+      }
     } else remainingTelegraphs.push(telegraph);
   }
   game.telegraphs = remainingTelegraphs;
+  advanceDungeonWave();
   game.effects = game.effects.filter((effect) => now - effect.startedAt < effect.duration);
   game.floatingTexts = game.floatingTexts.filter((floatingText) => now - floatingText.startedAt < floatingText.duration);
   game.loot = game.loot.filter((loot) => loot.expiresAt > now);
@@ -1476,11 +1634,12 @@ function drawWorld(now: number): void {
   ctx.save();
   ctx.translate(-game.cameraX, -game.cameraY);
   if (game.mapMode === "dungeon") {
-    dungeonArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
-    ctx.drawImage(dungeonArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    const id = game.dungeonId!;
+    dungeonArts[id] ??= createMapArt(id === "bamboo" ? "bamboo" : "dungeon", WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.drawImage(dungeonArts[id]!, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#d4c7ef";
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    drawOutlinedText("TRÚC LÂM THÍ LUYỆN · CỔ MỘ BÍ ẨN", 270, 550);
+    drawOutlinedText(`${DUNGEONS[id].shortName} · ĐỢT ${game.dungeonWave + 1}/${DUNGEONS[id].waves.length}`, 270, 550);
   } else {
     ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#fff0bd";
@@ -1525,7 +1684,7 @@ function drawMinimap(now: number): void {
   const sx = miniMap.width / WORLD_WIDTH;
   const sy = miniMap.height / WORLD_HEIGHT;
   mc.clearRect(0, 0, miniMap.width, miniMap.height);
-  const background = game.mapMode === "world" ? worldArt : dungeonArt;
+  const background = game.mapMode === "world" ? worldArt : dungeonArts[game.dungeonId!];
   if (background) {
     mc.drawImage(background, 0, 0, miniMap.width, miniMap.height);
   } else {
@@ -1560,7 +1719,7 @@ function drawNpc(npc: Npc, now: number): void {
   ctx.beginPath();
   ctx.ellipse(0, 19, 20, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  const sprite: SpriteId = npc.id === "dungeon" ? "portal" : npc.id;
+  const sprite: SpriteId = npc.id === "dungeon" ? "portal" : npc.id === "merchant" ? "guide" : npc.id;
   if (!drawSprite(ctx, sprite, 0, 20, npc.id === "dungeon" ? 84 : 62, npc.id === "dungeon" ? 84 : 70)) {
     ctx.fillStyle = npc.color;
     ctx.beginPath();
@@ -2048,13 +2207,20 @@ function refreshUi(force = false): void {
   mobileAuto.classList.toggle("active", game.autoBattle);
   mobileAuto.setAttribute("aria-pressed", String(game.autoBattle));
   mobileAuto.setAttribute("aria-label", game.autoBattle ? "Tắt tự động chiến đấu" : "Bật tự động chiến đấu");
-  setText("#mobile-map-name", game.mapMode === "world" ? "RỪNG TRÚC" : "CỔ MỘ");
+  setText("#mobile-map-name", game.mapMode === "world" ? "RỪNG TRÚC" : DUNGEONS[game.dungeonId!].shortName);
+  document.querySelector(".mobile-map-channel")!.textContent = game.mapMode === "world" ? "Kênh 1⌄" : `Đợt ${game.dungeonWave + 1}/${DUNGEONS[game.dungeonId!].waves.length}`;
   setText("#quest-kill-progress", `${Math.min(player.questKills, 5)} / 5 sơn tặc`);
   setText("#quest-boss-progress", `${player.bossDefeated ? "✓" : "○"} Lang Vương`);
   setText("#quest-title", player.questRewardClaimed ? "Dấu chân hoàn tất" : "Dấu chân trong Rừng Trúc");
   setText("#quest-text", player.questRewardClaimed ? "Mộc sư huynh đã ghi nhận chiến công của bạn. Cổ Mộ Thí Luyện đã mở." : "Đánh bại 5 sơn tặc, tìm món đồ tốt hơn và hạ Lang Vương.");
   setText("#quest-reward", player.questRewardClaimed ? "Đã nhận thưởng" : "+100 XP · +300 bạc");
-  setText("#bag-count", `${player.inventory.length}/12`);
+  setText("#bag-count", `${player.inventory.length}/${BAG_CAPACITY}`);
+  for (const kind of ["hp", "mp"] as PotionKind[]) {
+    const button = document.querySelector<HTMLButtonElement>(`.potion-shortcuts [data-use-potion="${kind}"]`)!;
+    button.querySelector("small")!.textContent = player.potionCooldown > 0 ? `${Math.ceil(player.potionCooldown)}s` : `${player.potions[kind]}`;
+    button.disabled = player.potionCooldown > 0 || player.potions[kind] === 0;
+    button.setAttribute("aria-label", `${POTIONS[kind].name}: ${player.potions[kind]} bình${player.potionCooldown > 0 ? `, hồi chiêu ${Math.ceil(player.potionCooldown)} giây` : ""}`);
+  }
   const avatar = document.querySelector<HTMLElement>("#avatar-orb");
   if (avatar && avatar.dataset.sect !== player.sect) {
     avatar.dataset.sect = player.sect;
@@ -2138,18 +2304,43 @@ function itemRow(item: Item, index: number, equipped = false): string {
   const statLabel = item.slot === "weapon" ? `+${item.power} công` : `+${item.power} phòng`;
   const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>+ Cường hóa</button>`;
   const equipButton = equipped ? "" : `<button class="mini-button equip-btn" data-index="${index}">Mặc đồ</button>`;
-  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${item.icon}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span></div><div class="item-actions">${equipButton}${enhanceButton}</div></div>`;
+  const saleButton = equipped ? "" : `<button class="mini-button sell-btn ${pendingSaleId === item.id ? "sale-confirm" : ""}" data-item-id="${escapeHtml(item.id)}" ${game?.mapMode === "dungeon" ? "disabled" : ""}>${pendingSaleId === item.id ? "Xác nhận bán" : `Bán · ${itemSalePrice(item)} bạc`}</button>`;
+  const cancelButton = pendingSaleId === item.id ? `<button class="mini-button" data-cancel-sale>Hủy</button>` : "";
+  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${item.icon}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span></div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
+}
+
+function supplyMarkup(): string {
+  if (!game) return "";
+  const player = game.player;
+  return `<div class="supply-list">${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="supply-row"><span class="supply-icon potion-${kind}">${POTIONS[kind].label}</span><div><strong>${POTIONS[kind].name}</strong><small>${player.potions[kind]} bình · Hồi 40% ${POTIONS[kind].label} tối đa</small></div><button class="mini-button" data-use-potion="${kind}" ${player.potionCooldown > 0 || player.potions[kind] < 1 ? "disabled" : ""}>${player.potionCooldown > 0 ? `${Math.ceil(player.potionCooldown)}s` : "Dùng"}</button></div>`).join("")}</div>`;
 }
 
 function renderInventory(): void {
   if (!game) {
+    inventoryRenderKey = "";
     inventoryContent.innerHTML = `<div class="empty-state">Chọn môn phái để mở túi đồ.</div>`;
     return;
   }
   const player = game.player;
+  const shopOpen = game.mapMode === "world";
+  // Keep buttons/focus stable instead of replacing the entire sheet every tick.
+  const renderKey = JSON.stringify([activeTab, pendingSaleId, player.sect, player.level, player.gold, player.refiningStones, player.skillPoints, player.skillRanks, player.potions, Math.ceil(player.potionCooldown), player.inventory, player.equipment, player.pendingItems.length, player.dungeonClears, game.mapMode, game.dungeonId, game.dungeonWave, game.dungeonCleared, Math.ceil(game.dungeonTimeLeft), shopOpen ? 0 : game.enemies.filter((enemy) => !enemy.dead).length]);
+  if (renderKey === inventoryRenderKey) return;
+  inventoryRenderKey = renderKey;
   document.querySelectorAll<HTMLButtonElement>(".tab-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === activeTab);
   });
+  if (activeTab === "shop") {
+    inventoryContent.innerHTML = `
+      <div class="smith-intro"><span class="smith-icon">◆</span><div><strong>Châu thương nhân</strong><p>Mua bình bằng bạc. Bình xếp riêng, không chiếm ô trang bị.</p></div></div>
+      <div class="resource-hint"><span>Bạc hiện có</span><b>${formatNumber(player.gold)} bạc</b></div>
+      ${game.mapMode === "dungeon" ? `<p class="panel-notice">Tiệm đóng trong phụ bản. Bạn vẫn dùng được bình đã mang theo.</p>` : ""}
+      ${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="shop-card"><strong>${POTIONS[kind].name} · ${POTIONS[kind].price} bạc</strong><p>Hồi 40% ${POTIONS[kind].label} tối đa · Đang có ${player.potions[kind]}/${MAX_POTIONS}</p><div class="item-actions">${[1, 5].map((quantity) => `<button class="mini-button" data-buy-potion="${kind}" data-quantity="${quantity}" ${!shopOpen || player.gold < POTIONS[kind].price * quantity || player.potions[kind] + quantity > MAX_POTIONS ? "disabled" : ""}>Mua ${quantity} · ${POTIONS[kind].price * quantity} bạc</button>`).join("")}</div></div>`).join("")}
+      <p class="panel-notice">Hai loại bình dùng chung hồi chiêu 8 giây. Q: bình HP · R: bình MP. HP/MP đầy sẽ không mất bình.</p>
+      <button class="outline-button" data-open-bag>Bán trang bị thừa trong Túi đồ</button>
+    `;
+    return;
+  }
   if (activeTab === "smith") {
     const equipment = (["weapon", "armor"] as ItemSlot[]).map((slot) => player.equipment[slot] ? itemRow(player.equipment[slot]!, 0, true) : "").join("");
     inventoryContent.innerHTML = `
@@ -2178,17 +2369,20 @@ function renderInventory(): void {
   }
   if (activeTab === "dungeon") {
     if (game.mapMode === "dungeon") {
+      const dungeon = DUNGEONS[game.dungeonId!];
       const minutes = Math.floor(game.dungeonTimeLeft / 60).toString().padStart(2, "0");
       const seconds = Math.floor(game.dungeonTimeLeft % 60).toString().padStart(2, "0");
       inventoryContent.innerHTML = game.dungeonCleared ? `
-        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>Phụ bản hoàn thành</strong><p>Cổ Mộ Thủ Vệ đã bị đánh bại. Nhận thưởng để quay về Rừng Trúc.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
+        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>${dungeon.name} hoàn thành</strong><p>Nhận thưởng để về Rừng Trúc. Tất cả đồ chưa nhặt sẽ được thu hồi; túi đầy sẽ chuyển vào Đồ chờ nhận.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
       ` : `
-        <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>Trúc Lâm Thí Luyện</strong><p>Hạ Cổ Mộ Thủ Vệ trước khi đồng hồ về 0.</p><div class="dungeon-timer">${minutes}:${seconds}</div><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
+        <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>${dungeon.name}</strong><p>Đợt ${game.dungeonWave + 1}/${dungeon.waves.length} · Còn ${game.enemies.filter((enemy) => !enemy.dead).length} quái.<br>${dungeon.mechanic}</p><div class="dungeon-timer">${minutes}:${seconds}</div><p>Ngã xuống, hết giờ hoặc rời sớm: không nhận thưởng hoàn thành.</p><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
       `;
     } else {
-      inventoryContent.innerHTML = `
-        <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>Trúc Lâm Thí Luyện</strong><p>Phụ bản solo cấp 3+. Dọn 3 U Binh, vượt Mộ Tướng và hạ Cổ Mộ Thủ Vệ trong 3 phút.</p><div class="dungeon-reward-line"><span>Thưởng</span><b>+320 XP · +420 bạc · +1 token</b></div><button class="outline-button dungeon-btn" data-dungeon-action="enter" ${player.level < 3 ? "disabled" : ""}>${player.level < 3 ? "Cần cấp 3" : "Vào phụ bản"}</button></div>
-      `;
+      inventoryContent.innerHTML = `<p class="panel-notice">2 phụ bản solo · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(DUNGEONS).map((dungeon) => {
+        const unlocked = canEnterDungeon(dungeon.id, player.level, player.dungeonClears);
+        const condition = player.level < dungeon.minLevel ? `Cần cấp ${dungeon.minLevel}` : `Cần hoàn thành ${DUNGEONS[dungeon.prerequisite!]?.name ?? "thí luyện"}`;
+        return `<div class="dungeon-card"><strong>${dungeon.name}</strong><small>Solo · Cấp ${dungeon.minLevel}+ · ${dungeon.timeLimit / 60} phút · ${dungeon.waves.length} đợt · Đã vượt ${player.dungeonClears[dungeon.id]} lần</small><p>${dungeon.description}</p><div class="dungeon-reward-line"><b>+${dungeon.reward.xp} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá · 1 đồ Hiếm</b></div><button class="outline-button dungeon-btn" data-dungeon-action="enter" data-dungeon-id="${dungeon.id}" ${unlocked ? "" : "disabled"}>${unlocked ? "Vào phụ bản" : condition}</button></div>`;
+      }).join("")}`;
     }
     return;
   }
@@ -2199,6 +2393,9 @@ function renderInventory(): void {
   }).join("");
   const bag = player.inventory.map((item, index) => itemRow(item, index)).join("");
   inventoryContent.innerHTML = `
+    <div class="bag-tools"><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm hồi phục</button></div>
+    ${supplyMarkup()}
+    ${player.pendingItems.length ? `<div class="pending-rewards"><strong>Đồ chờ nhận · ${player.pendingItems.length} món</strong><p>Thưởng đã giữ lại, kể cả khi tải lại trang.</p><button class="outline-button" data-collect-pending ${player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Nhận vào túi</button></div>` : ""}
     <div class="equipped-block">${equipped}</div>
     <div class="equipped-label bag-label">ĐỒ NHẶT ĐƯỢC</div>
     <div class="item-list">${bag || `<div class="empty-state">Hạ quái để tìm trang bị rơi dưới đất.</div>`}</div>
@@ -2226,12 +2423,16 @@ function renderSectCards(): void {
 }
 
 function closeMobileSheet(): void {
+  pendingSaleId = null;
   inventoryPanel.classList.remove("mobile-sheet-open");
   mobileSheetBackdrop.classList.remove("show");
 }
 
 function openMobileSheet(tab: PanelTab): void {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
+  pendingSaleId = null;
+  resetJoystick();
+  keys.clear();
   activeTab = tab;
   inventoryPanel.classList.add("mobile-sheet-open");
   mobileSheetBackdrop.classList.add("show");
@@ -2295,6 +2496,8 @@ document.addEventListener("keydown", (event) => {
   if (key === "2") castSkill("skill2");
   if (key === "3") castSkill("ultimate");
   if (key === "e") pickupNearby();
+  if (key === "q") drinkPotion("hp");
+  if (key === "r") drinkPotion("mp");
   if (key === "b") {
     if (mobileGameMedia.matches) {
       if (inventoryPanel.classList.contains("mobile-sheet-open")) closeMobileSheet();
@@ -2338,15 +2541,34 @@ inventoryContent.addEventListener("click", (event) => {
   const enhanceButton = target.closest<HTMLButtonElement>(".enhance-btn");
   const skillButton = target.closest<HTMLButtonElement>(".skill-upgrade");
   const dungeonButton = target.closest<HTMLButtonElement>(".dungeon-btn");
+  const saleButton = target.closest<HTMLButtonElement>(".sell-btn");
+  const potionButton = target.closest<HTMLButtonElement>("[data-use-potion]");
+  const purchaseButton = target.closest<HTMLButtonElement>("[data-buy-potion]");
   if (equipButton) equipItem(Number(equipButton.dataset.index));
   if (enhanceButton) enhanceItem(Number(enhanceButton.dataset.index), enhanceButton.dataset.equipped as ItemSlot | undefined);
   if (skillButton) upgradeSkill(skillButton.dataset.skillRank as SkillKey);
+  if (saleButton) sellItem(saleButton.dataset.itemId!);
+  if (potionButton) drinkPotion(potionButton.dataset.usePotion as PotionKind);
+  if (purchaseButton) purchasePotion(purchaseButton.dataset.buyPotion as PotionKind, Number(purchaseButton.dataset.quantity));
+  if (target.closest("[data-collect-pending]")) collectPendingItems();
+  if (target.closest("[data-save-progress]")) saveGame();
+  if (target.closest("[data-load-progress]")) loadGame();
+  if (target.closest("[data-open-shop]")) openMobileSheet("shop");
+  if (target.closest("[data-open-bag]")) openMobileSheet("bag");
+  if (target.closest("[data-cancel-sale]")) {
+    pendingSaleId = null;
+    refreshUi(true);
+  }
   if (dungeonButton) {
     const action = dungeonButton.dataset.dungeonAction;
-    if (action === "enter") enterDungeon();
+    if (action === "enter") enterDungeon(dungeonButton.dataset.dungeonId as DungeonId);
     if (action === "leave") leaveDungeon();
     if (action === "claim") claimDungeonReward();
   }
+});
+
+document.querySelectorAll<HTMLButtonElement>(".potion-shortcuts [data-use-potion]").forEach((button) => {
+  button.addEventListener("click", () => drinkPotion(button.dataset.usePotion as PotionKind));
 });
 
 skillBar.addEventListener("click", (event) => {
@@ -2358,6 +2580,7 @@ skillBar.addEventListener("click", (event) => {
 document.querySelectorAll<HTMLButtonElement>(".tab-button").forEach((button) => {
   button.addEventListener("click", () => {
     activeTab = button.dataset.tab as PanelTab;
+    pendingSaleId = null;
     refreshUi(true);
   });
 });

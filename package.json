@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "server:build": "tsc -p tsconfig.server.json",
     "server:start": "node dist-server/index.js",
     "server:check": "tsc -p tsconfig.server.json --noEmit"

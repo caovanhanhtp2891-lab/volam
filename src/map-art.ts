@@ -3,7 +3,7 @@ interface MapObstacle { x: number; y: number; w: number; h: number; type: string
 // Static scenery is painted once at half resolution, then reused by the world
 // and minimap. This avoids image downloads and repeated geometry every frame.
 export function createMapArt(
-  mode: "world" | "dungeon",
+  mode: "world" | "dungeon" | "bamboo",
   width: number,
   height: number,
   obstacles: readonly MapObstacle[] = [],
@@ -13,16 +13,16 @@ export function createMapArt(
   canvas.height = Math.ceil(height / 2);
   const context = canvas.getContext("2d")!;
   context.scale(canvas.width / width, canvas.height / height);
-  context.fillStyle = mode === "world" ? "#5d8058" : "#222b37";
+  context.fillStyle = mode === "world" ? "#5d8058" : mode === "bamboo" ? "#35543e" : "#222b37";
   context.fillRect(0, 0, width, height);
 
-  if (mode === "dungeon") {
-    context.fillStyle = "#3e4857";
+  if (mode !== "world") {
+    context.fillStyle = mode === "bamboo" ? "#8f9261" : "#3e4857";
     context.fillRect(160, 500, 1450, 470);
-    context.strokeStyle = "#697082";
+    context.strokeStyle = mode === "bamboo" ? "#b0b579" : "#697082";
     context.lineWidth = 8;
     context.strokeRect(160, 500, 1450, 470);
-    context.strokeStyle = "#35404f";
+    context.strokeStyle = mode === "bamboo" ? "#7e8256" : "#35404f";
     context.lineWidth = 2;
     context.beginPath();
     for (let x = 160; x <= 1610; x += 96) {
@@ -34,6 +34,17 @@ export function createMapArt(
       context.lineTo(1610, y);
     }
     context.stroke();
+    if (mode === "bamboo") {
+      context.fillStyle = "#6f945c";
+      for (let x = 160; x < 1650; x += 90) {
+        context.fillRect(x, 365, 7, 110);
+        context.fillRect(x + 30, 1010, 7, 100);
+        context.beginPath();
+        context.ellipse(x + 5, 380, 32, 10, -.4, 0, Math.PI * 2);
+        context.ellipse(x + 30, 1020, 32, 10, .4, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
     return canvas;
   }
 

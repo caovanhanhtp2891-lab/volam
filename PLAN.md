@@ -1,7 +1,7 @@
 # PLAN — Game web kiếm hiệp 2D
 
 > Tài liệu thiết kế và kế hoạch phát triển cho repository `volam`.
-> Ngày lập: 01/10/2026. Cập nhật visual/mobile: 02/10/2026. Trạng thái: P0–P5 local, nền online P3 và giao diện mobile một viewport đã triển khai; có HUD gọn, minimap vị trí thật, chat, Auto, floating combat text và ảnh kiếm hiệp 2D. Chiến đấu authoritative, P6 tổ đội/phụ bản online và bang hội vẫn nằm ở các milestone sau.
+> Ngày lập: 01/10/2026. Cập nhật gameplay: 02/10/2026. Trạng thái: prototype local đã có vòng chiến đấu/loot/cường hóa/võ công, HUD mobile gọn, đồ họa 2D nhẹ, cửa hàng/bình hồi phục và hai phụ bản solo. P3 mới có nền session/World WebSocket; các gate online P3–P7, gồm authority, giao dịch, tổ đội và bang hội, chưa hoàn thành.
 > Tên làm việc: **Giang Hồ Dị Truyện**; có thể đổi trước khi phát hành.
 
 Tài liệu này là bản thiết kế để bắt đầu lập trình. Các hệ thống gameplay và tiêu chí nghiệm thu là mục tiêu triển khai; số liệu cân bằng, thời gian và hiệu năng sẽ được cập nhật sau khi có bản chơi thử.
@@ -9,6 +9,19 @@ Tài liệu này là bản thiết kế để bắt đầu lập trình. Các h�
 Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot bằng atlas tạo riêng, bổ sung nền rừng và cảnh vật, xuất WebP, sửa nút kỹ năng bị flex kéo thành bầu dục, tách các vùng chạm và hỗ trợ mobile dọc/ngang. Nhiệm vụ mặc định thu gọn; mục tiêu chỉ hiện khi chọn quái. Đây là bước hoàn thiện hình ảnh/UX, không đánh dấu hoàn thành milestone online. Animation hiện là nhún/đảo hướng sprite; nền minh họa chưa thay cho tilemap/collider được thiết kế riêng.
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 384 × 384 px, tối đa 64 màu, 19 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Dữ liệu ảnh giảm khoảng 99,1% so với bộ ảnh 2,06 MB; bố cục và các thao tác mobile vẫn được giữ.
+
+Lát gameplay local ngày 02/10/2026:
+
+- [x] Bình HP/MP hồi 40% tài nguyên tối đa, cooldown dùng chung 8 giây; kiểm tra bình hết/tài nguyên đầy và nút mobile/phím Q–R.
+- [x] NPC Châu thương nhân, tab Tiệm; mua 1/5 bình, kiểm tra bạc và giới hạn stack 99; không mở shop trong instance.
+- [x] Bán trang bị trong túi với giá xem trước và xác nhận/hủy; không bán đồ đang mặc.
+- [x] Hai phụ bản solo cấu hình bằng dữ liệu: Cổ Mộ Bí Ẩn (cấp 3, 2 đợt, 3 phút) và Trúc Lâm Thí Luyện (cấp 5 + hoàn thành Cổ Mộ, 3 đợt, 4 phút). Các mức cấp/thời lượng này dành cho prototype, chưa thay thế bảng cân bằng mục 12.1.
+- [x] Quái không hồi sinh trong instance, phải clear đợt để mở boss; boss có telegraph theo tên và pha Cuồng Nộ dưới 50% HP; chết/timeout/rời sớm đóng lượt, không cấp thưởng hoàn thành.
+- [x] Thu hồi đồ/bạc/đá chưa nhặt khi nhận thưởng; đồ tràn túi chuyển hàng chờ, có nút nhận sau khi giải phóng ô. Chặn claim lặp trong cùng lượt ở local, lưu số lượt clear và điều kiện mở phụ bản.
+- [x] Checkpoint trước vào phụ bản; tự lưu các giao dịch world/claim; migrate save cũ, nút Lưu/Tải trong Túi đồ mobile; không ghi nhận khả năng khôi phục lượt đang chạy hoặc giao dịch online từ các hành vi này.
+- [x] Bộ unit test thuần không thêm dependency; smoke test browser cho gameplay/responsive và bắt lỗi trình duyệt. CI chạy unit test trước deploy.
+
+Chưa triển khai trong lát này: quota ngày theo giờ server, authority/economic ledger/DB, pending reward qua server crash, party, bang hội thật, bộ chỉ số/slot/content đầy đủ MVP. Không đánh dấu hoàn thành P4/P5 online chỉ vì đã có bản local. Bước tiếp theo ưu tiên nền authority/lưu dữ liệu thật trước khi mở tổ đội/bang hội online.
 
 **Mục lục nhanh:**
 

@@ -36,7 +36,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build for project Pages URL
-        run: pnpm typecheck && pnpm exec vite build --base=/volam/
+        run: pnpm test && pnpm typecheck && pnpm exec vite build --base=/volam/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

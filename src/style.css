@@ -164,8 +164,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 .target-meta { color: #738b8d; }
 
 .inventory-panel { min-height: 318px; }
-.panel-tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
-.tab-button { padding: 12px 8px; border: 0; border-bottom: 2px solid transparent; color: #6f8b8d; background: transparent; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.panel-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.tab-button { min-width: 0; padding: 12px 4px; border: 0; border-bottom: 2px solid transparent; color: #6f8b8d; background: transparent; cursor: pointer; font-size: 9px; font-weight: 700; letter-spacing: .04em; }
 .tab-button span { color: #527174; font-size: 9px; letter-spacing: 0; }
 .tab-button.active { border-bottom-color: var(--gold); color: #e8e3ce; }
 .tab-button.active span { color: var(--gold); }
@@ -182,6 +182,28 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
 .item-actions { display: flex; grid-column: 1 / -1; gap: 5px; }
 .mini-button { flex: 1; padding: 5px 6px; border: 1px solid rgba(187, 217, 202, .13); border-radius: 4px; color: #aac7bb; background: rgba(255,255,255,.04); cursor: pointer; font-size: 8px; }
 .mini-button:hover { border-color: rgba(233,200,117,.55); color: #f2d98f; }
+.item-actions { flex-wrap: wrap; }
+.sale-confirm { border-color: #df8077; color: #ffc2b9; }
+.bag-tools { display: flex; gap: 6px; margin-bottom: 10px; }
+.bag-tools .mini-button, .supply-row .mini-button, .shop-card .mini-button, .item-actions .mini-button { min-height: 32px; }
+.supply-list { display: grid; gap: 6px; margin-bottom: 14px; }
+.supply-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 52px; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 6px; }
+.supply-icon { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid currentColor; border-radius: 6px; font: 700 10px sans-serif; }
+.potion-hp { color: #df8077; }
+.potion-mp { color: #7bbcdf; }
+.supply-row strong, .shop-card strong, .pending-rewards strong, .dungeon-card strong { display: block; color: #e7e7d7; font-size: 12px; }
+.supply-row small, .dungeon-card small { display: block; margin-top: 4px; color: #b3c4b4; font-size: 10px; line-height: 1.5; }
+.shop-card, .pending-rewards, .dungeon-card { margin-bottom: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); }
+.shop-card p, .pending-rewards p, .dungeon-card p, .panel-notice { color: #a3b5aa; font-size: 11px; line-height: 1.6; }
+.pending-rewards { border-color: #a39b62; }
+.dungeon-card .dungeon-reward-line { margin-bottom: 10px; padding: 8px 0; }
+.dungeon-card .dungeon-reward-line b { font-size: 10px; line-height: 1.6; }
+.dungeon-card .outline-button { width: 100%; min-height: 36px; }
+.potion-shortcuts { display: flex; gap: 6px; }
+.potion-button { display: grid; width: 38px; height: 42px; flex: 0 0 auto; place-content: center; gap: 3px; padding: 2px; border: 1px solid currentColor; border-radius: 7px; background: #152524; cursor: pointer; touch-action: manipulation; }
+.potion-button span { font-size: 10px; font-weight: 700; }
+.potion-button small { color: #f0eddf; font-size: 10px; }
+.potion-button:disabled { opacity: .6; cursor: not-allowed; }
 .equipped-empty { padding: 8px; border: 1px dashed rgba(177, 211, 204, .13); border-radius: 6px; color: #597478; font-size: 9px; }
 .smith-intro { gap: 9px; margin-bottom: 13px; }
 .smith-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--gold); background: rgba(233, 200, 117, .12); font-size: 17px; }
@@ -369,6 +391,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .mobile-pickup small { font-size: 8px; color: #fff0c3; }
   .combat-bar { position: absolute; z-index: 6; right: 8px; bottom: calc(var(--hud-bottom) + 65px); left: auto; display: block; padding: 0; border: 0; background: transparent; pointer-events: none; }
   .combat-status { display: none; }
+  .potion-shortcuts { position: fixed; z-index: 6; bottom: calc(var(--hud-bottom) + 129px); left: 114px; pointer-events: auto; }
+  .potion-button { width: 44px; height: 44px; }
   .skill-bar { width: auto; align-items: flex-end; justify-content: flex-end; gap: 8px; pointer-events: auto; }
   .skill-button { flex: 0 0 auto; width: 48px; height: 48px; min-height: 0; display: block; padding: 0; border: 1px solid #c6a96a; border-radius: 50%; background: #111d25; box-shadow: 0 3px 12px rgba(0,0,0,.5); text-align: center; touch-action: manipulation; }
   .skill-button:last-child { width: 58px; height: 58px; min-height: 0; margin: 0; border: 2px solid #f2d18c; background: #182938; }
@@ -415,8 +439,8 @@ kbd { display: inline-grid; min-width: 25px; height: 21px; place-items: center; 
   .target-heading strong { overflow: hidden; color: #fff1c9; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
   .target-panel .enemy-meter { height: 4px; margin: 4px 0 0; }
   .inventory-panel { display: none; }
-  .inventory-panel.mobile-sheet-open { position: fixed; z-index: 25; right: 8px; bottom: var(--hud-bottom); left: 8px; display: block; width: auto; max-height: min(72dvh, 610px); margin: 0; overflow: auto; overscroll-behavior: contain; border-color: rgba(233,200,117,.5); box-shadow: 0 22px 70px rgba(0,0,0,.58); }
-  .inventory-panel.mobile-sheet-open .panel-tabs { position: sticky; z-index: 2; top: 27px; grid-template-columns: repeat(4, 1fr); background: #10212b; }
+  .inventory-panel.mobile-sheet-open { position: fixed; z-index: 25; right: 8px; bottom: var(--hud-bottom); left: 8px; display: block; width: auto; max-height: min(72dvh, 610px); margin: 0; overflow: auto; overscroll-behavior: contain; border-color: rgba(233,200,117,.5); background: #10212b; box-shadow: 0 22px 70px rgba(0,0,0,.58); }
+  .inventory-panel.mobile-sheet-open .panel-tabs { position: sticky; z-index: 2; top: 27px; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #10212b; }
   .inventory-panel .tab-button { min-height: 44px; padding: 8px 3px; font-size: 9px; }
   .guild-teaser, .controls-panel { display: none; }
   .toast { right: auto; bottom: calc(var(--hud-bottom) + 227px); left: 50%; width: max-content; max-width: calc(100% - 48px); padding: 6px 9px; border-radius: 6px; font-size: 10px; line-height: 1.4; transform: translate(-50%, 8px); }
