@@ -1,10 +1,12 @@
 # PLAN — Game web kiếm hiệp 2D
 
 > Tài liệu thiết kế và kế hoạch phát triển cho repository `volam`.
-> Ngày lập: 01/10/2026. Trạng thái: P0–P5 local, nền online P3 và lát giao diện/visual P6 portrait mobile đã triển khai; P6 hiện khóa một viewport mobile, có HUD tài nguyên, chat, Auto và floating combat text; chiến đấu authoritative, tổ đội và bang hội vẫn nằm ở các milestone sau.
+> Ngày lập: 01/10/2026. Cập nhật visual/mobile: 02/10/2026. Trạng thái: P0–P5 local, nền online P3 và giao diện mobile một viewport đã triển khai; có HUD gọn, minimap vị trí thật, chat, Auto, floating combat text và ảnh kiếm hiệp 2D. Chiến đấu authoritative, P6 tổ đội/phụ bản online và bang hội vẫn nằm ở các milestone sau.
 > Tên làm việc: **Giang Hồ Dị Truyện**; có thể đổi trước khi phát hành.
 
 Tài liệu này là bản thiết kế để bắt đầu lập trình. Các hệ thống gameplay và tiêu chí nghiệm thu là mục tiêu triển khai; số liệu cân bằng, thời gian và hiệu năng sẽ được cập nhật sau khi có bản chơi thử.
+
+Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot bằng atlas tạo riêng, bổ sung nền rừng và cảnh vật, xuất WebP, sửa nút kỹ năng bị flex kéo thành bầu dục, tách các vùng chạm và hỗ trợ mobile dọc/ngang. Nhiệm vụ mặc định thu gọn; mục tiêu chỉ hiện khi chọn quái. Đây là bước hoàn thiện hình ảnh/UX, không đánh dấu hoàn thành milestone online. Animation hiện là nhún/đảo hướng sprite; nền minh họa chưa thay cho tilemap/collider được thiết kế riêng.
 
 **Mục lục nhanh:**
 

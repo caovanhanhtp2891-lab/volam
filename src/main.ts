@@ -1,5 +1,6 @@
 import "./style.css";
 import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
+import { drawSprite, drawScenerySprite, spriteMarkup, worldArt, type SpriteId } from "./art";
 
 type SectId = "kim" | "hoa" | "thuy";
 type ItemSlot = "weapon" | "armor";
@@ -167,6 +168,7 @@ const WORLD_WIDTH = 1900;
 const WORLD_HEIGHT = 1200;
 let VIEW_WIDTH = 960;
 let VIEW_HEIGHT = 600;
+const MOBILE_GAME_QUERY = "(max-width: 600px) and (orientation: portrait), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape)";
 const PLAYER_START = { x: 300, y: 360 };
 const SAVE_KEY = "giang-ho-di-truyen-prototype";
 
@@ -262,6 +264,7 @@ app.innerHTML = `
         </section>
 
         <section class="panel quest-panel">
+          <button class="quest-toggle" id="quest-toggle" type="button" aria-label="Mở chi tiết nhiệm vụ" aria-expanded="false">⌄</button>
           <div class="section-kicker">NHIỆM VỤ CHÍNH</div>
           <div class="quest-title" id="quest-title">Dấu chân trong Rừng Trúc</div>
           <div class="quest-text" id="quest-text">Đánh bại 5 sơn tặc, tìm món đồ tốt hơn và hạ Lang Vương.</div>
@@ -289,8 +292,8 @@ app.innerHTML = `
           <div class="canvas-badge" id="canvas-badge"><span class="live-dot"></span> RỪNG TRÚC · KÊNH 01</div>
           <div class="canvas-tip" id="canvas-tip">Chọn môn phái để bắt đầu hành trình</div>
           <div class="mobile-map-card" aria-label="Bản đồ nhỏ">
-            <div class="mobile-map-title">THANH KHÊ TRẤN <span>☼</span></div>
-            <div class="mobile-map-art"><i></i><b></b><em></em><strong></strong></div>
+            <div class="mobile-map-title"><b id="mobile-map-name">RỪNG TRÚC</b><span>☼</span></div>
+            <canvas class="mobile-map-art" id="mobile-minimap" width="190" height="120" aria-label="Vị trí nhân vật, quái và NPC"></canvas>
             <div class="mobile-map-channel">Kênh 1⌄</div>
           </div>
           <div class="mobile-resource-strip" aria-label="Tài nguyên">
@@ -298,14 +301,14 @@ app.innerHTML = `
             <span class="mobile-currency mobile-currency-stone">✦ <b id="mobile-stones">0</b></span>
           </div>
           <div class="mobile-action-rail" aria-label="Menu nhanh">
-            <button class="mobile-action" type="button" data-mobile-tab="bag"><span>◈</span><small>Hành trang</small></button>
-            <button class="mobile-action" type="button" data-mobile-tab="skills"><span>✦</span><small>Nhân vật</small></button>
-            <button class="mobile-action mobile-auto-button" id="mobile-auto" type="button"><span>⚔</span><small>Auto</small></button>
+            <button class="mobile-action" type="button" data-mobile-tab="dungeon" aria-label="Mở phụ bản">${spriteMarkup("portal")}<small>Phụ bản</small></button>
+            <button class="mobile-action" type="button" data-mobile-tab="skills" aria-label="Xem nhân vật">${spriteMarkup("kim", "character-shortcut")}<small>Nhân vật</small></button>
+            <button class="mobile-action mobile-auto-button" id="mobile-auto" type="button" aria-label="Bật tự động chiến đấu" aria-pressed="false">${spriteMarkup("sword")}<small>Auto</small></button>
           </div>
           <div class="mobile-chat" id="mobile-chat" aria-live="polite"></div>
           <div class="mobile-hud" id="mobile-hud" aria-label="Điều khiển trên điện thoại">
             <div class="joystick" id="joystick" aria-label="Cần điều khiển di chuyển"><div class="joystick-ring"><div class="joystick-knob" id="joystick-knob"></div></div></div>
-            <button class="mobile-pickup" id="mobile-pickup" type="button"><span>✦</span><small>Nhặt</small></button>
+            <button class="mobile-pickup" id="mobile-pickup" type="button" aria-label="Nhặt đồ xung quanh">${spriteMarkup("loot")}<small>Nhặt</small></button>
           </div>
         </div>
         <div class="combat-bar">
@@ -317,11 +320,11 @@ app.innerHTML = `
           <div id="log-list" class="log-list"></div>
         </div>
         <nav class="mobile-bottom-nav" aria-label="Thanh menu mobile">
-          <button class="mobile-nav-button" type="button" data-mobile-tab="skills"><span>✧</span><small>Kỹ năng</small></button>
-          <button class="mobile-nav-button" type="button" data-mobile-guild="true"><span>⚑</span><small>Bang</small></button>
-          <button class="mobile-nav-button" type="button" data-mobile-tab="smith"><span>⚒</span><small>Rèn</small></button>
-          <button class="mobile-nav-button" type="button" data-mobile-tab="bag"><span>◈</span><small>Túi đồ</small></button>
-          <button class="mobile-nav-button" type="button" data-mobile-settings="true"><span>⚙</span><small>Cài đặt</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="skills">${spriteMarkup("sword")}<small>Kỹ năng</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-guild="true">${spriteMarkup("guide")}<small>Bang</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="smith">${spriteMarkup("smith")}<small>Rèn</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="bag">${spriteMarkup("loot")}<small>Túi đồ</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-settings="true"><span aria-hidden="true">⚙︎</span><small>Cài đặt</small></button>
         </nav>
       </section>
 
@@ -357,7 +360,7 @@ app.innerHTML = `
         <h1>Chọn con đường nhập môn</h1>
         <p class="dialog-lead">Mỗi môn phái có nhịp chiến đấu riêng. Bạn có thể thử lại bằng nút Chơi lại.</p>
         <div class="sect-cards" id="sect-cards"></div>
-        <div class="dialog-footer"><span>Prototype P6 · giao diện mobile</span><span>WASD / Joystick · Click · 1 / 2 / 3 · E</span></div>
+        <div class="dialog-footer"><span>Hành trình bắt đầu tại Rừng Trúc</span><span>Chạm để đi · Joystick để di chuyển</span></div>
       </div>
     </div>
 
@@ -373,9 +376,13 @@ if (!context) throw new Error("Không khởi tạo được canvas context");
 const ctx: CanvasRenderingContext2D = context;
 
 function resizeGameViewport(): void {
-  const phonePortrait = window.innerWidth <= 600 && window.innerHeight >= window.innerWidth;
-  const nextWidth = phonePortrait ? 675 : 960;
-  const nextHeight = phonePortrait ? 1200 : 600;
+  const mobileViewport = window.matchMedia(MOBILE_GAME_QUERY).matches;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const scale = Math.min(1.6, (rect.width > rect.height ? 1100 : 720) / rect.width, 1020 / rect.height);
+  // Match the rendered aspect ratio so characters and hit targets never stretch.
+  const nextWidth = mobileViewport ? Math.round(rect.width * scale) : 960;
+  const nextHeight = mobileViewport ? Math.round(rect.height * scale) : 600;
   if (canvas.width === nextWidth && canvas.height === nextHeight) return;
   VIEW_WIDTH = nextWidth;
   VIEW_HEIGHT = nextHeight;
@@ -385,12 +392,15 @@ function resizeGameViewport(): void {
 
 resizeGameViewport();
 window.addEventListener("resize", resizeGameViewport);
+new ResizeObserver(resizeGameViewport).observe(canvas);
 
 const sectOverlay = document.querySelector<HTMLDivElement>("#sect-overlay")!;
 const sectCards = document.querySelector<HTMLDivElement>("#sect-cards")!;
 const inventoryContent = document.querySelector<HTMLDivElement>("#inventory-content")!;
 const targetContent = document.querySelector<HTMLDivElement>("#target-content")!;
 const targetPanel = document.querySelector<HTMLElement>(".target-panel")!;
+const miniMap = document.querySelector<HTMLCanvasElement>("#mobile-minimap")!;
+const miniMapContext = miniMap.getContext("2d")!;
 const logList = document.querySelector<HTMLDivElement>("#log-list")!;
 const toast = document.querySelector<HTMLDivElement>("#toast")!;
 const skillBar = document.querySelector<HTMLDivElement>("#skill-bar")!;
@@ -415,6 +425,7 @@ let activeTab: PanelTab = "bag";
 let lastFrame = performance.now();
 let lastUiUpdate = 0;
 let toastTimer = 0;
+let renderedSkillSect: SectId | null = null;
 const touchInput = { x: 0, y: 0 };
 let joystickPointerId: number | null = null;
 
@@ -682,7 +693,8 @@ function addLog(message: string): void {
   if (!game) return;
   game.logs.push(message);
   if (game.logs.length > 7) game.logs.shift();
-  showToast(message);
+  // Routine damage already has floating numbers and the combat log.
+  if (!/\d+ sát thương\.$/.test(message)) showToast(message);
 }
 
 function showToast(message: string): void {
@@ -1435,6 +1447,16 @@ function drawBar(x: number, y: number, width: number, height: number, ratio: num
   }
 }
 
+function drawOutlinedText(text: string, x: number, y: number): void {
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(18,28,19,.85)";
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 function drawWorld(now: number): void {
   ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   if (!game) {
@@ -1463,54 +1485,36 @@ function drawWorld(now: number): void {
     ctx.font = "12px 'DM Sans', sans-serif";
     ctx.fillText("Hạ Cổ Mộ Thủ Vệ và nhận token phụ bản", 270, 575);
   } else {
-    ctx.fillStyle = "#183936";
-    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    ctx.fillStyle = "rgba(255,255,255,.025)";
-    for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
-    for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
-    ctx.fillStyle = "#224b40";
-    ctx.fillRect(245, 230, 230, 300);
-    ctx.fillRect(1190, 250, 180, 270);
-    ctx.fillStyle = "rgba(198, 155, 91, .21)";
-    ctx.fillRect(242, 480, 1180, 48);
-    ctx.fillRect(360, 330, 48, 560);
-    ctx.fillStyle = "rgba(111, 198, 189, .13)";
-    ctx.beginPath();
-    ctx.arc(1670, 920, 190, 0, Math.PI * 2);
-    ctx.fill();
+    if (worldArt.complete && worldArt.naturalWidth) {
+      ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    } else {
+      ctx.fillStyle = "#183936";
+      ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      ctx.fillStyle = "rgba(255,255,255,.025)";
+      for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
+      for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
+      ctx.fillStyle = "#224b40";
+      ctx.fillRect(245, 230, 230, 300);
+      ctx.fillRect(1190, 250, 180, 270);
+      ctx.fillStyle = "rgba(198, 155, 91, .21)";
+      ctx.fillRect(242, 480, 1180, 48);
+      ctx.fillRect(360, 330, 48, 560);
+      ctx.fillStyle = "rgba(111, 198, 189, .13)";
+      ctx.beginPath();
+      ctx.arc(1670, 920, 190, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     for (const obstacle of obstacles) {
-      if (obstacle.type === "rock") {
-        ctx.fillStyle = "#415e60";
-        drawRoundedRect(ctx, obstacle.x, obstacle.y, obstacle.w, obstacle.h, 18);
-        ctx.fill();
-        ctx.fillStyle = "rgba(211,238,221,.14)";
-        drawRoundedRect(ctx, obstacle.x + 12, obstacle.y + 10, obstacle.w * 0.45, 12, 6);
-        ctx.fill();
-      } else {
-        for (let x = obstacle.x + 24; x < obstacle.x + obstacle.w; x += 38) {
-          for (let y = obstacle.y + 25; y < obstacle.y + obstacle.h; y += 38) {
-            ctx.fillStyle = "#1b5a43";
-            ctx.beginPath();
-            ctx.arc(x, y, 22, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#2c7753";
-            ctx.beginPath();
-            ctx.arc(x - 6, y - 7, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#6a4933";
-            ctx.fillRect(x - 3, y + 12, 6, 13);
-          }
-        }
-      }
+      drawSceneryObstacle(obstacle);
     }
 
     ctx.fillStyle = "#cfb374";
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    ctx.fillText("THANH KHÊ TRẤN", 268, 260);
+    drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
     ctx.fillStyle = "rgba(222, 239, 220, .55)";
     ctx.font = "12px 'DM Sans', sans-serif";
-    ctx.fillText("Cổng phía đông · Lang Vương", 1320, 1030);
+    drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
     for (const npc of NPCS) drawNpc(npc, now);
   }
 
@@ -1532,15 +1536,117 @@ function drawWorld(now: number): void {
   }
   ctx.restore();
 
-  const vignette = ctx.createRadialGradient(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 130, VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 520);
+  const vignetteRadius = Math.max(VIEW_WIDTH, VIEW_HEIGHT) * .65;
+  const vignette = ctx.createRadialGradient(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, vignetteRadius * .25, VIEW_WIDTH / 2, VIEW_HEIGHT / 2, vignetteRadius);
   vignette.addColorStop(0, "rgba(4, 12, 16, 0)");
-  vignette.addColorStop(1, "rgba(4, 12, 16, .46)");
+  vignette.addColorStop(1, "rgba(4, 12, 16, .26)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   if (game.screenFlash > 0) {
     ctx.fillStyle = `rgba(255, 225, 160, ${game.screenFlash * 0.5})`;
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   }
+  drawMinimap();
+}
+
+function drawSceneryObstacle(obstacle: typeof obstacles[number]): void {
+  const { x, y, w, h } = obstacle;
+  if (obstacle.type === "rock") {
+    if (drawScenerySprite(ctx, "rock", x + w / 2, y + h + 8, w * 1.12, h * 1.4)) return;
+  } else {
+    const count = Math.ceil(w / 80);
+    let ready = false;
+    for (let index = 0; index < count; index++) {
+      ready = drawScenerySprite(ctx, "bamboo", x + w * (index + .5) / count, y + h + 8, w / count + 25, h + 42);
+    }
+    if (ready) return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  if (obstacle.type === "rock") {
+    ctx.fillStyle = "rgba(18,35,26,.3)";
+    ctx.beginPath();
+    ctx.ellipse(w / 2, h * .8, w * .57, h * .35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const stone = ctx.createLinearGradient(0, 0, w, h);
+    stone.addColorStop(0, "#a1ab8b");
+    stone.addColorStop(.4, "#6a7e6b");
+    stone.addColorStop(1, "#364d44");
+    ctx.fillStyle = stone;
+    ctx.beginPath();
+    ctx.moveTo(0, h * .55);
+    ctx.lineTo(w * .16, h * .1);
+    ctx.lineTo(w * .58, 0);
+    ctx.lineTo(w * .92, h * .23);
+    ctx.lineTo(w, h * .76);
+    ctx.lineTo(w * .67, h);
+    ctx.lineTo(w * .15, h * .92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(215,222,181,.3)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w * .17, h * .12);
+    ctx.lineTo(w * .42, h * .49);
+    ctx.lineTo(w * .9, h * .26);
+    ctx.moveTo(w * .42, h * .49);
+    ctx.lineTo(w * .63, h * .98);
+    ctx.stroke();
+  } else {
+    for (let sx = 10; sx < w; sx += 22) {
+      for (let sy = 24; sy < h; sy += 35) {
+        const sway = Math.sin(x + sx + sy) * 6;
+        ctx.strokeStyle = "#70924e";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + 19);
+        ctx.lineTo(sx + sway, sy - 28);
+        ctx.stroke();
+        for (let index = 0; index < 5; index++) {
+          const ly = sy - 22 + index * 8;
+          const side = index % 2 ? 1 : -1;
+          ctx.fillStyle = index % 2 ? "#416b36" : "#71984c";
+          ctx.beginPath();
+          ctx.moveTo(sx + sway, ly);
+          ctx.quadraticCurveTo(sx + side * 30, ly - 15, sx + side * 36, ly - 2);
+          ctx.quadraticCurveTo(sx + side * 19, ly + 5, sx + sway, ly);
+          ctx.fill();
+        }
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawMinimap(): void {
+  if (!game || !window.matchMedia(MOBILE_GAME_QUERY).matches) return;
+  const mc = miniMapContext;
+  const sx = miniMap.width / WORLD_WIDTH;
+  const sy = miniMap.height / WORLD_HEIGHT;
+  mc.clearRect(0, 0, miniMap.width, miniMap.height);
+  if (game.mapMode === "world" && worldArt.complete && worldArt.naturalWidth) {
+    mc.drawImage(worldArt, 0, 0, miniMap.width, miniMap.height);
+  } else {
+    mc.fillStyle = game.mapMode === "dungeon" ? "#29253b" : "#41694b";
+    mc.fillRect(0, 0, miniMap.width, miniMap.height);
+  }
+  mc.fillStyle = "rgba(7,18,14,.22)";
+  mc.fillRect(0, 0, miniMap.width, miniMap.height);
+  mc.strokeStyle = "rgba(255,241,189,.75)";
+  mc.lineWidth = 1;
+  mc.strokeRect(game.cameraX * sx, game.cameraY * sy, VIEW_WIDTH * sx, VIEW_HEIGHT * sy);
+  const dot = (x: number, y: number, color: string, radius: number) => {
+    mc.fillStyle = color;
+    mc.beginPath();
+    mc.arc(x * sx, y * sy, radius, 0, Math.PI * 2);
+    mc.fill();
+  };
+  if (game.mapMode === "world") for (const npc of NPCS) dot(npc.x, npc.y, "#88e8ce", 2);
+  for (const enemy of game.enemies) {
+    if (!enemy.dead) dot(enemy.x, enemy.y, enemy.kind === "boss" ? "#ffdb65" : "#f06e62", enemy.kind === "boss" ? 3.5 : 2);
+  }
+  dot(game.player.x, game.player.y, "#ffffff", 4.5);
+  dot(game.player.x, game.player.y, "#58cfff", 3);
 }
 
 function drawNpc(npc: Npc, now: number): void {
@@ -1552,28 +1658,32 @@ function drawNpc(npc: Npc, now: number): void {
   ctx.beginPath();
   ctx.ellipse(0, 19, 20, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = npc.color;
-  ctx.beginPath();
-  ctx.arc(0, 0, 17, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#f2d0ad";
-  ctx.beginPath();
-  ctx.arc(0, -5, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#232b3b";
-  ctx.beginPath();
-  ctx.arc(0, -8, 8, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#10212c";
-  ctx.font = "700 13px 'DM Sans', sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(npc.icon, 0, 5);
+  const sprite: SpriteId = npc.id === "dungeon" ? "portal" : npc.id;
+  if (!drawSprite(ctx, sprite, 0, 20, npc.id === "dungeon" ? 84 : 62, npc.id === "dungeon" ? 84 : 70)) {
+    ctx.fillStyle = npc.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 17, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f2d0ad";
+    ctx.beginPath();
+    ctx.arc(0, -5, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#232b3b";
+    ctx.beginPath();
+    ctx.arc(0, -8, 8, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#10212c";
+    ctx.font = "700 13px 'DM Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(npc.icon, 0, 5);
+  }
   ctx.fillStyle = "#e2eadc";
   ctx.font = "600 11px 'DM Sans', sans-serif";
-  ctx.fillText(npc.name, 0, -29);
+  ctx.textAlign = "center";
+  drawOutlinedText(npc.name, 0, -67);
   ctx.fillStyle = "rgba(210, 224, 214, .65)";
   ctx.font = "9px 'DM Sans', sans-serif";
-  ctx.fillText(npc.title, 0, -17);
+  drawOutlinedText(npc.title, 0, -55);
   ctx.textAlign = "left";
   ctx.restore();
 }
@@ -1709,6 +1819,10 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.beginPath();
   ctx.arc(0, 0, loot.item ? 21 : 17, 0, Math.PI * 2);
   ctx.fill();
+  if (drawSprite(ctx, loot.item?.slot === "weapon" ? "sword" : "loot", 0, 14, 30, 30)) {
+    ctx.restore();
+    return;
+  }
   if (loot.item) {
     ctx.save();
     ctx.rotate(Math.PI / 4 + Math.sin(now / 300) * 0.08);
@@ -1742,6 +1856,17 @@ function drawEnemySprite(enemy: Enemy, now: number): void {
   const isWolf = enemy.name.includes("Lang") || enemy.name.includes("Trúc Lang");
   const isInsect = enemy.name.includes("Trùng");
   const isUndead = enemy.name.includes("U Binh") || enemy.name.includes("Mộ Tướng");
+  const sprite: SpriteId = isWolf ? enemy.kind === "boss" ? "alpha" : "wolf"
+    : isInsect ? "beetle" : enemy.kind === "boss" ? "guardian" : isUndead ? "undead" : "bandit";
+  ctx.save();
+  ctx.translate(0, Math.sin(now / 180 + enemy.x) * 1.2);
+  if (enemy.hitFlash > 0) ctx.globalAlpha = .65 + Math.sin(now / 35) * .2;
+  const illustrated = drawSprite(ctx, sprite, 0, enemy.radius * .8,
+    enemy.radius * (isWolf ? 3.6 : 3.2), enemy.radius * (isWolf ? 2.8 : 3.4),
+    Boolean(game && enemy.x > game.player.x),
+  );
+  ctx.restore();
+  if (illustrated) return;
   ctx.save();
   ctx.scale(scale, scale);
   const bob = Math.sin(now / 180 + enemy.x) * (isWolf ? 1.2 : 0.6);
@@ -1865,11 +1990,12 @@ function drawEnemy(enemy: Enemy, now: number): void {
   drawEnemySprite(enemy, now);
   ctx.restore();
   const barWidth = enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
-  drawBar(enemy.x - barWidth / 2, enemy.y - enemy.radius - 23, barWidth, enemy.kind === "boss" ? 8 : 5, enemy.hp / enemy.maxHp, enemy.kind === "boss" ? "#dd6c79" : "#a6d36c");
+  const labelY = enemy.y - enemy.radius * 2.6 - 12;
+  drawBar(enemy.x - barWidth / 2, labelY, barWidth, enemy.kind === "boss" ? 8 : 5, enemy.hp / enemy.maxHp, enemy.kind === "boss" ? "#dd6c79" : "#a6d36c");
   ctx.fillStyle = enemy.kind === "boss" ? "#ffe0a1" : "#d4e1d3";
   ctx.font = `${enemy.kind === "boss" ? 700 : 600} ${enemy.kind === "boss" ? 13 : 11}px 'DM Sans', sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText(`${enemy.name} · Cấp ${enemy.level}`, enemy.x, enemy.y - enemy.radius - 30);
+  drawOutlinedText(`${enemy.name} · Cấp ${enemy.level}`, enemy.x, labelY - 7);
   ctx.textAlign = "left";
 }
 
@@ -1882,70 +2008,77 @@ function drawHeroSprite(sect: Sect, facingX: number, facingY: number, now: numbe
   ctx.beginPath();
   ctx.ellipse(0, 17, 21, 7, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = hexToRgba(sect.color, 0.92);
-  ctx.beginPath();
-  ctx.moveTo(0, -21);
-  ctx.lineTo(15, -5);
-  ctx.lineTo(14, 17);
-  ctx.lineTo(-14, 17);
-  ctx.lineTo(-15, -5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#f0c5a4";
-  ctx.beginPath();
-  ctx.arc(0, -12, 9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#202538";
-  ctx.beginPath();
-  ctx.arc(0, -15, 10, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = sect.accent;
-  ctx.fillRect(-8, -5, 16, 3);
-  const angle = Math.atan2(facingY, facingX);
   ctx.save();
-  ctx.rotate(angle);
-  if (sect.id === "kim") {
-    ctx.strokeStyle = "#eef4e9";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(6, 2);
-    ctx.lineTo(30, 2);
-    ctx.stroke();
-    ctx.strokeStyle = sect.accent;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(10, -4);
-    ctx.lineTo(10, 8);
-    ctx.stroke();
-  } else if (sect.id === "hoa") {
-    ctx.strokeStyle = "#8f6a4b";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(4, 12);
-    ctx.lineTo(4, -17);
-    ctx.stroke();
-    ctx.fillStyle = "#ffbd66";
-    ctx.beginPath();
-    ctx.arc(4, -21, 6 + Math.sin(now / 90) * 1.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff0a4";
-    ctx.beginPath();
-    ctx.arc(2, -23, 2, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.strokeStyle = sect.accent;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(3, 10);
-    ctx.quadraticCurveTo(20, 0, 7, -13);
-    ctx.quadraticCurveTo(20, -4, 29, -9);
-    ctx.stroke();
-    ctx.fillStyle = "#bcecff";
-    ctx.beginPath();
-    ctx.arc(28, -9, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const moving = remote || Boolean(game?.moveTarget) || keys.size > 0 || Boolean(touchInput.x || touchInput.y);
+  if (moving) ctx.rotate(Math.sin(now / 95) * .035);
+  const illustrated = drawSprite(ctx, sect.id, 0, 21, 76, 83, facingX < 0);
   ctx.restore();
+  if (!illustrated) {
+    ctx.fillStyle = hexToRgba(sect.color, 0.92);
+    ctx.beginPath();
+    ctx.moveTo(0, -21);
+    ctx.lineTo(15, -5);
+    ctx.lineTo(14, 17);
+    ctx.lineTo(-14, 17);
+    ctx.lineTo(-15, -5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f0c5a4";
+    ctx.beginPath();
+    ctx.arc(0, -12, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#202538";
+    ctx.beginPath();
+    ctx.arc(0, -15, 10, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = sect.accent;
+    ctx.fillRect(-8, -5, 16, 3);
+    const angle = Math.atan2(facingY, facingX);
+    ctx.save();
+    ctx.rotate(angle);
+    if (sect.id === "kim") {
+      ctx.strokeStyle = "#eef4e9";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(6, 2);
+      ctx.lineTo(30, 2);
+      ctx.stroke();
+      ctx.strokeStyle = sect.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(10, -4);
+      ctx.lineTo(10, 8);
+      ctx.stroke();
+    } else if (sect.id === "hoa") {
+      ctx.strokeStyle = "#8f6a4b";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(4, 12);
+      ctx.lineTo(4, -17);
+      ctx.stroke();
+      ctx.fillStyle = "#ffbd66";
+      ctx.beginPath();
+      ctx.arc(4, -21, 6 + Math.sin(now / 90) * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff0a4";
+      ctx.beginPath();
+      ctx.arc(2, -23, 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = sect.accent;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(3, 10);
+      ctx.quadraticCurveTo(20, 0, 7, -13);
+      ctx.quadraticCurveTo(20, -4, 29, -9);
+      ctx.stroke();
+      ctx.fillStyle = "#bcecff";
+      ctx.beginPath();
+      ctx.arc(28, -9, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   if (!remote && game?.player.shieldUntil && game.player.shieldUntil > now && game.player.shield > 0) {
     ctx.strokeStyle = hexToRgba(sect.accent, 0.7);
     ctx.lineWidth = 3;
@@ -1962,11 +2095,11 @@ function drawPlayer(player: Player, now: number): void {
   ctx.translate(player.x, player.y);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
-  drawBar(player.x - 25, player.y - 42, 50, 5, player.hp / player.maxHp, "#66db9c");
+  drawBar(player.x - 25, player.y - 67, 50, 5, player.hp / player.maxHp, "#66db9c");
   ctx.fillStyle = "#e8eff1";
   ctx.font = "700 11px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(`Bạn · Cấp ${player.level}`, player.x, player.y - 49);
+  drawOutlinedText(`Bạn · Cấp ${player.level}`, player.x, player.y - 74);
   ctx.textAlign = "left";
 }
 
@@ -1975,11 +2108,11 @@ function drawRemotePlayer(remote: OnlineSnapshot["players"][number], now: number
   ctx.translate(remote.x, remote.y + Math.sin(now / 190 + remote.x) * 1.2);
   drawHeroSprite(SECTS.thuy, 1, 0, now, true);
   ctx.restore();
-  drawBar(remote.x - 23, remote.y - 40, 46, 4, 1, "#72b9e8");
+  drawBar(remote.x - 23, remote.y - 62, 46, 4, 1, "#72b9e8");
   ctx.fillStyle = "#c5e4f2";
   ctx.font = "600 10px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(`${remote.name} · Cấp ${remote.level}`, remote.x, remote.y - 47);
+  drawOutlinedText(`${remote.name} · Cấp ${remote.level}`, remote.x, remote.y - 69);
   ctx.textAlign = "left";
 }
 
@@ -1998,6 +2131,7 @@ function refreshUi(force = false): void {
   const sect = SECTS[player.sect];
   const target = currentTarget();
   targetPanel.classList.toggle("has-target", Boolean(target));
+  combatStatusText.parentElement?.classList.toggle("has-target", Boolean(target));
   const setText = (selector: string, value: string) => {
     const element = document.querySelector(selector);
     if (element) element.textContent = value;
@@ -2014,6 +2148,9 @@ function refreshUi(force = false): void {
   setText("#mobile-gold", formatNumber(player.gold));
   setText("#mobile-stones", formatNumber(player.refiningStones));
   mobileAuto.classList.toggle("active", game.autoBattle);
+  mobileAuto.setAttribute("aria-pressed", String(game.autoBattle));
+  mobileAuto.setAttribute("aria-label", game.autoBattle ? "Tắt tự động chiến đấu" : "Bật tự động chiến đấu");
+  setText("#mobile-map-name", game.mapMode === "world" ? "RỪNG TRÚC" : "CỔ MỘ");
   setText("#quest-kill-progress", `${Math.min(player.questKills, 5)} / 5 sơn tặc`);
   setText("#quest-boss-progress", `${player.bossDefeated ? "✓" : "○"} Lang Vương`);
   setText("#quest-title", player.questRewardClaimed ? "Dấu chân hoàn tất" : "Dấu chân trong Rừng Trúc");
@@ -2021,10 +2158,13 @@ function refreshUi(force = false): void {
   setText("#quest-reward", player.questRewardClaimed ? "Đã nhận thưởng" : "+100 XP · +300 bạc");
   setText("#bag-count", `${player.inventory.length}/12`);
   const avatar = document.querySelector<HTMLElement>("#avatar-orb");
-  if (avatar) {
+  if (avatar && avatar.dataset.sect !== player.sect) {
+    avatar.dataset.sect = player.sect;
     avatar.className = `avatar-orb avatar-${player.sect}`;
-    avatar.innerHTML = `<span class="portrait-hair"></span><span class="portrait-face"></span><span class="portrait-collar"></span>`;
+    avatar.innerHTML = spriteMarkup(player.sect, "portrait-sprite");
     avatar.style.background = `linear-gradient(135deg, ${hexToRgba(sect.color, 0.6)}, #142434)`;
+    const shortcut = document.querySelector(".character-shortcut");
+    if (shortcut) shortcut.outerHTML = spriteMarkup(player.sect, "character-shortcut");
   }
   const bars: Record<string, string> = {
     "#xp-bar": `${(player.xp / xpToNext(player.level)) * 100}%`,
@@ -2043,6 +2183,7 @@ function refreshUi(force = false): void {
     <div><span>TỐC</span><strong>${formatNumber(player.speed)}</strong></div>
   `;
   if (target) {
+    targetContent.classList.remove("target-empty");
     const status = target.kind === "boss" ? "BOSS · CƠ CHẾ ĐANG HOẠT ĐỘNG" : target.kind === "elite" ? "TINH ANH" : "ĐANG GIAO CHIẾN";
     targetContent.innerHTML = `
       <div class="target-heading"><div class="target-orb" style="--target-color:${target.color}"></div><div><strong>${escapeHtml(target.name)}</strong><span>${status} · Cấp ${target.level}</span></div></div>
@@ -2052,6 +2193,7 @@ function refreshUi(force = false): void {
     `;
     combatStatusText.textContent = `${target.name} · ${Math.floor(target.hp)} HP`;
   } else {
+    targetContent.classList.add("target-empty");
     targetContent.innerHTML = `<div class="target-empty">Click vào quái để chọn mục tiêu</div>`;
     combatStatusText.textContent = "Chưa có mục tiêu";
   }
@@ -2062,12 +2204,14 @@ function refreshUi(force = false): void {
 }
 
 function skillGlyphMarkup(skill: SkillKey, sectId: SectId): string {
-  return `<span class="skill-glyph skill-${skill} sect-${sectId}" aria-hidden="true"><span></span></span>`;
+  const sprite = sectId === "kim" ? "sword" : sectId === "hoa" ? "fire" : "ice";
+  return `<span class="skill-glyph skill-${skill} sect-${sectId} illustrated-skill" aria-hidden="true">${spriteMarkup(sprite)}</span>`;
 }
 
 function renderSkillBar(): void {
   if (!game) {
     skillBar.innerHTML = "";
+    renderedSkillSect = null;
     return;
   }
   const player = game.player;
@@ -2077,12 +2221,19 @@ function renderSkillBar(): void {
     { key: "skill2" as const, number: "2", name: sect.skills[1], icon: sect.id === "kim" ? "➶" : sect.id === "hoa" ? "◉" : "◌" },
     { key: "ultimate" as const, number: "3", name: sect.ultimate, icon: "✦" },
   ];
-  skillBar.innerHTML = skillData.map((skill) => {
+  if (renderedSkillSect !== player.sect) {
+    skillBar.innerHTML = skillData.map((skill) => `<button class="skill-button" data-skill="${skill.key}" title="${skill.name}"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`).join("");
+    renderedSkillSect = player.sect;
+  }
+  for (const skill of skillData) {
     const locked = skill.key === "skill2" && player.level < 3 || skill.key === "ultimate" && player.level < 5;
     const cooldown = player.cooldowns[skill.key];
     const coolText = locked ? "KHÓA" : cooldown > 0 ? `${cooldown.toFixed(1)}s` : skill.key === "ultimate" ? `${Math.floor(player.rage)}% nộ` : "SẴN SÀNG";
-    return `<button class="skill-button ${locked ? "locked" : ""}" data-skill="${skill.key}" title="${skill.name}"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown">${coolText}</span></button>`;
-  }).join("");
+    const button = skillBar.querySelector<HTMLButtonElement>(`[data-skill="${skill.key}"]`)!;
+    button.classList.toggle("locked", locked);
+    button.setAttribute("aria-label", `${skill.name}: ${coolText}`);
+    button.querySelector(".skill-cooldown")!.textContent = coolText;
+  }
 }
 
 function itemRow(item: Item, index: number, equipped = false): string {
@@ -2166,6 +2317,7 @@ function startGame(sect: SectId): void {
 function renderSectCards(): void {
   sectCards.innerHTML = Object.values(SECTS).map((sect) => `
     <button class="sect-card" data-sect="${sect.id}" style="--sect-color:${sect.color};--sect-accent:${sect.accent}">
+      ${spriteMarkup(sect.id, "sect-character-art")}
       <span class="sect-card-top"><span class="sect-emblem sect-${sect.id}"><span class="sect-art" aria-hidden="true"></span></span><span class="sect-role">${sect.title}</span></span>
       <strong>${sect.name}</strong>
       <span class="sect-description">${sect.description}</span>
@@ -2246,11 +2398,20 @@ document.addEventListener("keydown", (event) => {
   if (key === "3") castSkill("ultimate");
   if (key === "e") pickupNearby();
   if (key === "b") {
+    if (window.matchMedia(MOBILE_GAME_QUERY).matches) {
+      if (inventoryPanel.classList.contains("mobile-sheet-open")) closeMobileSheet();
+      else openMobileSheet("bag");
+      return;
+    }
     activeTab = "bag";
     document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     refreshUi(true);
   }
   if (key === "k") {
+    if (window.matchMedia(MOBILE_GAME_QUERY).matches) {
+      openMobileSheet("skills");
+      return;
+    }
     activeTab = "skills";
     document.querySelector(".inventory-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     refreshUi(true);
@@ -2313,6 +2474,12 @@ document.querySelectorAll<HTMLButtonElement>("[data-mobile-guild]").forEach((but
 document.querySelectorAll<HTMLButtonElement>("[data-mobile-settings]").forEach((button) => button.addEventListener("click", () => showToast("Cài đặt âm thanh và tài khoản sẽ mở ở mốc vận hành.")));
 mobileSheetClose.addEventListener("click", closeMobileSheet);
 mobileSheetBackdrop.addEventListener("click", closeMobileSheet);
+document.querySelector<HTMLButtonElement>("#quest-toggle")!.addEventListener("click", (event) => {
+  const button = event.currentTarget as HTMLButtonElement;
+  const expanded = button.closest(".quest-panel")!.classList.toggle("expanded");
+  button.setAttribute("aria-expanded", String(expanded));
+  button.setAttribute("aria-label", expanded ? "Thu gọn nhiệm vụ" : "Mở chi tiết nhiệm vụ");
+});
 mobileAuto.addEventListener("click", () => {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
   game.autoBattle = !game.autoBattle;
