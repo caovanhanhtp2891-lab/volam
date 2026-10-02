@@ -1,19 +1,22 @@
-# Bộ ảnh kiếm hiệp 2D
+# Hình 2D đơn giản, nhẹ
 
-Tạo riêng cho **Giang Hồ Dị Truyện** bằng công cụ tạo ảnh OpenAI ngày 02/10/2026. Các ảnh dùng phong cách kiếm hiệp chibi vẽ tay, góc nhìn từ trên xuống. Không tải asset bên thứ ba.
+Theo yêu cầu người dùng: hình phẳng, ít màu, ít chi tiết và nhẹ trên điện thoại.
 
-| File | Nội dung | Cách sử dụng |
-| --- | --- | --- |
-| `wuxia-atlas.webp` | 3 nhân vật/phái; sơn tặc, sói, Lang Vương, bọ, u binh; người dẫn đường, thợ rèn, cổng phụ bản, boss cổ mộ; 3 icon chiêu và túi loot | 16 vùng ảnh; tọa độ chuẩn hóa được khai báo trong `src/art.ts` |
-| `scenery-atlas.webp` | Đá rêu, bụi trúc, cây đào và cổng gỗ | Atlas 2 × 2; đá và trúc thể hiện các vật cản hiện có, đào/cổng dự trữ cho map tiếp theo |
-| `thanh-khe.webp` | Bản đồ rừng trúc với đường đất, làng, hồ và hoa đào | Lớp nền thế giới và nền minimap; khung thế giới 1900 × 1200 |
+`simple-atlas.webp` là ảnh duy nhất game cần tải: **19.044 byte**, 384 × 384 px, nền trong suốt, tối đa 64 màu. Atlas 4 × 4 chứa 16 ô 96 × 96 px. Mỗi sprite nằm trọn trong ô, có khoảng trống xung quanh; tọa độ ở `src/art.ts`.
 
-Ảnh PNG gốc được xuất từ công cụ tạo ảnh, sau đó mã hóa WebP (quality 86–88) để giảm dữ liệu tải trên mobile. Atlas nhân vật/cảnh vật giữ nền trong suốt. Nạp qua URL của Vite để có tên file theo nội dung và hoạt động ở đường dẫn GitHub Pages `/volam/`.
+| Hàng | Nội dung từ trái sang phải |
+| --- | --- |
+| 1 | Kiếm khách Kim Phong, hỏa pháp Xích Diệm, thủy pháp Huyền Thủy, sơn tặc |
+| 2 | Sói, Lang Vương, bọ, u binh |
+| 3 | Người dẫn đường, thợ rèn, cổng phụ bản, boss cổ mộ |
+| 4 | Kiếm, lửa, băng và túi loot |
 
-Nhân vật hiện dùng sprite tĩnh kết hợp nhún/đảo hướng; chưa phải spritesheet đi bộ 4 hướng. Collider vẫn do gameplay định nghĩa, không được suy ra từ từng pixel của nền minh họa. Canvas giữ hình vẽ đơn giản làm phương án dự phòng khi ảnh chưa tải xong.
+Ảnh được tạo riêng bằng công cụ tạo ảnh OpenAI ngày 02/10/2026 theo mô tả cartoon 2D đơn giản: mặt tròn, mắt chấm, áo trơn, vũ khí ít nét, không họa tiết cầu kỳ. PNG gốc được đóng lại thành các ô đều nhau, thu nhỏ, giới hạn bảng màu và xuất WebP lossless. Không tải asset bên thứ ba.
 
-## Mô tả tạo ảnh
+Nền Rừng Trúc, phụ bản, cây và đá dùng hình học Canvas trong `src/map-art.ts`, không có file ảnh nền/cảnh vật. Nền được vẽ một lần trên canvas 950 × 600 và tái sử dụng; nền phụ bản chỉ tạo khi người chơi vào đó. Vật cản được vẽ theo cùng dữ liệu collider của gameplay. Minimap dùng chung nền đã lưu.
 
-- Nhân vật: chibi kiếm khách áo trắng/vàng, hỏa pháp áo đỏ, thủy pháp áo xanh; quái, boss và NPC cùng ánh sáng/phong cách; các đối tượng tách biệt trên nền trong suốt, không chữ hay UI.
-- Cảnh vật: đá xám phủ rêu, bụi trúc xanh, đào hồng và cổng làng có đèn lồng; các đối tượng riêng trên nền trong suốt.
-- Bản đồ: làng rừng trúc sáng ban mai, lối đất giao nhau, đá rêu, hàng rào, nhà gỗ, hồ và cầu; vùng giữa dành cho di chuyển; không chứa nhân vật, quái hay giao diện.
+Game vẽ tối đa 30 FPS; mô phỏng/input vẫn theo vòng cập nhật hiện có. Minimap cập nhật khoảng 5 lần/giây. Kỹ năng dùng vòng tròn/cung đơn giản, không tạo gradient toàn màn hình; UI không cần backdrop blur.
+
+Ngân sách cho atlas: dưới 32 KB. Nếu mở rộng nội dung, ưu tiên dùng lại sprite/đổi màu và giữ ít chi tiết. Nhân vật hiện chuyển động bằng nhún/đảo hướng sprite, chưa có bộ frame đi bộ 4 hướng.
+
+Bộ ảnh chi tiết trước đây (khoảng 2,06 MB) được thay thế; có thể khôi phục từ commit `c2e3511` trong lịch sử Git. Asset mới giảm dữ liệu ảnh tải khoảng **99,1%**. URL ảnh vẫn được Vite xử lý cho đường dẫn GitHub Pages `/volam/`.

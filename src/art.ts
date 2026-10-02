@@ -1,18 +1,15 @@
-// Original generated art. Rectangles use normalized coordinates so the atlas
-// does not depend on the generator's output resolution.
-export const ATLAS_URL = new URL("./assets/wuxia-atlas.webp", import.meta.url).href;
-export const WORLD_ART_URL = new URL("./assets/thanh-khe.webp", import.meta.url).href;
-const SCENERY_URL = new URL("./assets/scenery-atlas.webp", import.meta.url).href;
+// One small atlas: 16 simple sprites, each contained in an equal-size cell.
+export const ATLAS_URL = new URL("./assets/simple-atlas.webp", import.meta.url).href;
 
 const SPRITES = {
-  kim: [0, 0, .25, .274],
-  hoa: [.25, 0, .25, .274],
-  thuy: [.5, 0, .25, .274],
-  bandit: [.75, 0, .25, .274],
-  wolf: [0, .274, .25, .226],
-  alpha: [.25, .274, .25, .226],
-  beetle: [.5, .274, .25, .226],
-  undead: [.75, .274, .25, .226],
+  kim: [0, 0, .25, .25],
+  hoa: [.25, 0, .25, .25],
+  thuy: [.5, 0, .25, .25],
+  bandit: [.75, 0, .25, .25],
+  wolf: [0, .25, .25, .25],
+  alpha: [.25, .25, .25, .25],
+  beetle: [.5, .25, .25, .25],
+  undead: [.75, .25, .25, .25],
   guide: [0, .5, .25, .25],
   smith: [.25, .5, .25, .25],
   portal: [.5, .5, .25, .25],
@@ -33,8 +30,6 @@ function loadImage(url: string): HTMLImageElement {
 }
 
 const atlas = loadImage(ATLAS_URL);
-const scenery = loadImage(SCENERY_URL);
-export const worldArt = loadImage(WORLD_ART_URL);
 
 export function spriteMarkup(id: SpriteId, extraClass = ""): string {
   const [x, y, w, h] = SPRITES[id];
@@ -51,15 +46,6 @@ export function drawSprite(
   flip = false,
 ): boolean {
   return drawFromAtlas(context, atlas, SPRITES[id], x, y, width, height, flip);
-}
-
-export function drawScenerySprite(
-  context: CanvasRenderingContext2D,
-  id: "rock" | "bamboo" | "peach" | "gate",
-  x: number, y: number, width: number, height: number,
-): boolean {
-  const rects = { rock: [0, 0, .5, .5], bamboo: [.5, 0, .5, .5], peach: [0, .5, .5, .5], gate: [.5, .5, .5, .5] } as const;
-  return drawFromAtlas(context, scenery, rects[id], x, y, width, height);
 }
 
 function drawFromAtlas(

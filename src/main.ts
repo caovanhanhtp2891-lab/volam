@@ -1,6 +1,7 @@
 import "./style.css";
 import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
-import { drawSprite, drawScenerySprite, spriteMarkup, worldArt, type SpriteId } from "./art";
+import { drawSprite, spriteMarkup, type SpriteId } from "./art";
+import { createMapArt } from "./map-art";
 
 type SectId = "kim" | "hoa" | "thuy";
 type ItemSlot = "weapon" | "armor";
@@ -169,6 +170,8 @@ const WORLD_HEIGHT = 1200;
 let VIEW_WIDTH = 960;
 let VIEW_HEIGHT = 600;
 const MOBILE_GAME_QUERY = "(max-width: 600px) and (orientation: portrait), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape)";
+const mobileGameMedia = window.matchMedia(MOBILE_GAME_QUERY);
+const RENDER_INTERVAL_MS = 1000 / 30;
 const PLAYER_START = { x: 300, y: 360 };
 const SAVE_KEY = "giang-ho-di-truyen-prototype";
 
@@ -376,7 +379,7 @@ if (!context) throw new Error("Không khởi tạo được canvas context");
 const ctx: CanvasRenderingContext2D = context;
 
 function resizeGameViewport(): void {
-  const mobileViewport = window.matchMedia(MOBILE_GAME_QUERY).matches;
+  const mobileViewport = mobileGameMedia.matches;
   const rect = canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
   const scale = Math.min(1.6, (rect.width > rect.height ? 1100 : 720) / rect.width, 1020 / rect.height);
@@ -423,6 +426,8 @@ const keys = new Set<string>();
 let game: GameState | null = null;
 let activeTab: PanelTab = "bag";
 let lastFrame = performance.now();
+let lastDrawTime = 0;
+let lastMiniMapDraw = 0;
 let lastUiUpdate = 0;
 let toastTimer = 0;
 let renderedSkillSect: SectId | null = null;
@@ -465,6 +470,9 @@ const obstacles = [
   { x: 1030, y: 300, w: 125, h: 130, type: "rock" },
   { x: 1480, y: 420, w: 150, h: 100, type: "rock" },
 ];
+
+const worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+let dungeonArt: HTMLCanvasElement | null = null;
 
 const NPCS: Npc[] = [
   { id: "guide", name: "Mộc sư huynh", title: "Người dẫn đường", x: 170, y: 300, color: "#72d1a0", icon: "?" },
@@ -1468,51 +1476,17 @@ function drawWorld(now: number): void {
   ctx.save();
   ctx.translate(-game.cameraX, -game.cameraY);
   if (game.mapMode === "dungeon") {
-    ctx.fillStyle = "#181b31";
-    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    ctx.fillStyle = "rgba(194, 177, 232, .045)";
-    for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
-    for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
-    ctx.fillStyle = "#272b4a";
-    ctx.fillRect(160, 500, 1450, 470);
-    ctx.strokeStyle = "rgba(190, 161, 238, .3)";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(160, 500, 1450, 470);
+    dungeonArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.drawImage(dungeonArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#d4c7ef";
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    ctx.fillText("TRÚC LÂM THÍ LUYỆN · CỔ MỘ BÍ ẨN", 270, 550);
-    ctx.fillStyle = "rgba(218, 203, 247, .56)";
-    ctx.font = "12px 'DM Sans', sans-serif";
-    ctx.fillText("Hạ Cổ Mộ Thủ Vệ và nhận token phụ bản", 270, 575);
+    drawOutlinedText("TRÚC LÂM THÍ LUYỆN · CỔ MỘ BÍ ẨN", 270, 550);
   } else {
-    if (worldArt.complete && worldArt.naturalWidth) {
-      ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    } else {
-      ctx.fillStyle = "#183936";
-      ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-      ctx.fillStyle = "rgba(255,255,255,.025)";
-      for (let x = 0; x < WORLD_WIDTH; x += 32) ctx.fillRect(x, 0, 1, WORLD_HEIGHT);
-      for (let y = 0; y < WORLD_HEIGHT; y += 32) ctx.fillRect(0, y, WORLD_WIDTH, 1);
-      ctx.fillStyle = "#224b40";
-      ctx.fillRect(245, 230, 230, 300);
-      ctx.fillRect(1190, 250, 180, 270);
-      ctx.fillStyle = "rgba(198, 155, 91, .21)";
-      ctx.fillRect(242, 480, 1180, 48);
-      ctx.fillRect(360, 330, 48, 560);
-      ctx.fillStyle = "rgba(111, 198, 189, .13)";
-      ctx.beginPath();
-      ctx.arc(1670, 920, 190, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    for (const obstacle of obstacles) {
-      drawSceneryObstacle(obstacle);
-    }
-
-    ctx.fillStyle = "#cfb374";
+    ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.fillStyle = "#fff0bd";
     ctx.font = "600 14px 'DM Sans', sans-serif";
     drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
-    ctx.fillStyle = "rgba(222, 239, 220, .55)";
+    ctx.fillStyle = "#dde8cd";
     ctx.font = "12px 'DM Sans', sans-serif";
     drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
     for (const npc of NPCS) drawNpc(npc, now);
@@ -1536,96 +1510,24 @@ function drawWorld(now: number): void {
   }
   ctx.restore();
 
-  const vignetteRadius = Math.max(VIEW_WIDTH, VIEW_HEIGHT) * .65;
-  const vignette = ctx.createRadialGradient(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, vignetteRadius * .25, VIEW_WIDTH / 2, VIEW_HEIGHT / 2, vignetteRadius);
-  vignette.addColorStop(0, "rgba(4, 12, 16, 0)");
-  vignette.addColorStop(1, "rgba(4, 12, 16, .26)");
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   if (game.screenFlash > 0) {
     ctx.fillStyle = `rgba(255, 225, 160, ${game.screenFlash * 0.5})`;
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   }
-  drawMinimap();
+  drawMinimap(now);
 }
 
-function drawSceneryObstacle(obstacle: typeof obstacles[number]): void {
-  const { x, y, w, h } = obstacle;
-  if (obstacle.type === "rock") {
-    if (drawScenerySprite(ctx, "rock", x + w / 2, y + h + 8, w * 1.12, h * 1.4)) return;
-  } else {
-    const count = Math.ceil(w / 80);
-    let ready = false;
-    for (let index = 0; index < count; index++) {
-      ready = drawScenerySprite(ctx, "bamboo", x + w * (index + .5) / count, y + h + 8, w / count + 25, h + 42);
-    }
-    if (ready) return;
-  }
-  ctx.save();
-  ctx.translate(x, y);
-  if (obstacle.type === "rock") {
-    ctx.fillStyle = "rgba(18,35,26,.3)";
-    ctx.beginPath();
-    ctx.ellipse(w / 2, h * .8, w * .57, h * .35, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const stone = ctx.createLinearGradient(0, 0, w, h);
-    stone.addColorStop(0, "#a1ab8b");
-    stone.addColorStop(.4, "#6a7e6b");
-    stone.addColorStop(1, "#364d44");
-    ctx.fillStyle = stone;
-    ctx.beginPath();
-    ctx.moveTo(0, h * .55);
-    ctx.lineTo(w * .16, h * .1);
-    ctx.lineTo(w * .58, 0);
-    ctx.lineTo(w * .92, h * .23);
-    ctx.lineTo(w, h * .76);
-    ctx.lineTo(w * .67, h);
-    ctx.lineTo(w * .15, h * .92);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "rgba(215,222,181,.3)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(w * .17, h * .12);
-    ctx.lineTo(w * .42, h * .49);
-    ctx.lineTo(w * .9, h * .26);
-    ctx.moveTo(w * .42, h * .49);
-    ctx.lineTo(w * .63, h * .98);
-    ctx.stroke();
-  } else {
-    for (let sx = 10; sx < w; sx += 22) {
-      for (let sy = 24; sy < h; sy += 35) {
-        const sway = Math.sin(x + sx + sy) * 6;
-        ctx.strokeStyle = "#70924e";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy + 19);
-        ctx.lineTo(sx + sway, sy - 28);
-        ctx.stroke();
-        for (let index = 0; index < 5; index++) {
-          const ly = sy - 22 + index * 8;
-          const side = index % 2 ? 1 : -1;
-          ctx.fillStyle = index % 2 ? "#416b36" : "#71984c";
-          ctx.beginPath();
-          ctx.moveTo(sx + sway, ly);
-          ctx.quadraticCurveTo(sx + side * 30, ly - 15, sx + side * 36, ly - 2);
-          ctx.quadraticCurveTo(sx + side * 19, ly + 5, sx + sway, ly);
-          ctx.fill();
-        }
-      }
-    }
-  }
-  ctx.restore();
-}
 
-function drawMinimap(): void {
-  if (!game || !window.matchMedia(MOBILE_GAME_QUERY).matches) return;
+function drawMinimap(now: number): void {
+  if (!game || !mobileGameMedia.matches || now - lastMiniMapDraw < 180) return;
+  lastMiniMapDraw = now;
   const mc = miniMapContext;
   const sx = miniMap.width / WORLD_WIDTH;
   const sy = miniMap.height / WORLD_HEIGHT;
   mc.clearRect(0, 0, miniMap.width, miniMap.height);
-  if (game.mapMode === "world" && worldArt.complete && worldArt.naturalWidth) {
-    mc.drawImage(worldArt, 0, 0, miniMap.width, miniMap.height);
+  const background = game.mapMode === "world" ? worldArt : dungeonArt;
+  if (background) {
+    mc.drawImage(background, 0, 0, miniMap.width, miniMap.height);
   } else {
     mc.fillStyle = game.mapMode === "dungeon" ? "#29253b" : "#41694b";
     mc.fillRect(0, 0, miniMap.width, miniMap.height);
@@ -1696,10 +1598,10 @@ function drawSkillEffect(effect: SkillEffect, now: number): void {
   ctx.save();
   ctx.translate(effect.x, effect.y);
   ctx.globalAlpha = fade;
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   if (effect.kind === "slash") {
     ctx.rotate(effect.angle ?? 0);
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < 2; index += 1) {
       ctx.strokeStyle = effect.color;
       ctx.lineWidth = 7 - index * 2;
       ctx.beginPath();
@@ -1742,11 +1644,7 @@ function drawSkillEffect(effect: SkillEffect, now: number): void {
     ctx.arc(0, 0, radius * 0.8, -now / 500, -now / 500 + Math.PI * 1.3);
     ctx.stroke();
   } else {
-    const gradient = ctx.createRadialGradient(0, 0, radius * 0.08, 0, 0, radius);
-    gradient.addColorStop(0, hexToRgba(effect.color, 0.72));
-    gradient.addColorStop(0.45, hexToRgba(effect.color, 0.22));
-    gradient.addColorStop(1, hexToRgba(effect.color, 0));
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = hexToRgba(effect.color, .16);
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -2162,7 +2060,7 @@ function refreshUi(force = false): void {
     avatar.dataset.sect = player.sect;
     avatar.className = `avatar-orb avatar-${player.sect}`;
     avatar.innerHTML = spriteMarkup(player.sect, "portrait-sprite");
-    avatar.style.background = `linear-gradient(135deg, ${hexToRgba(sect.color, 0.6)}, #142434)`;
+    avatar.style.background = hexToRgba(sect.color, .3);
     const shortcut = document.querySelector(".character-shortcut");
     if (shortcut) shortcut.outerHTML = spriteMarkup(player.sect, "character-shortcut");
   }
@@ -2398,7 +2296,7 @@ document.addEventListener("keydown", (event) => {
   if (key === "3") castSkill("ultimate");
   if (key === "e") pickupNearby();
   if (key === "b") {
-    if (window.matchMedia(MOBILE_GAME_QUERY).matches) {
+    if (mobileGameMedia.matches) {
       if (inventoryPanel.classList.contains("mobile-sheet-open")) closeMobileSheet();
       else openMobileSheet("bag");
       return;
@@ -2408,7 +2306,7 @@ document.addEventListener("keydown", (event) => {
     refreshUi(true);
   }
   if (key === "k") {
-    if (window.matchMedia(MOBILE_GAME_QUERY).matches) {
+    if (mobileGameMedia.matches) {
       openMobileSheet("skills");
       return;
     }
@@ -2516,7 +2414,10 @@ function frame(now: number): void {
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   update(dt, now);
-  drawWorld(now);
+  if (now - lastDrawTime >= RENDER_INTERVAL_MS) {
+    drawWorld(now);
+    lastDrawTime = now - (now - lastDrawTime) % RENDER_INTERVAL_MS;
+  }
   refreshUi();
   window.requestAnimationFrame(frame);
 }

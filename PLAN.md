@@ -8,6 +8,8 @@ Tài liệu này là bản thiết kế để bắt đầu lập trình. Các h�
 
 Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot bằng atlas tạo riêng, bổ sung nền rừng và cảnh vật, xuất WebP, sửa nút kỹ năng bị flex kéo thành bầu dục, tách các vùng chạm và hỗ trợ mobile dọc/ngang. Nhiệm vụ mặc định thu gọn; mục tiêu chỉ hiện khi chọn quái. Đây là bước hoàn thiện hình ảnh/UX, không đánh dấu hoàn thành milestone online. Animation hiện là nhún/đảo hướng sprite; nền minh họa chưa thay cho tilemap/collider được thiết kế riêng.
 
+Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 384 × 384 px, tối đa 64 màu, 19 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Dữ liệu ảnh giảm khoảng 99,1% so với bộ ảnh 2,06 MB; bố cục và các thao tác mobile vẫn được giữ.
+
 **Mục lục nhanh:**
 
 - [Mục tiêu và phạm vi phiên bản](#1-mục-tiêu-sản-phẩm).
