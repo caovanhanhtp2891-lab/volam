@@ -7,7 +7,8 @@ const saveKey = 'giang-ho-di-truyen-prototype';
 function captureCanvas() {
   Math.random = () => .5;
   const proto = CanvasRenderingContext2D.prototype;
-  const clear = proto.clearRect, translate = proto.translate, draw = proto.drawImage;
+  const clear = proto.clearRect, translate = proto.translate, draw = proto.drawImage, stroke = proto.stroke;
+  proto.stroke = function(...args) { if (this.canvas.id === "game-canvas") { window.sectColors ??= new Set(); window.sectColors.add(this.strokeStyle); } return stroke.apply(this, args); };
   proto.clearRect = function(...args) { if (this.canvas.id === 'game-canvas') this.captureNextCamera = true; return clear.apply(this, args); };
   proto.translate = function(x, y) { if (this.captureNextCamera) { window.currentCamera = { x: -x, y: -y }; this.captureNextCamera = false; } return translate.call(this, x, y); };
   proto.drawImage = function(image, ...args) { if (image instanceof HTMLImageElement && image.naturalWidth === 480 && args[6] === 46 && args[7] === 50) window.smallHeroDrawn = true; return draw.call(this, image, ...args); };
@@ -19,6 +20,7 @@ async function saved(page) {
 
 async function seed(page, changes) {
   const snapshot = await saved(page);
+  await page.evaluate(() => { window.sectColors = new Set(); });
   Object.assign(snapshot.player, { level: 5, xp: 0, attack: 10, defense: 1000, hp: 50, mp: 500, rage: 100, x: 460, y: 330, cooldowns: { skill1: 0, skill2: 0, ultimate: 0 }, skillRanks: { skill1: 1, skill2: 1, ultimate: 1 }, idle: { ...snapshot.player.idle, enabled: false, inTown: false, autoSkills: false, autoLoot: false, autoEquip: false }, ...changes });
   if (changes.factionId === null) delete snapshot.player.factionId;
   await page.evaluate(({ key, data }) => { localStorage.setItem(key, JSON.stringify(data)); document.querySelector('#load-btn').click(); }, { key: saveKey, data: snapshot });
@@ -45,6 +47,7 @@ async function castAndSave(page, key, aimId = 'bandit-1') {
 
 (async () => {
   const { SECTS, SECT_BY_FACTION, SKILL_KEYS } = await import('../src/sects.ts');
+  const { SKILL_PALETTES } = await import('../src/skill-art.ts');
   const browser = await chromium.launch({ executablePath: process.env.VOLAM_CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   const errors = [];
   try {
@@ -76,11 +79,13 @@ async function castAndSave(page, key, aimId = 'bandit-1') {
       for (const key of SKILL_KEYS) {
         const definition = sect.kit[key], before = await seed(page, {});
         assert.equal(await page.locator(`[data-skill="${key}"] svg`).getAttribute('data-motif'), definition.motif);
+        assert.equal(await page.locator(`[data-skill="${key}"] svg`).getAttribute('data-visual'), `${sect.id}-${key}`);
         const after = await castAndSave(page, key);
         assert.equal(after.player.mp, after.before.player.mp - definition.mp, `${sect.name} ${key}: MP cost`);
         assert.ok(after.player.cooldowns[key] > 0, `${sect.name} ${key}: cooldown`);
         assert.equal(after.player.radius, 12);
         await page.waitForTimeout(800);
+        assert.ok(await page.evaluate(color => window.sectColors.has(color), SKILL_PALETTES[sect.id].color), `${sect.name} ${key}: actual combat uses the new school palette`);
         const impacted = await saved(page);
         if (definition.damage > 0) assert.ok(impacted.enemies[0].hp < before.enemies[0].hp, `${sect.name} ${key}: damage`);
         if (definition.heal) assert.ok((definition.healOnHit ? impacted.player.hp : after.player.hp) > before.player.hp, `${sect.name} ${key}: healing`);

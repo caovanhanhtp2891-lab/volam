@@ -47,7 +47,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.7.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.8.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;
@@ -154,7 +154,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
 
     await seed(page,s=>{s.player.level=100;s.player.xp=0;s.player.preferences.xpMultiplier=5;s.player.attack=100000;s.player.defense=10000;s.player.idle.inTown=true;s.player.idle.autoLoot=false;s.player.goldenClears=[];});
     await tab(page,'inv'); await page.locator('[data-tab="dungeon"]').click(); await page.locator('[data-dungeon-action="enter"][data-dungeon-id="tomb"]').click();
-    await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').isDisabled(),true);
+    await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').isDisabled(),true); assert.equal(await page.locator('#skill-effects-quality').isDisabled(),true);
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.match(await page.locator('#rebirth-blocked').textContent(),/phụ bản/); await page.locator('#utility-close').click();
     await page.locator('#titles-btn').click(); assert.equal(await page.locator('[data-wear-title="novice"]').isDisabled(),true); await page.locator('#utility-close').click();
     await page.locator('#mobile-auto').click();

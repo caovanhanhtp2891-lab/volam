@@ -9,11 +9,12 @@ export interface GamePreferences {
   titleVisible: boolean;
   titleEffects: boolean;
   minimap: boolean;
+  skillEffects: "full" | "simple";
 }
 export function normalizePreferences(value?: Partial<GamePreferences>): GamePreferences {
   const source = value && typeof value === "object" ? value : {};
   const bool = (key: keyof GamePreferences) => typeof source[key] === "boolean" ? source[key] as boolean : true;
-  return { xpMultiplier: XP_MULTIPLIERS.includes(source.xpMultiplier!) ? source.xpMultiplier! : 1, damageNumbers: bool("damageNumbers"), titleVisible: bool("titleVisible"), titleEffects: bool("titleEffects"), minimap: bool("minimap") };
+  return { skillEffects: source.skillEffects === "simple" ? "simple" : "full", xpMultiplier: XP_MULTIPLIERS.includes(source.xpMultiplier!) ? source.xpMultiplier! : 1, damageNumbers: bool("damageNumbers"), titleVisible: bool("titleVisible"), titleEffects: bool("titleEffects"), minimap: bool("minimap") };
 }
 export interface Journey {
   rebirths: number;

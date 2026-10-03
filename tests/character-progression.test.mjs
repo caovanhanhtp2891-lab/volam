@@ -4,9 +4,11 @@ import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJou
 
 const fighter = () => ({ level: 1, xp: 0, attack: 20, defense: 10, skillPoints: 0, idle: { attributePoints: 0 }, journey: normalizeJourney(), inventory: [], equipment: {}, pendingItems: [], dungeonClears: { tomb: 0, bamboo: 0 }, goldenClears: [] });
 test("XP preferences accept only the requested rates and preserve independent display toggles", () => {
+  assert.equal(normalizePreferences({ skillEffects: "simple" }).skillEffects, "simple");
+  for (const skillEffects of [null, false, "unknown"]) assert.equal(normalizePreferences({ skillEffects }).skillEffects, "full");
   for (const xpMultiplier of XP_MULTIPLIERS) assert.equal(normalizePreferences({ xpMultiplier }).xpMultiplier, xpMultiplier);
   for (const xpMultiplier of [0, -1, 2, "1000", Infinity, NaN]) assert.equal(normalizePreferences({ xpMultiplier }).xpMultiplier, 1);
-  assert.deepEqual(normalizePreferences({ minimap: false, titleEffects: false }), { xpMultiplier: 1, damageNumbers: true, minimap: false, titleEffects: false, titleVisible: true });
+  assert.deepEqual(normalizePreferences({ minimap: false, titleEffects: false }), { xpMultiplier: 1, skillEffects: "full", damageNumbers: true, minimap: false, titleEffects: false, titleVisible: true });
 });
 test("every XP multiplier conserves XP across multiple levels and grants each level's points once", () => {
   for (const multiplier of XP_MULTIPLIERS) {

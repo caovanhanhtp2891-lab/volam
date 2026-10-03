@@ -15,7 +15,9 @@ PNG gốc được cắt từng ô, trim, thu nhỏ tối đa 78 × 78, đặt v
 
 Nhân vật trong sân vẽ **46 × 50**, bán kính collider 12; bóng và thanh HP gọn. `src/combat-art.ts` dùng cùng sprite với màn chọn phái/ảnh đại diện, nhún theo quãng đường thật, đảo hướng và nghiêng người khi đánh/thi triển. Lướt chạy qua nhiều frame. Có một khung/phái, chưa có animation bốn hướng hoặc bộ sprite nam/nữ độc lập; giới tính vẫn được lưu, có điểm nhấn dây buộc đơn giản. Vòng trang bị và màu vũ khí vẫn hiển thị, không đổi áo đến mức mất nhận diện phái.
 
-Ba mươi icon võ công dùng SVG nội tuyến và 16 nhóm nét vẽ Canvas trong `src/sect-effects.ts`, phân biệt bằng màu phái, hình và cấp chiêu: côn, chuông, thương, tiễn, bẫy, độc, sen, quạt, băng, rồng, xoáy, song đao, ảnh bộ, thái cực, kiếm và sét. Chiêu dùng tối đa 8 nét/cánh chính, không phát sáng hoặc flash toàn màn hình. Tối đa 24 hiệu ứng thoáng, 6 trận theo thời gian. Đạn thường, xác quái và đồ bay giữ giới hạn của hệ thống chiến đấu hiện có; sát thương đạn chỉ xử lý khi chạm.
+Ba mươi icon võ công v0.8.0 dùng SVG nội tuyến trong `src/skill-art.ts`: mỗi chiêu có hình riêng, nền tròn, ánh màu tĩnh và nét vũ khí/biểu tượng sáng. Hình tự vẽ bằng vector, lấy cảm hứng từ đặc trưng võ học Võ Lâm/Kiếm Thế, không lấy asset chính thức. `src/sect-effects.ts` vẽ 16 nhóm motif với biến thể theo cấp chiêu/phái, viền màu/lõi trắng, vệt chuyển động, cánh sen, thương trận, cổ trùng, băng tinh, hỏa long, ma đao, thái cực, mưa kiếm và lôi trận. Đạn được phân biệt theo 10 phái thay vì chỉ năm hệ.
+
+Mỗi hiệu ứng dùng hình học có giới hạn: tối đa 8 nét/cánh chính (sen tuyệt chiêu thêm 6 cánh trong), 8 tia trang trí và một quầng sáng nhỏ đã lưu theo màu. Không tạo gradient trong vòng vẽ, không dùng shadowBlur/filter/flash toàn màn hình/hệ particle. Quầng sáng 96 × 96 được tạo một lần theo màu và dùng lại; không tải thêm texture. Đầy đủ/Gọn lưu từng nhân vật; Gọn bỏ quầng sáng và giảm số cánh/tia/nhánh. Tối đa 24 hiệu ứng thoáng và 6 trận, trận giữ vòng phạm vi rõ. Preview dùng cùng renderer, không thi triển gameplay. Chiêu tầm xa có dấu tụ lực nhỏ, đạn và hiệu ứng trúng khi đến nơi; một hiệu ứng lớn cho mỗi lần cast để tránh chồng nhiều vòng khi đánh đông quái.
 
 Nền Rừng Trúc/phụ bản/sân luyện được vẽ một lần từ dữ liệu trong `src/map-art.ts`, minimap tái sử dụng nền. Vật cản và collider dùng cùng dữ liệu. Game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; mô phỏng/input giữ cập nhật theo thời gian. UI không cần backdrop blur.
 
@@ -23,6 +25,6 @@ Nền Rừng Trúc/phụ bản/sân luyện được vẽ một lần từ dữ 
 
 Tinh anh dùng sprite quái có sẵn với vòng/nhãn vàng. Lửa trại dùng hai khúc gỗ và ba lớp ngọn lửa vẽ Canvas, phạm vi nét đứt, tối đa ba lửa cùng lúc; nhấp nhô theo thời gian, không có bitmap hoặc bộ particle mới. Atlas vẫn giữ 28.026 byte ở v0.6.0.
 
-URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`.
+URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`, `skill-art-browser.cjs`.
 
 Danh hiệu v0.7.0 dùng `src/title-art.ts`: 12 motif riêng (lá, mũi kiếm, tinh thể, vương miện, trận phù, kim tiền, tia lửa, song kiếm, tinh tú, mặt trời, sen và quỹ đạo), vài nét Canvas dưới chân, một danh hiệu được đeo. Preview dùng cùng hàm vẽ; không thêm sprite, texture hay hệ particle. Có thể tắt tên/hiệu ứng trong Cài đặt; atlas giữ 28.026 byte.

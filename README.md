@@ -2,6 +2,36 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Võ học rực sáng · v0.8.0
+
+Thiết kế lại **30 icon và hiệu ứng võ công** theo đặc trưng thập đại môn phái, lấy cảm hứng từ võ học Võ Lâm/Kiếm Thế. Hình SVG/Canvas do dự án tự vẽ; không sao chép texture hay tải ảnh kỹ năng bên ngoài.
+
+| Phái | Hình chiêu và màu riêng |
+| --- | --- |
+| Thiếu Lâm | Côn quét vàng, kim chung, bàn tay kim cang |
+| Thiên Vương | Thương xuyên, vệt lướt vàng–ngọc, lục thương phá trận |
+| Đường Môn | Ám tiễn lục, cơ quan lõi hỏa, ám khí tỏa quạt |
+| Ngũ Độc | Linh xà, ngũ độc trận, cổ trùng/bọ cạp tím–lục |
+| Nga Mi | Liên hoa hồng–ngọc, hộ thể, sen nhiều lớp hồi phục |
+| Thúy Yên | Quạt tuyết, băng tâm, cột băng tinh lam trắng |
+| Cái Bang | Hỏa long cam vàng, bầu rượu/xoáy lửa, song long |
+| Thiên Nhẫn | Song nhận đỏ, ảnh bộ tím, vòng ma đao |
+| Võ Đang | Lưỡng nghi kiếm khí, thái cực/bát quái, mưa kiếm lam |
+| Côn Lôn | Lôi tím lõi trắng, lôi trận, thiên lôi tam kích/phù vàng |
+
+- **Võ công → Xem chiêu**: xem thử cả ba chiêu, kể cả chiêu chưa mở; không tốn MP/nộ hoặc kích hoạt hồi chiêu. Màn chọn phái cũng dùng icon/renderer mới.
+- **Khác → Hiệu ứng võ công**: chọn Đầy đủ hoặc Gọn; lưu riêng từng nhân vật. Gọn giảm ánh sáng và chi tiết, vẫn giữ hình chiêu/phạm vi trận. Nút tuyệt chiêu viền vàng khi đã đủ cấp/MP/nộ và hết hồi chiêu.
+- Đạn có hình riêng theo phái; hiệu ứng lớn của chiêu tầm xa xuất hiện khi đạn tới mục tiêu. Chiêu đánh nhiều quái chỉ có một hiệu ứng lớn, các lần trúng còn lại dùng hiệu ứng nhỏ để dễ quan sát sân. Sét lan vẽ đường bay giữa những mục tiêu đã chọn, dùng thời điểm/sát thương cũ.
+- Atlas giữ **28.026 byte**, không thêm bitmap. Chỉ thêm vector và quầng sáng 96px lưu một lần theo màu, dùng lại; không tạo gradient động, blur, flash toàn màn hình hoặc hệ particle. Giữ 30 FPS, tối đa 24 hiệu ứng thoáng/6 trận. Chế độ Gọn bỏ quầng sáng của kỹ năng và giảm số nét trang trí.
+
+Kiểm tra hình thật và chế độ đồ họa trên build production bằng cùng các biến Playwright/Chromium/URL ở phần kiểm thử:
+
+```bash
+node --experimental-strip-types tests/skill-art-browser.cjs
+```
+
+Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác nhau, MP/nộ/XP/hồi chiêu không đổi khi xem, cài đặt tồn tại sau reload, số thao tác vẽ giảm mỗi frame và sáu kích thước màn hình. Xuất bảng hình vào `/tmp/volam-skill-gallery.png`. Bộ `sects-browser.cjs` kiểm tra đủ 30 chiêu trong trận thật, màu phái, sát thương/status và các trường hợp cast không hợp lệ. Mức mượt trên thiết bị điện thoại thật cần tiếp tục playtest.
+
 ## Giao diện và vòng chơi idle
 
 - Chọn một trong 10 môn phái thuộc 5 hệ ngũ hành, đặt tên và giới tính nhân vật. Mỗi phái có ngoại hình riêng và bộ 2 võ công + 1 tuyệt chiêu với hành vi chiến đấu khác nhau.
@@ -234,7 +264,7 @@ Bộ này kiểm tra XP thật từ quái/lửa trại/vắng mặt ở cả 5 h
 
 Giao diện chiếm một viewport, hỗ trợ màn hình dọc và điện thoại xoay ngang: sân đấu ở trên, menu ở dưới, minimap theo vị trí thật, joystick, Auto và nút kỹ năng tròn. Các tab thông tin cuộn nội bộ, không kéo cả trang. Nút thu gọn/mở rộng cho phép tập trung vào sân đấu. Sát thương thường xuất hiện bằng số nổi và nhật ký, không bật toast liên tục che menu.
 
-Đồ họa dùng một atlas **28.026 byte**, 480 × 384, 20 ô: 10 phái và 10 hình quái/NPC/loot. Nhân vật vẽ ở 46 × 50, nhỏ hơn khoảng 40% so với sprite 76 × 83 trước đây. Icon kỹ năng là SVG nội tuyến; 30 chiêu dùng nét Canvas gọn theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
+Đồ họa dùng một atlas **28.026 byte**, 480 × 384, 20 ô: 10 phái và 10 hình quái/NPC/loot. Nhân vật vẽ ở 46 × 50, nhỏ hơn khoảng 40% so với sprite 76 × 83 trước đây. Icon kỹ năng là SVG nội tuyến; 30 chiêu dùng hình Canvas nhiều lớp theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
 
 ## Võ công của thập đại môn phái · v0.4.0
 
@@ -253,7 +283,7 @@ Màn nhập môn có 10 ô nhỏ, chọn phái để xem cả ba icon, mô tả 
 | Võ Đang | Lưỡng Nghi Kiếm | Thái Cực Hộ Thể | Vạn Kiếm Quy Tông | Kiếm xuyên tuyến, thái cực, mưa kiếm |
 | Côn Lôn | Ngũ Lôi Chưởng | Lôi Động Cửu Thiên | Thiên Lôi Trấn Địa | Sét lan tối đa 3 quái, choáng, phá giáp |
 
-Dữ liệu chung ở `src/sects.ts`, hình hiệu ứng/icon ở `src/sect-effects.ts`. Boss chịu choáng/đóng băng tối đa 0,35 giây. Lướt kiểm tra cả đường qua collider; không đủ MP/nộ, ngoài tầm, bị khóa cấp hoặc đường lướt bị chặn sẽ không mất MP/hồi chiêu. Độc, bẫy và hỏa trận thực sự gây sát thương theo thời gian. Nội lực hồi 0,7 MP/giây khi chơi. Những con số này phục vụ prototype, cần playtest cân bằng cho cả 10 phái ở cấp nhập môn và boss.
+Dữ liệu chung ở `src/sects.ts`, hình hiệu ứng ở `src/sect-effects.ts`, icon/palette ở `src/skill-art.ts`. Boss chịu choáng/đóng băng tối đa 0,35 giây. Lướt kiểm tra cả đường qua collider; không đủ MP/nộ, ngoài tầm, bị khóa cấp hoặc đường lướt bị chặn sẽ không mất MP/hồi chiêu. Độc, bẫy và hỏa trận thực sự gây sát thương theo thời gian. Nội lực hồi 0,7 MP/giây khi chơi. Những con số này phục vụ prototype, cần playtest cân bằng cho cả 10 phái ở cấp nhập môn và boss.
 
 Save giữ các `factionId` hiện có và mã archetype `kim/hoa/thuy` để tương thích ba ô nhân vật/file xuất. Save rất cũ chưa có `factionId` sẽ dùng Thiên Vương/Cái Bang/Nga Mi tương ứng, giữ cấp/XP, bạc, trang bị và điểm võ học; bán kính nhân vật chuyển về 12. Sprite có một khung/phái, nhún/đảo hướng/động tác đơn giản, chưa có bộ đi bộ bốn hướng hoặc hai bộ sprite nam/nữ riêng.
 

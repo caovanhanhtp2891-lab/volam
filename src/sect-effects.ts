@@ -1,118 +1,230 @@
-import type { EffectMotif, SkillDefinition, SkillKey } from "./sects";
+import type { EffectMotif, SectId, SkillKey } from "./sects.ts";
+import { SKILL_PALETTES, type SkillPalette } from "./skill-art.ts";
+import { drawGlow } from "./battle-vfx.ts";
+export { skillIconMarkup } from "./skill-art.ts";
 
-const ICON_PATHS: Record<EffectMotif, string> = {
-  staff: '<path d="M9 25 24 8M6 21l6 5M20 6l6 5"/>',
-  bell: '<path d="M10 23h12l-2-5v-5a4 4 0 0 0-8 0v5zm4-16h4M14 26h4"/>',
-  spear: '<path d="m8 26 14-15M20 6l6-1-1 6-5 1zM11 19l4 4"/>',
-  arrows: '<path d="m5 25 18-18m-2 0h6v6M5 18 16 7M12 27l13-13"/>',
-  trap: '<path d="M8 8h16v16H8zM16 4v24M4 16h24m-14-2 4 4m0-4-4 4"/>',
-  poison: '<path d="M16 5c-2 6-8 9-8 15a8 8 0 0 0 16 0c0-6-6-9-8-15zM12 21h.1M20 21h.1M13 25h6"/>',
-  lotus: '<path d="M16 25C4 23 5 12 8 10l8 9 8-9c3 2 4 13-8 15zm0-6c-7-5-5-11 0-15 5 4 7 10 0 15"/>',
-  fan: '<path d="M16 27 4 12a17 17 0 0 1 24 0zm0 0L10 8m6 19V6m0 21 6-19"/>',
-  frost: '<path d="M16 4v24M6 10l20 12M6 22l20-12m-13-3 3 3 3-3m-6 18 3-3 3 3"/>',
-  dragon: '<path d="M5 25c17 1-2-14 14-14l5-7 3 9-7 4c-3 3 10 9-2 10M22 11h.1"/>',
-  spiral: '<path d="M11 5h10l-2 6c8 7 7 16-3 16s-11-9-3-16zM9 19h14"/>',
-  blades: '<path d="M6 26 23 5c5 9-2 15-11 18zM26 26 9 5c-5 9 2 15 11 18z"/>',
-  shadow: '<path d="M5 9h10M3 16h9M6 23h8m9-18-6 11h7l-7 12"/>',
-  taiji: '<circle cx="16" cy="16" r="11"/><path d="M16 5c10 0 10 11 0 11s-10 11 0 11"/><circle cx="16" cy="10" r="1"/><circle cx="16" cy="22" r="1"/>',
-  swords: '<path d="M16 4v24M12 21h8M8 6v17m-3-3h6M24 6v17m-3-3h6"/>',
-  lightning: '<path d="m19 3-13 16h9l-2 10 13-17h-9z"/>',
-};
-
-export function skillIconMarkup(skill: SkillDefinition, key: SkillKey, color: string): string {
-  const marker = key === "ultimate" ? '<path d="m4 5 2 1m22-1-2 1M16 30v-2"/>' : key === "skill2" ? '<circle cx="28" cy="27" r="1"/><circle cx="4" cy="27" r="1"/>' : '';
-  return `<svg viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-motif="${skill.motif}" data-icon-skill="${key}">${ICON_PATHS[skill.motif]}${marker}</svg>`;
-}
-
+export type SkillQuality = "full" | "simple";
 export interface SectEffect {
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
-  kind: EffectMotif;
-  angle?: number;
-  skill?: SkillKey;
+  x: number; y: number; radius: number; color: string; kind: EffectMotif;
+  angle?: number; skill?: SkillKey; sect?: SectId;
+  phase?: "cast" | "impact"; quality?: SkillQuality;
+}
+const TAU = Math.PI * 2;
+const ring = (c: CanvasRenderingContext2D, r: number) => { c.beginPath(); c.arc(0, 0, r, 0, TAU); };
+const segment = (c: CanvasRenderingContext2D, a: number, b: number, x: number, y: number) => { c.moveTo(a, b); c.lineTo(x, y); };
+// Saturated body with a narrow, hot core, sharing the same path.
+function ink(c: CanvasRenderingContext2D, palette: SkillPalette, width = 5, accent = false): void {
+  c.strokeStyle = accent ? palette.accent : palette.color; c.lineWidth = width; c.stroke();
+  c.strokeStyle = palette.light; c.lineWidth = Math.max(.8, width * .23); c.stroke();
+}
+function sword(c: CanvasRenderingContext2D, length: number, palette: SkillPalette): void {
+  c.beginPath(); c.moveTo(0, -length); c.lineTo(-3, -length * .76); c.lineTo(-2, 7);
+  c.lineTo(2, 7); c.lineTo(3, -length * .76); c.closePath();
+  c.fillStyle = palette.color; c.fill(); ink(c, palette, 2);
+  c.beginPath(); segment(c, -7, 8, 7, 8); segment(c, 0, 8, 0, 17); ink(c, palette, 3);
+}
+function dragon(c: CanvasRenderingContext2D, r: number, p: number, palette: SkillPalette): void {
+  c.beginPath(); c.moveTo(-r * .85, r * .25);
+  c.bezierCurveTo(-r * .45, -r * (.75 + p * .2), r * .05, r * .65, r * .65, -r * .14);
+  ink(c, palette, Math.min(16, r * .18));
+  c.beginPath(); c.moveTo(r * .5, -r * .15); c.lineTo(r * .62, -r * .32);
+  c.lineTo(r * .87, -r * .22); c.lineTo(r, -r * .06); c.lineTo(r * .8, r * .05);
+  c.lineTo(r * .64, 0); c.closePath(); c.fillStyle = palette.color; c.fill(); ink(c, palette, 2);
+  c.beginPath(); segment(c, r * .64, -r * .27, r * .58, -r * .45);
+  segment(c, r * .77, -r * .24, r * .84, -r * .42);
+  c.moveTo(r * .89, -r * .02); c.quadraticCurveTo(r * 1.02, r * .16, r * .72, r * .18); ink(c, palette, 2);
+  c.fillStyle = palette.light; c.beginPath(); c.arc(r * .82, -r * .16, 2, 0, TAU); c.fill();
+}
+function lotus(c: CanvasRenderingContext2D, r: number, count: number, p: number, palette: SkillPalette): void {
+  for (let i = 0; i < count; i++) {
+    c.save(); c.rotate(i * TAU / count + p * .35);
+    c.beginPath(); c.moveTo(0, 0); c.bezierCurveTo(-r * .36, -r * .36, -r * .2, -r * .8, 0, -r);
+    c.bezierCurveTo(r * .2, -r * .8, r * .36, -r * .36, 0, 0);
+    c.fillStyle = i % 2 ? palette.accent + "45" : palette.color + "55"; c.fill(); ink(c, palette, 2);
+    c.restore();
+  }
 }
 
-// Bounded flat geometry, no particles, gradients, shadows or additive blending.
-export function drawSectEffect(ctx: CanvasRenderingContext2D, effect: SectEffect, progress: number, persistent = false): void {
+// Bounded vectors and cached 96px light sprites. No dynamic gradients, blur,
+// filters, random particle systems or screen-wide flashes.
+export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, progress: number, persistent = false): void {
   const p = Math.max(0, Math.min(1, progress));
-  const r = Math.max(8, effect.radius * (.65 + p * .35));
-  const count = effect.skill === "ultimate" ? 8 : 4;
-  ctx.save();
-  ctx.translate(effect.x, effect.y);
-  ctx.globalAlpha = persistent ? .3 : Math.sin(Math.PI * p) * .85;
-  ctx.strokeStyle = effect.color;
-  ctx.fillStyle = effect.color;
-  ctx.lineWidth = effect.skill === "ultimate" ? 3 : 2;
-  ctx.lineCap = "round";
-  const circle = (radius: number) => { ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke(); };
-  const line = (x1: number, y1: number, x2: number, y2: number) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
-  const motif = effect.kind;
-  if (motif === "staff" || motif === "spear" || motif === "arrows" || motif === "blades" || motif === "shadow") {
-    ctx.rotate(effect.angle ?? 0);
-    if (effect.skill === "ultimate") circle(r * .9);
-    if (motif === "staff" || motif === "blades") {
-      for (let i = 0; i < (motif === "blades" ? 2 : 1); i++) {
-        ctx.beginPath(); ctx.arc(0, 0, r * (.7 + i * .18), -.9 + p * .5 + i * Math.PI, .9 + p * .5 + i * Math.PI); ctx.stroke();
-      }
-      if (motif === "staff") line(-r * .4, -r * .5, r * .6, r * .5);
-    } else if (motif === "spear") {
-      for (let i = 0; i < (effect.skill === "ultimate" ? 6 : 1); i++) {
-        ctx.save(); ctx.rotate(i * Math.PI / 3); line(-r * .7, 0, r, 0); line(r, 0, r * .75, -8); line(r, 0, r * .75, 8); ctx.restore();
-      }
-    } else if (motif === "arrows") {
-      for (let i = 0; i < count; i++) {
-        ctx.save(); ctx.rotate((i - (count - 1) / 2) * .17); const x = r * p; line(x - r * .65, 0, x, 0); line(x, 0, x - 7, -4); line(x, 0, x - 7, 4); ctx.restore();
-      }
-    } else {
-      for (let i = 0; i < 3; i++) { line(-r * .7, (i - 1) * 10, r * (.3 + p * .5), (i - 1) * 10); }
-      ctx.beginPath(); ctx.arc(r * .4, 0, r * .4, -.9, .9); ctx.stroke();
+  if (!persistent && (p <= 0 || p >= 1)) return;
+  const palette = effect.sect ? SKILL_PALETTES[effect.sect] : { color: effect.color, light: "#fff9e6", accent: effect.color, dark: "#142c27" };
+  const full = effect.quality !== "simple", ult = effect.skill === "ultimate", second = effect.skill === "skill2";
+  const base = Math.max(8, effect.radius), expand = persistent ? 1 : .48 + .52 * (1 - (1 - p) ** 3);
+  const r = base * expand, count = full ? (ult ? 8 : 6) : 4;
+  c.save(); c.translate(effect.x, effect.y); c.lineCap = "round"; c.lineJoin = "round";
+  c.globalAlpha *= persistent ? .32 : Math.min(1, p / .12, (1 - p) / .35) * .88;
+  if (persistent) { ring(c, base); c.strokeStyle = palette.color; c.lineWidth = 1.2; c.stroke(); }
+  if (full) drawGlow(c, 0, 0, Math.min(54, r * .45), palette.color, persistent ? .3 : .48);
+  if (effect.phase === "cast") {
+    ring(c, r * .65); ink(c, palette, 2);
+    for (let i = 0; i < (full ? 4 : 2); i++) {
+      c.save(); c.rotate(p * 2 + i * Math.PI / 2); c.beginPath(); segment(c, r * .8, 0, r * .45, 0); ink(c, palette, 3); c.restore();
     }
-  } else if (motif === "lotus" || motif === "poison" || motif === "fan") {
-    if (motif === "fan") {
-      ctx.rotate(effect.angle ?? 0); ctx.beginPath(); ctx.arc(0, 0, r, -.8, .8); ctx.stroke();
-      for (let i = 0; i < 5; i++) { const a = -.8 + i * .4; line(0, 0, Math.cos(a) * r, Math.sin(a) * r); }
-    } else {
-      circle(r * .7);
-      for (let i = 0; i < count; i++) {
-        const a = i * Math.PI * 2 / count + p * .5;
-        ctx.save(); ctx.rotate(a); ctx.beginPath();
-        if (motif === "lotus") ctx.ellipse(r * .45, 0, r * .38, r * .14, 0, 0, Math.PI * 2);
-        else { ctx.moveTo(r * .85, 0); ctx.quadraticCurveTo(r * .2, -r * .35, r * .2, 0); ctx.quadraticCurveTo(r * .2, r * .35, r * .85, 0); }
-        ctx.stroke(); ctx.restore();
-      }
-      if (motif === "lotus") { line(-7, 0, 7, 0); line(0, -7, 0, 7); }
-    }
-  } else if (motif === "frost" || motif === "lightning" || motif === "swords") {
-    if (motif === "swords" && effect.skill === "skill1") {
-      ctx.rotate(effect.angle ?? 0);
-      for (const offset of [-6, 6]) { line(-r * .2, offset, r, offset); line(r, offset, r * .85, offset - 6); }
-      ctx.restore();
-      return;
-    }
-    if (effect.skill !== "skill1") circle(r * .85);
-    for (let i = 0; i < (motif === "frost" ? 6 : count); i++) {
-      ctx.save(); ctx.rotate(i * Math.PI * 2 / (motif === "frost" ? 6 : count));
-      if (motif === "frost") { line(0, 0, r, 0); line(r * .65, 0, r * .45, -10); line(r * .65, 0, r * .45, 10); }
-      else if (motif === "lightning") { ctx.beginPath(); ctx.moveTo(r * .2, -r * .7); ctx.lineTo(-r * .05, -r * .15); ctx.lineTo(r * .24, -r * .15); ctx.lineTo(-r * .1, r * .65); ctx.stroke(); }
-      else { const x = r * .65; line(x, -r * .45, x, r * .45); line(x - 7, r * .2, x + 7, r * .2); line(x, -r * .45, x - 3, -r * .3); }
-      ctx.restore();
-    }
-  } else if (motif === "trap") {
-    ctx.rotate(p * .35); ctx.strokeRect(-r * .65, -r * .65, r * 1.3, r * 1.3); circle(r * .8);
-    line(-r * .4, 0, r * .4, 0); line(0, -r * .4, 0, r * .4);
-  } else if (motif === "bell") {
-    circle(r); ctx.beginPath(); ctx.moveTo(-r * .5, r * .4); ctx.quadraticCurveTo(-r * .4, -r * .7, 0, -r * .7); ctx.quadraticCurveTo(r * .4, -r * .7, r * .5, r * .4); ctx.closePath(); ctx.stroke(); line(-r * .5, r * .55, r * .5, r * .55);
-  } else if (motif === "taiji") {
-    ctx.rotate(p * Math.PI); circle(r); ctx.beginPath(); ctx.arc(0, -r / 2, r / 2, -Math.PI / 2, Math.PI / 2); ctx.arc(0, r / 2, r / 2, -Math.PI / 2, -Math.PI * 1.5, true); ctx.stroke();
-    for (const y of [-r / 2, r / 2]) { ctx.beginPath(); ctx.arc(0, y, 4, 0, Math.PI * 2); ctx.fill(); }
-  } else if (motif === "dragon") {
-    ctx.rotate(effect.angle ?? 0); ctx.beginPath(); ctx.moveTo(-r, r * .2); ctx.bezierCurveTo(-r * .6, -r, r * .3, r, r * .8, -r * .2); ctx.stroke();
-    const x = r * .8, y = -r * .2; line(x, y, x + 10, y - 9); line(x, y, x + 12, y + 5); line(x - 8, y - 5, x - 5, y - 16);
-    if (effect.skill === "ultimate") { circle(r * .7); circle(r); }
-  } else {
-    ctx.beginPath(); for (let i = 0; i < 24; i++) { const a = i * .4 + p * Math.PI; const d = r * i / 24; const x = Math.cos(a) * d, y = Math.sin(a) * d; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.stroke();
+    c.restore(); return;
   }
-  ctx.restore();
+  const motif = effect.kind;
+  if (["staff", "spear", "arrows", "fan", "shadow"].includes(motif) || motif === "swords" && !ult) c.rotate(effect.angle ?? 0);
+  if (motif === "staff" || motif === "blades") {
+    const blades = motif === "staff" ? 1 : ult ? (full ? 6 : 4) : 2;
+    for (let i = 0; i < blades; i++) {
+      c.save(); c.rotate(i * TAU / blades + p * (ult ? 1.2 : .7));
+      c.beginPath(); c.arc(0, 0, r * .82, -.95, .95);
+      c.quadraticCurveTo(r * .27, r * .25, r * .6, -r * .55); c.closePath();
+      c.fillStyle = palette.color + "45"; c.fill(); ink(c, palette, ult ? 5 : 4);
+      if (full) { c.beginPath(); c.arc(0, 0, r, -.85, .6); ink(c, palette, 1.2, true); }
+      c.restore();
+    }
+    if (motif === "staff") { c.beginPath(); segment(c, -r * .4, -r * .48, r * .4, r * .48); ink(c, palette, 5); }
+  } else if (motif === "spear") {
+    const spears = ult ? 6 : 1;
+    if (ult) { ring(c, r * .9); ink(c, palette, 2, true); }
+    if (second) {
+      c.beginPath(); c.arc(-r * .2, 0, r * .48, -.8, .8); ink(c, palette, 3, true);
+      if (full) { c.beginPath(); c.arc(-r * .36, 0, r * .48, -.8, .8); ink(c, palette, 1.5, true); }
+      c.translate(p * r * .2, 0);
+    }
+    for (let i = 0; i < spears; i++) {
+      c.save(); c.rotate(i * TAU / spears);
+      c.beginPath(); segment(c, -r * .5, 0, r * .84, 0); ink(c, palette, 5);
+      c.beginPath(); c.moveTo(r, 0); c.lineTo(r * .78, -6); c.lineTo(r * .82, 0); c.lineTo(r * .78, 6); c.closePath();
+      c.fillStyle = palette.light; c.fill();
+      if (full) { c.beginPath(); segment(c, -r * .45, -8, r * .6, -8); segment(c, -r * .45, 8, r * .6, 8); ink(c, palette, 1.5, true); }
+      c.restore();
+    }
+  } else if (motif === "arrows") {
+    const arrows = ult ? count : 3;
+    for (let i = 0; i < arrows; i++) {
+      c.save(); c.rotate((i - (arrows - 1) / 2) * (ult ? .19 : .1));
+      const x = r * (.4 + .6 * p); c.beginPath(); segment(c, x - r * .6, 0, x, 0); ink(c, palette, 3);
+      c.beginPath(); c.moveTo(x + 5, 0); c.lineTo(x - 5, -3); c.lineTo(x - 5, 3); c.closePath(); c.fillStyle = palette.light; c.fill(); c.restore();
+    }
+    if (ult) { c.beginPath(); c.arc(0, 0, r * .6, -.9, .9); ink(c, palette, 2, true); }
+  } else if (motif === "trap") {
+    c.rotate(p * .45); ring(c, r * .8); ink(c, palette, 2);
+    for (let i = 0; i < 2; i++) { c.save(); c.rotate(i * Math.PI / 4); c.beginPath(); c.rect(-r * .5, -r * .5, r, r); ink(c, palette, 2, !!i); c.restore(); }
+    for (let i = 0; i < count; i++) { c.save(); c.rotate(i * TAU / count); c.beginPath(); segment(c, r * .65, 0, r * .9, 0); ink(c, palette, 4); c.restore(); }
+    ring(c, r * .2); c.fillStyle = palette.accent + "90"; c.fill(); ink(c, palette, 3, true);
+  } else if (motif === "poison") {
+    if (second || ult) {
+      c.beginPath(); for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + i * TAU * 2 / 5; const x = Math.cos(a) * r * .85, y = Math.sin(a) * r * .85; if (!i) c.moveTo(x, y); else c.lineTo(x, y); } ink(c, palette, 2, true);
+    }
+    for (let i = 0; i < count; i++) { const a = i * TAU / count + p * .6; c.beginPath(); c.ellipse(Math.cos(a) * r * .55, Math.sin(a) * r * .55, r * .3, r * .18, a, 0, TAU); c.fillStyle = (i % 2 ? palette.accent : palette.color) + "38"; c.fill(); }
+    c.save(); c.scale(r / 48, r / 48);
+    if (ult) {
+      c.beginPath(); c.ellipse(0, 2, 7, 13, 0, 0, TAU); c.fillStyle = palette.color; c.fill(); ink(c, palette, 2);
+      c.beginPath(); c.moveTo(0, 13); c.bezierCurveTo(-32, 25, -24, -30, -5, -22); c.lineTo(-10, -17);
+      for (const s of [-1, 1]) { segment(c, s * 7, -4, s * 20, -18); segment(c, s * 20, -18, s * 25, -9); for (let i = 0; i < 3; i++) segment(c, s * 6, i * 7, s * 19, i * 8 + 4); } ink(c, palette, 3, true);
+    } else {
+      c.beginPath(); c.moveTo(8, 20); c.bezierCurveTo(-23, 27, 20, -7, -4, -10); c.bezierCurveTo(-20, -34, 23, -34, 8, -11); ink(c, palette, 7);
+      c.beginPath(); segment(c, -5, -23, -2, -20); segment(c, 7, -23, 4, -20); ink(c, palette, 1.5, true);
+    }
+    c.restore();
+  } else if (motif === "lotus") {
+    c.save(); c.scale(1, .75); lotus(c, r * .9, count, p, palette);
+    if (ult && full) lotus(c, r * .58, 6, -p, palette);
+    if (second) { ring(c, r); ink(c, palette, 2, true); } c.restore();
+    c.beginPath(); segment(c, -7, 0, 7, 0); segment(c, 0, -7, 0, 7); ink(c, palette, 3, true);
+  } else if (motif === "fan" || motif === "frost") {
+    if (motif === "fan") {
+      c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, r, -.72, .72); c.closePath(); c.fillStyle = palette.color + "28"; c.fill(); ink(c, palette, 2);
+      for (let i = 0; i < count; i++) { const a = -.72 + i * 1.44 / (count - 1); c.beginPath(); segment(c, 0, 0, Math.cos(a) * r, Math.sin(a) * r); ink(c, palette, 1.2); }
+    } else if (ult) {
+      c.save(); c.scale(1, .6); ring(c, r * .85); ink(c, palette, 2, true); c.restore();
+      const crystals = full ? 5 : 3;
+      for (let i = 0; i < crystals; i++) {
+        const a = i * TAU / crystals, x = Math.cos(a) * r * .57, y = Math.sin(a) * r * .28;
+        c.save(); c.translate(x, y + (1 - p) * 18);
+        c.beginPath(); c.moveTo(0, -r * .65); c.lineTo(-r * .13, -r * .27); c.lineTo(-r * .1, r * .15);
+        c.lineTo(0, r * .24); c.lineTo(r * .1, r * .15); c.lineTo(r * .13, -r * .27); c.closePath();
+        c.fillStyle = palette.color + "65"; c.fill(); ink(c, palette, 2);
+        c.beginPath(); segment(c, 0, -r * .6, 0, r * .2); segment(c, -r * .12, -r * .27, 0, -r * .17); segment(c, 0, -r * .17, r * .12, -r * .27); ink(c, palette, 1.2); c.restore();
+      }
+    } else {
+      ring(c, r * .85); ink(c, palette, 2, true);
+      for (let i = 0; i < (full ? 6 : 4); i++) {
+        c.save(); c.rotate(i * TAU / (full ? 6 : 4)); c.translate(r * .65, 0); c.rotate(Math.PI / 2);
+        c.beginPath(); c.moveTo(0, -r * .36); c.lineTo(-r * .12, 0); c.lineTo(0, r * .25); c.lineTo(r * .12, 0); c.closePath(); c.fillStyle = palette.color + "70"; c.fill(); ink(c, palette, 2); c.restore();
+      }
+      if (second) { c.beginPath(); c.moveTo(0, -r * .4); c.lineTo(r * .22, 0); c.lineTo(0, r * .4); c.lineTo(-r * .22, 0); c.closePath(); ink(c, palette, 4); }
+    }
+  } else if (motif === "bell") {
+    ring(c, r * .9); ink(c, palette, 3); c.save(); c.scale(r / 48, r / 48);
+    if (ult) {
+      c.beginPath(); c.moveTo(-15, 25); c.lineTo(-23, -1); c.quadraticCurveTo(-22, -13, -15, 1); c.lineTo(-12, 7);
+      c.lineTo(-12, -24); c.quadraticCurveTo(-8, -32, -5, -24); c.lineTo(-5, -4); c.lineTo(-5, -30); c.quadraticCurveTo(0, -38, 3, -30);
+      c.lineTo(3, -4); c.lineTo(3, -25); c.quadraticCurveTo(9, -32, 11, -24); c.lineTo(11, -2); c.lineTo(11, -18); c.quadraticCurveTo(18, -23, 18, -16); c.lineTo(18, 15); c.quadraticCurveTo(15, 36, -15, 25);
+    } else { c.beginPath(); c.moveTo(-26, 22); c.lineTo(-20, 8); c.bezierCurveTo(-25, -40, 25, -40, 20, 8); c.lineTo(26, 22); c.closePath(); }
+    c.fillStyle = palette.color + "45"; c.fill(); ink(c, palette, 3);
+    c.beginPath(); segment(c, -23, 26, 23, 26); ink(c, palette, 3); c.restore();
+  } else if (motif === "taiji") {
+    c.save(); c.scale(1, .7); c.rotate(p * Math.PI);
+    const t = r * .75; ring(c, t); c.fillStyle = palette.dark + "bb"; c.fill(); ink(c, palette, 2);
+    c.beginPath(); c.arc(0, 0, t, -Math.PI / 2, Math.PI / 2); c.arc(0, t / 2, t / 2, Math.PI / 2, -Math.PI / 2, true); c.arc(0, -t / 2, t / 2, Math.PI / 2, -Math.PI / 2); c.closePath(); c.fillStyle = palette.light + "bb"; c.fill();
+    for (const s of [-1, 1]) { c.beginPath(); c.arc(0, s * t / 2, t * .11, 0, TAU); c.fillStyle = s > 0 ? palette.light : palette.dark; c.fill(); }
+    for (let i = 0; i < 8; i++) { c.save(); c.rotate(i * Math.PI / 4); c.beginPath(); for (let j = 0; j < 3; j++) { const x = r * (.84 + j * .05); if ((i + j) % 2) { segment(c, x, -5, x, -1); segment(c, x, 1, x, 5); } else segment(c, x, -5, x, 5); } ink(c, palette, 1.2, true); c.restore(); } c.restore();
+  } else if (motif === "swords") {
+    if (!ult) {
+      for (const y of [-6, 6]) { c.save(); c.translate(r * (.15 + p * .5), y); c.rotate(Math.PI / 2); sword(c, r * .45, palette); c.restore(); }
+      c.beginPath(); segment(c, -r * .2, -6, r * .6, -6); segment(c, -r * .2, 6, r * .6, 6); ink(c, palette, 3);
+    } else {
+      c.save(); c.scale(1, .65); ring(c, r * .9); ink(c, palette, 2, true); c.restore();
+      for (let i = 0; i < count; i++) { const a = i * TAU / count; c.save(); c.translate(Math.cos(a) * r * .68, Math.sin(a) * r * .4 - (1 - p) * 30); c.rotate(Math.PI); sword(c, Math.min(34, r * .28), palette); c.restore(); }
+    }
+  } else if (motif === "dragon") {
+    c.rotate((effect.angle ?? 0) + (ult ? p * .8 : 0)); dragon(c, r, p, palette);
+    if (ult) { c.save(); c.rotate(Math.PI); dragon(c, r * .85, p, palette); c.restore(); ring(c, r * .85); ink(c, palette, 2, true); }
+  } else if (motif === "spiral") {
+    for (let i = 0; i < 2; i++) { c.beginPath(); c.arc(0, 0, r * (.7 + i * .2), p * 3 + i * Math.PI, p * 3 + i * Math.PI + 2.3); ink(c, palette, 4, !!i); }
+    c.beginPath(); c.ellipse(0, 4, r * .2, r * .24, 0, 0, TAU); c.ellipse(0, -r * .25, r * .14, r * .16, 0, 0, TAU); c.fillStyle = palette.color + "88"; c.fill(); ink(c, palette, 2);
+  } else if (motif === "shadow") {
+    for (let i = 0; i < (full ? 3 : 2); i++) {
+      c.save(); c.translate(-r * .4 + i * r * .35 + p * 12, 0); c.globalAlpha *= .3 + i * .2;
+      c.beginPath(); c.arc(0, -15, 5, 0, TAU); c.moveTo(-8, 7); c.lineTo(-5, -8); c.lineTo(5, -8); c.lineTo(10, 7); c.closePath(); c.fillStyle = palette.accent; c.fill(); ink(c, palette, 1.5); c.restore();
+    }
+    c.beginPath(); for (const y of [-12, 0, 12]) segment(c, -r * .75, y, r * .7, y); ink(c, palette, 2);
+  } else if (motif === "lightning") {
+    if (second || ult) { c.save(); c.scale(1, .6); ring(c, r * .85); ink(c, palette, 2, true); c.restore(); }
+    if (ult) {
+      c.save(); c.scale(1, .6); c.rotate(p * .5);
+      c.beginPath(); for (let i = 0; i <= 6; i++) { const a = i * TAU / 6; const x = Math.cos(a) * r * .82, y = Math.sin(a) * r * .82; if (!i) c.moveTo(x, y); else c.lineTo(x, y); } ink(c, palette, 2, true);
+      c.restore();
+    }
+    const bolts = ult ? (full ? 3 : 2) : second ? 2 : 1;
+    for (let i = 0; i < bolts; i++) {
+      const x = (i - (bolts - 1) / 2) * r * .45;
+      c.beginPath(); c.moveTo(x + 8, -r * (ult ? 1.15 : .85)); c.lineTo(x - 8, -r * .28);
+      c.lineTo(x + 10, -r * .3); c.lineTo(x - 3, r * .2); ink(c, palette, ult ? 7 : 5);
+      if (full) { c.beginPath(); segment(c, x - 7, -r * .3, x - 25, -r * .5); segment(c, x - 2, r * .1, x + 22, -r * .06); ink(c, palette, 2, true); }
+    }
+  }
+  if (full && !persistent) {
+    c.fillStyle = palette.light;
+    for (let i = 0; i < (ult ? 8 : 4); i++) { const a = i * TAU / (ult ? 8 : 4) + .3, d = r * (.6 + p * .25); c.save(); c.translate(Math.cos(a) * d, Math.sin(a) * d); c.rotate(a); c.fillRect(-3, -1, 6, 2); c.restore(); }
+  }
+  c.restore();
+}
+
+export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
+  const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 18 : 12;
+  c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
+  if (full) drawGlow(c, -2, 0, r * 1.5, palette.color, .45);
+  c.beginPath(); segment(c, -r * 2.7, 0, 0, 0); ink(c, palette, key ? 3 : 2);
+  if (full) { c.beginPath(); segment(c, -r * 2, -4, -r * .7, -3); segment(c, -r * 2.3, 4, -r * .8, 3); ink(c, palette, 1.2, true); }
+  if (sect === "cai-bang") dragon(c, r, (now % 500) / 500, palette);
+  else if (sect === "ngu-doc") {
+    c.beginPath(); c.moveTo(-r, 0); c.bezierCurveTo(-r * .5, -8, 0, 8, r, 0); ink(c, palette, 5);
+    c.beginPath(); c.moveTo(r + 5, 0); c.lineTo(r - 3, -4); c.lineTo(r - 3, 4); c.closePath(); c.fillStyle = palette.accent; c.fill();
+  } else if (sect === "nga-mi") { c.rotate(now / 1000); lotus(c, r, full ? 5 : 3, 0, palette); }
+  else if (sect === "con-lon") {
+    c.beginPath(); c.moveTo(-r, -3); c.lineTo(0, 4); c.lineTo(-2, -4); c.lineTo(r + 5, 0); ink(c, palette, 5);
+  } else if (sect === "duong-mon") {
+    for (let i = -1; i <= 1; i++) { c.save(); c.translate(-Math.abs(i) * 5, i * 5); c.beginPath(); segment(c, -9, 0, 9, 0); ink(c, palette, 2); c.beginPath(); c.moveTo(14, 0); c.lineTo(6, -2); c.lineTo(6, 2); c.closePath(); c.fillStyle = palette.light; c.fill(); c.restore(); }
+  } else if (sect === "thien-nhan") {
+    c.rotate(now / 150); for (let i = 0; i < 2; i++) { c.rotate(Math.PI); c.beginPath(); c.arc(0, 0, r, -.9, 1); ink(c, palette, 4); }
+  } else if (sect === "vo-dang" || sect === "thien-vuong" || sect === "thieu-lam") { c.rotate(Math.PI / 2); sword(c, r + 4, palette); }
+  else { c.beginPath(); c.moveTo(r + 5, 0); c.lineTo(0, -6); c.lineTo(-r, 0); c.lineTo(0, 6); c.closePath(); c.fillStyle = palette.color + "bb"; c.fill(); ink(c, palette, 2); }
+  c.restore();
 }

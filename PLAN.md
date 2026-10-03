@@ -10,6 +10,16 @@ Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot 
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
 
+Lát võ học local ngày 03/10/2026 · **v0.8.0 Võ học rực sáng**:
+
+- [x] 30 icon SVG riêng: nền ánh màu, vũ khí/biểu tượng, lõi sáng và dấu tuyệt chiêu; nhận diện đúng 10 phái ở màn nhập môn, nút chiến đấu và danh sách võ công.
+- [x] VFX có đặc trưng môn phái lấy cảm hứng Võ Lâm/Kiếm Thế, tự vẽ vector: kim cang/thương/ám khí/cổ độc/liên hoa/băng tinh/hỏa long/ma diệm/thái cực/thiên lôi. Không thêm ảnh hoặc texture bên thứ ba.
+- [x] Đạn bay theo phái, tụ lực/trúng đòn riêng; chỉ một hiệu ứng lớn mỗi lần thi triển nhiều mục tiêu, còn lại hit nhỏ. Giữ logic phạm vi, MP, hồi chiêu, nộ, sát thương, trạng thái và tick trận; đường sét lan là hình ảnh của mục tiêu đã chọn.
+- [x] Võ công → Xem chiêu dùng renderer thật, không phát sinh MP/nộ/hồi chiêu/XP. Hai chất lượng Đầy đủ/Gọn lưu từng nhân vật, tương thích save cũ, chặn đổi trong phụ bản chưa lưu. Viền tuyệt chiêu khi sẵn sàng, giữ kích thước HUD nhỏ.
+- [x] Atlas vẫn 28.026 byte; ánh sáng nhỏ lưu một lần theo màu, không gradient động/blur/flash toàn màn hình/hệ particle; 30 FPS, tối đa 24 hiệu ứng thoáng/6 trận. Gọn giữ motif và vòng phạm vi, giảm ánh sáng/chi tiết.
+- [x] 88 unit test và 5 bộ browser (hình võ công, 10 phái, combat, idle/mobile, tiến trình/cài đặt) trên build production `/volam/`: đủ 30 chiêu, màu thật khi chiến đấu, sát thương/status, preview an toàn, chế độ gọn/lưu lại, khóa cài đặt trong phụ bản, thao tác vẽ/frame và sáu viewport. Typecheck/build thành công; atlas 28.026 byte, không tăng ảnh tải.
+- [ ] Playtest độ mượt/readability trên điện thoại thật, đặc biệt nhiều quái và boss; backend authority theo các gate hiện có.
+
 Lát tiến trình local ngày 03/10/2026 · **v0.7.0 Trùng sinh và danh hiệu**:
 
 - [x] Cài đặt XP x1/x5/x10/x100/x1000 lưu từng nhân vật, áp dụng một lần qua nguồn thưởng chung cho quái/nhiệm vụ/phụ bản/boss/lửa trại/vắng mặt. Lên nhiều cấp nhận đúng điểm, tối đa 160, XP dư không tích sang trùng sinh.

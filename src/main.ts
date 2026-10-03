@@ -42,8 +42,6 @@ import {
   drawBattleEffect,
   drawGlow,
   VFX_COLORS,
-  drawVfxProjectile,
-  skillMarkup,
 } from "./battle-vfx";
 import { APP_VERSION } from "./release";
 import { REALMS, combatPower, cultivationForPower } from "./cultivation";
@@ -65,7 +63,8 @@ import {
 } from "./progression";
 
 import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, type Sect as School, type SkillDefinition, type EffectMotif } from "./sects";
-import { drawSectEffect, skillIconMarkup } from "./sect-effects";
+import { drawSectEffect, drawSectProjectile, skillIconMarkup } from "./sect-effects";
+import { SKILL_PALETTES } from "./skill-art";
 import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
 import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
 import { drawTitleEffect } from "./title-art";
@@ -216,6 +215,8 @@ interface SkillEffect {
   duration: number;
   kind: "slash" | "burst" | "orb" | "heal" | "shield" | "impact" | "trail" | EffectMotif;
   skill?: SkillKey;
+  sect?: School["id"];
+  phase?: "cast" | "impact";
   angle?: number;
   theme?: Element;
 }
@@ -225,6 +226,9 @@ interface SkillZone extends SkillEffect {
 }
 
 interface Projectile {
+  visualLeader?: boolean;
+  visualFrom?: { x: number; y: number };
+  sect: School["id"];
   definition?: SkillDefinition;
   skill?: SkillKey;
   from: { x: number; y: number };
@@ -937,6 +941,7 @@ function addSkillEffect(effect: Omit<SkillEffect, "startedAt">): void {
   if (!game) return;
   game.effects.push({
     theme: factionOf(game.player.factionId).element,
+    sect: effect.skill ? playerSect(game.player).id : undefined,
     ...effect,
     startedAt: nowMs(),
   });
@@ -1439,6 +1444,7 @@ function launchProjectile(
   if (!game) return;
   const from = { x: game.player.x, y: game.player.y - 24 };
   game.combat.projectiles.push({
+    sect: playerSect(game.player).id,
     from,
     target,
     startedAt: nowMs() + 110,
@@ -1546,12 +1552,13 @@ function castSkill(key: SkillKey, automatic = false): void {
         launchProjectile(enemy, multiplier * falloff, definition.name);
         const projectile = game.combat.projectiles[game.combat.projectiles.length - 1];
         projectile.definition = definition; projectile.skill = key;
+        projectile.visualLeader = index === 0 && hit === 0;
+        if (definition.shape === "chain" && index > 0) projectile.visualFrom = { x: selection.targets[index - 1].x, y: selection.targets[index - 1].y - 30 };
         projectile.startedAt += hit * 70;
       } else {
         game.combat.strikes.push({ target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : 150) + hit * 70, definition, range: definition.range, healing });
       }
     }
-    if (definition.shape === "chain") addSkillEffect({ x: enemy.x, y: enemy.y, radius: 35, color: sect.color, duration: 500, kind: definition.motif, skill: key });
   }
   if (definition.heal && !definition.healOnHit) {
     const heal = Math.min(player.maxHp - player.hp, Math.floor(player.maxHp * (definition.heal + Math.max(0, player.skillRanks[key] - 1) * .025)));
@@ -1563,10 +1570,11 @@ function castSkill(key: SkillKey, automatic = false): void {
     player.shieldUntil = now + 5000;
   }
   const visualRadius = definition.shape === "line" ? definition.range : definition.shape === "target" || definition.shape === "chain" ? 45 : definition.radius;
-  const visual = { ...selection.center, radius: Math.min(205, visualRadius), color: sect.color, kind: definition.motif, skill: key, angle: selection.angle, duration: key === "ultimate" ? 750 : 520 };
-  addSkillEffect(visual);
+  const visual = { ...selection.center, radius: Math.min(280, visualRadius), color: SKILL_PALETTES[sect.id].color, sect: sect.id, kind: definition.motif, skill: key, angle: selection.angle, duration: key === "ultimate" ? 850 : 600 };
+  const ranged = definition.anchor === "target" && definition.range > 160 && !definition.dash && definition.damage > 0;
+  addSkillEffect(ranged ? { ...visual, x: player.x, y: player.y - 22, radius: 32, phase: "cast", duration: 300 } : visual);
   if (definition.zone) {
-    game.zones.push({ ...visual, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
+    game.zones.push({ ...visual, ...selection.center, radius: definition.radius, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
     if (game.zones.length > 6) game.zones.shift();
   }
   // Damage ticks build rage; casting an ultimate itself always consumes all rage.
@@ -2257,12 +2265,14 @@ function updateCombat(now: number): void {
     addSkillEffect({
       x: target.x,
       y: target.y - 12,
-      radius: projectile.area || 32,
-      color: ELEMENTS[projectile.theme].color,
+      radius: projectile.visualLeader ? projectile.definition?.shape === "area" ? projectile.definition.radius : 45 : projectile.area || 28,
+      color: projectile.skill ? SKILL_PALETTES[projectile.sect].color : ELEMENTS[projectile.theme].color,
+      sect: projectile.sect,
+      phase: "impact",
       theme: projectile.theme,
-      kind: projectile.definition?.motif ?? (projectile.area ? "burst" : "impact"),
-      skill: projectile.skill,
-      duration: projectile.area ? 700 : 230,
+      kind: projectile.visualLeader ? projectile.definition!.motif : projectile.area ? "burst" : "impact",
+      skill: projectile.visualLeader ? projectile.skill : undefined,
+      duration: projectile.skill ? projectile.skill === "ultimate" ? 650 : 420 : projectile.area ? 700 : 230,
     });
   }
   combat.corpses = combat.corpses.filter((corpse) => now - corpse.at < 650);
@@ -2626,7 +2636,7 @@ function drawWorld(now: number): void {
   }
 
   for (const fire of activeCampfires()) drawCampfire(fire, now);
-  for (const zone of game.zones) drawSectEffect(ctx, { ...zone, kind: zone.kind as EffectMotif }, ((now - zone.startedAt) % 1200) / 1200, true);
+  for (const zone of game.zones) drawSectEffect(ctx, { ...zone, kind: zone.kind as EffectMotif, quality: game.player.preferences.skillEffects }, ((now - zone.startedAt) % 1200) / 1200, true);
   const groundEffects = new Set(["burst", "heal", "shield"]);
   for (const effect of game.effects)
     if (groundEffects.has(effect.kind)) drawSkillEffect(effect, now);
@@ -2782,7 +2792,7 @@ function drawNpc(npc: Npc, now: number): void {
 }
 
 function drawSkillEffect(effect: SkillEffect, now: number): void {
-  if (effect.skill) drawSectEffect(ctx, { ...effect, kind: effect.kind as EffectMotif }, clamp((now - effect.startedAt) / effect.duration, 0, 1));
+  if (effect.skill) drawSectEffect(ctx, { ...effect, kind: effect.kind as EffectMotif, quality: game?.player.preferences.skillEffects }, clamp((now - effect.startedAt) / effect.duration, 0, 1));
   else drawBattleEffect(ctx, { ...effect, kind: effect.kind as "slash" | "burst" | "orb" | "heal" | "shield" | "impact" | "trail" }, now);
 }
 
@@ -2908,19 +2918,13 @@ function drawProjectile(projectile: Projectile, now: number): void {
   if (now < projectile.startedAt) return;
   const t = clamp((now - projectile.startedAt) / projectile.duration, 0, 1);
   const to = { x: projectile.target.x, y: projectile.target.y - 30 };
-  const x = projectile.from.x + (to.x - projectile.from.x) * t;
+  const from = projectile.visualFrom ?? projectile.from;
+  const x = from.x + (to.x - from.x) * t;
   const y =
-    projectile.from.y +
-    (to.y - projectile.from.y) * t -
+    from.y +
+    (to.y - from.y) * t -
     Math.sin(t * Math.PI) * 18;
-  drawVfxProjectile(
-    ctx,
-    x,
-    y,
-    Math.atan2(to.y - projectile.from.y, to.x - projectile.from.x),
-    projectile.theme,
-    now,
-  );
+  drawSectProjectile(ctx, x, y, Math.atan2(to.y - from.y, to.x - from.x), projectile.sect, projectile.skill, now, game?.player.preferences.skillEffects);
 }
 
 function drawPickupFlight(
@@ -3520,6 +3524,7 @@ function renderSkillBar(): void {
       `[data-skill="${skill.key}"]`,
     )!;
     button.classList.toggle("locked", locked);
+    button.classList.toggle("ultimate-ready", skill.key === "ultimate" && !locked && cooldown <= 0 && player.rage >= 100 && player.mp >= sect.kit[skill.key].mp);
     button.setAttribute("aria-label", `${skill.name}: ${coolText}`);
     button.querySelector(".skill-cooldown")!.textContent = coolText;
   }
@@ -3618,7 +3623,7 @@ function renderInventory(): void {
     const skillRows = SKILL_KEYS.map(key => ({ key, ...sect.kit[key] }));
 
     inventoryContent.innerHTML = `
-      <div class="skill-points-card"><span class="skill-points-icon">✦</span><div><strong>${player.skillPoints} điểm võ học</strong><p>Mỗi lần lên cấp nhận 1 điểm. Tối đa bậc 20.</p></div></div>
+      <div class="skill-points-card"><span class="skill-points-icon">✦</span><div><strong>${player.skillPoints} điểm võ học</strong><p>Mỗi lần lên cấp nhận 1 điểm. Tối đa bậc 20.</p></div><button class="mini-button" data-show-skill-art>Xem chiêu</button></div>
       <div class="skill-list">${skillRows
         .map((skill) => {
           const rank = player.skillRanks[skill.key] ?? 0;
@@ -4038,6 +4043,7 @@ function refreshIdleUi(): void {
   text("rebirth-status", player.level === MAX_LEVEL ? "Đã đủ cấp · Về cấp 1, nhận chỉ số vĩnh viễn" : `Cần cấp ${MAX_LEVEL} · Hiện tại ${player.level}`);
   text("xp-buff-status", `Đang dùng x${player.preferences.xpMultiplier} XP${player.level === MAX_LEVEL ? " · Cấp đã tối đa" : ""}`);
   document.querySelector<HTMLSelectElement>("#xp-multiplier")!.disabled = game.mapMode !== "world";
+  document.querySelector<HTMLSelectElement>("#skill-effects-quality")!.disabled = game.mapMode !== "world";
   document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.disabled = game!.mapMode !== "world");
   document.querySelector(".mobile-map-card")!.classList.toggle("hidden", !player.preferences.minimap);
   refreshHuntUi();
@@ -4124,6 +4130,7 @@ function hydrateSettings(): void {
     game.player.idle.speed,
   );
   document.querySelector<HTMLSelectElement>("#xp-multiplier")!.value = String(game.player.preferences.xpMultiplier);
+  document.querySelector<HTMLSelectElement>("#skill-effects-quality")!.value = game.player.preferences.skillEffects;
   document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.checked = game!.player.preferences[input.dataset.preference as keyof GamePreferences] === true);
   document
     .querySelectorAll<HTMLInputElement>("[data-setting]")
@@ -4685,6 +4692,8 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const skillPreview = target.closest<HTMLButtonElement>("[data-art-skill]");
+      if (skillPreview) openSkillArt(skillPreview.dataset.artSkill as SkillKey);
       const preview = target.closest<HTMLButtonElement>("[data-preview-title]");
       if (preview) openTitles(preview.dataset.previewTitle);
       const wear = target.closest<HTMLButtonElement>("[data-wear-title]");
@@ -4805,6 +4814,13 @@ function bindIdleUi(): void {
     game.player.preferences.xpMultiplier = XP_MULTIPLIERS.includes(value as GamePreferences["xpMultiplier"]) ? value as GamePreferences["xpMultiplier"] : 1;
     persistGame(); refreshUi(true);
     showToast(`Đã bật x${game.player.preferences.xpMultiplier} kinh nghiệm.`);
+  });
+  document.getElementById("skill-effects-quality")!.addEventListener("change", event => {
+    if (!game) return;
+    if (game.mapMode !== "world") { hydrateSettings(); return showToast("Rời phụ bản trước khi đổi cài đặt."); }
+    game.player.preferences.skillEffects = (event.target as HTMLSelectElement).value === "simple" ? "simple" : "full";
+    persistGame(); refreshUi(true);
+    showToast(game.player.preferences.skillEffects === "simple" ? "Đã bật hiệu ứng gọn." : "Đã bật hiệu ứng đầy đủ.");
   });
   document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.addEventListener("change", () => {
     if (!game) return;
@@ -4959,8 +4975,33 @@ function drawSectPreview(now: number): void {
   if (!previewCanvas || sectOverlay.classList.contains("hidden")) return;
   const pc = previewCanvas.getContext("2d")!, school = SCHOOL_KITS[SECT_BY_FACTION[selectedFaction]], definition = school.kit[previewSkill];
   pc.clearRect(0, 0, 128, 86);
-  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: school.color, kind: definition.motif, skill: previewSkill }, (now % 1800) / 1800);
+  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: school.color, sect: school.id, kind: definition.motif, skill: previewSkill }, (now % 1800) / 1800);
   drawSprite(pc, school.id, 56, 76, HERO_SIZE.width, HERO_SIZE.height);
+}
+
+let artPreviewSkill: SkillKey = "skill1";
+function openSkillArt(key: SkillKey = "skill1"): void {
+  if (!game) return;
+  artPreviewSkill = key;
+  const sect = playerSect(game.player), skill = sect.kit[key];
+  openUtility(`Võ công · ${sect.name}`, `<div class="skill-art-preview"><canvas id="skill-art-canvas" width="360" height="210" aria-label="Hiệu ứng ${skill.name}"></canvas><div class="sect-preview-skills">${SKILL_KEYS.map(k => `<button data-art-skill="${k}" aria-pressed="${k === key}">${skillIconMarkup(sect.kit[k], k, sect.color)}<span>${sect.kit[k].name}</span></button>`).join("")}</div><p><b>${skill.name}</b> · ${skill.mp} MP · Hồi ${skill.cooldown}s</p><p class="dim">${skill.description}</p><small class="dim">Xem thử không tốn nội lực hoặc nộ. Hiệu ứng ${game.player.preferences.skillEffects === "simple" ? "gọn" : "đầy đủ"}; đổi tại Cài đặt.</small></div>`);
+}
+function drawSkillArtPreview(now: number): void {
+  if (!game || document.getElementById("utility-overlay")!.classList.contains("hidden")) return;
+  const preview = document.querySelector<HTMLCanvasElement>("#skill-art-canvas");
+  if (!preview) return;
+  const c = preview.getContext("2d")!, sect = playerSect(game.player), skill = sect.kit[artPreviewSkill];
+  c.clearRect(0, 0, 360, 210);
+  c.fillStyle = "#132b26"; c.fillRect(0, 0, 360, 210);
+  c.strokeStyle = "#28443a"; c.lineWidth = 1;
+  for (let x = 0; x < 360; x += 30) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 210); c.stroke(); }
+  for (let y = 0; y < 210; y += 30) { c.beginPath(); c.moveTo(0, y); c.lineTo(360, y); c.stroke(); }
+  const p = (now % 1600) / 1600;
+  const directed = ["line", "cone"].includes(skill.shape) || skill.dash;
+  const origin = { x: directed ? 112 : 180, y: 120 };
+  drawSprite(c, sect.id, origin.x, origin.y + 24, HERO_SIZE.width, HERO_SIZE.height);
+  drawSectEffect(c, { ...origin, radius: directed ? 130 : 85, color: sect.color, sect: sect.id, kind: skill.motif, skill: artPreviewSkill, angle: 0, quality: game.player.preferences.skillEffects }, p);
+  if (skill.anchor === "target" && skill.range > 160 && !skill.dash && skill.damage > 0 && p < .65) drawSectProjectile(c, 50 + p * 200, 60, 0, sect.id, artPreviewSkill, now, game.player.preferences.skillEffects);
 }
 
 function closeMobileSheet(): void {
@@ -5107,6 +5148,7 @@ inventoryContent.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   const equipButton = target.closest<HTMLButtonElement>(".equip-btn");
   const enhanceButton = target.closest<HTMLButtonElement>(".enhance-btn");
+  if (target.closest("[data-show-skill-art]")) return openSkillArt();
   const skillButton = target.closest<HTMLButtonElement>(".skill-upgrade");
   const dungeonButton = target.closest<HTMLButtonElement>(".dungeon-btn");
   const saleButton = target.closest<HTMLButtonElement>(".sell-btn");
@@ -5312,6 +5354,7 @@ function frame(now: number): void {
   if (now - lastDrawTime >= RENDER_INTERVAL_MS) {
     drawWorld(now);
     drawSectPreview(now);
+    drawSkillArtPreview(now);
     drawTitlePreview(now);
     lastDrawTime = now - ((now - lastDrawTime) % RENDER_INTERVAL_MS);
   }
