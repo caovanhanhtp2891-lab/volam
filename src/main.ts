@@ -35,6 +35,15 @@ import {
   type ActorMotion,
 } from "./combat";
 import { drawAnimatedHero, drawEquipmentIcon } from "./combat-art";
+import { equipmentMarkup, equipmentTier } from "./equipment-art";
+import {
+  drawBattleEffect,
+  drawGlow,
+  VFX_COLORS,
+  drawVfxProjectile,
+  skillMarkup,
+} from "./battle-vfx";
+import { APP_VERSION } from "./release";
 import {
   BAG_CAPACITY,
   DUNGEONS,
@@ -295,7 +304,7 @@ let VIEW_HEIGHT = 600;
 const MOBILE_GAME_QUERY =
   "(max-width: 600px) and (orientation: portrait), (max-width: 1000px) and (max-height: 500px) and (orientation: landscape)";
 const mobileGameMedia = window.matchMedia(MOBILE_GAME_QUERY);
-const RENDER_INTERVAL_MS = 1000 / 30;
+const RENDER_INTERVAL_MS = 1000 / 60;
 const PLAYER_START = { x: 300, y: 360 };
 const LEGACY_SAVE_KEY = "giang-ho-di-truyen-prototype";
 let activeSlot = 0;
@@ -387,6 +396,7 @@ const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Không tìm thấy #app");
 
 app.innerHTML = idleShell();
+document.documentElement.dataset.version = APP_VERSION;
 
 const canvasElement = document.querySelector<HTMLCanvasElement>("#game-canvas");
 if (!canvasElement) throw new Error("Không tìm thấy game canvas");
@@ -1358,10 +1368,10 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string): void {
   addSkillEffect({
     x: enemy.x,
     y: enemy.y - 20,
-    radius: critical ? 32 : 22,
+    radius: critical ? 50 : 36,
     color: playerSect(game.player).color,
     kind: "impact",
-    duration: 230,
+    duration: 450,
   });
   game.player.rage = clamp(game.player.rage + 7, 0, 100);
   addFloatingText(
@@ -1475,9 +1485,9 @@ function playerBasicAttack(): void {
     addSkillEffect({
       x: game.player.x,
       y: game.player.y - 18,
-      radius: 66,
+      radius: 85,
       color,
-      duration: 280,
+      duration: 450,
       kind: "slash",
       angle: Math.atan2(target.y - game.player.y, target.x - game.player.x),
     });
@@ -1977,7 +1987,7 @@ function notifyLoot(item: Item): void {
   entry.className = "loot-notice";
   entry.style.setProperty("--loot-color", item.color);
   entry.dataset.lootItem = item.id;
-  entry.innerHTML = `<span>${escapeHtml(item.icon)}</span><div><b>${escapeHtml(item.name)}</b><small>${item.rarity} · Cấp ${item.level}</small></div>`;
+  entry.innerHTML = `${equipmentMarkup(item.slot, item.color, item.rarity)}<div><b>${escapeHtml(item.name)}</b><small>${item.rarity} · Cấp ${item.level}</small></div>`;
   entry.setAttribute("aria-label", `Đã nhặt ${item.name}, xem trang bị`);
   notices.prepend(entry);
   while (notices.children.length > 2) notices.lastElementChild?.remove();
@@ -2667,7 +2677,14 @@ function drawWorld(now: number): void {
     drawEnemySprite(corpse.enemy, now);
     ctx.restore();
   }
-  for (const loot of game.loot) drawLoot(loot, now);
+  for (const loot of game.loot)
+    if (
+      loot.x > game.cameraX - 100 &&
+      loot.x < game.cameraX + VIEW_WIDTH + 100 &&
+      loot.y > game.cameraY - 150 &&
+      loot.y < game.cameraY + VIEW_HEIGHT + 80
+    )
+      drawLoot(loot, now);
   const actors = [
     ...game.enemies
       .filter((enemy) => !enemy.dead)
@@ -2806,135 +2823,7 @@ function drawNpc(npc: Npc, now: number): void {
 }
 
 function drawSkillEffect(effect: SkillEffect, now: number): void {
-  const progress = clamp((now - effect.startedAt) / effect.duration, 0, 1);
-  const fade = Math.sin(Math.PI * progress);
-  const radius = effect.radius * (0.35 + progress * 0.65);
-  ctx.save();
-  ctx.translate(effect.x, effect.y);
-  ctx.globalAlpha = fade;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = effect.color;
-  ctx.fillStyle = effect.color;
-  if (effect.kind === "slash") {
-    ctx.rotate(effect.angle ?? 0);
-    const end = -0.9 + progress * 2.1;
-    for (let i = 2; i >= 0; i--) {
-      ctx.strokeStyle = i ? hexToRgba(effect.color, 0.3 + i * 0.2) : "#fff0be";
-      ctx.lineWidth = i ? 5 + i * 3 : 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, effect.radius * (0.8 + i * 0.06), end - 0.95, end);
-      ctx.stroke();
-    }
-  } else if (effect.kind === "trail") {
-    ctx.rotate(effect.angle ?? 0);
-    for (let i = -1; i <= 1; i++) {
-      ctx.lineWidth = i === 0 ? 4 : 2;
-      ctx.globalAlpha = fade * (i === 0 ? 0.5 : 0.3);
-      ctx.beginPath();
-      ctx.moveTo(effect.radius * progress * 0.4, i * 10);
-      ctx.lineTo(effect.radius * progress, i * 10);
-      ctx.stroke();
-    }
-  } else if (effect.kind === "impact") {
-    for (let i = 0; i < 7; i++) {
-      const angle = (i * Math.PI * 2) / 7;
-      ctx.lineWidth = i % 2 ? 2 : 3;
-      ctx.beginPath();
-      ctx.moveTo(
-        Math.cos(angle) * radius * 0.45,
-        Math.sin(angle) * radius * 0.45,
-      );
-      ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#fff4cf";
-    ctx.beginPath();
-    ctx.arc(0, 0, (1 - progress) * 8, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (effect.kind === "heal") {
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 12, radius, radius * 0.35, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 5; i++) {
-      const angle = (i * Math.PI * 2) / 5;
-      const x = Math.cos(angle) * radius * 0.6,
-        y = -progress * 65 + Math.sin(angle) * 15;
-      ctx.fillRect(x - 2, y - 7, 4, 14);
-      ctx.fillRect(x - 6, y - 2, 12, 4);
-    }
-  } else if (effect.kind === "shield") {
-    ctx.fillStyle = hexToRgba(effect.color, 0.12);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(0, -12, radius * 0.55, radius * 0.8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    for (let i = 0; i < 6; i++) {
-      const a = (i * Math.PI) / 3 + progress;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * radius * 0.6, Math.sin(a) * radius * 0.6 - 12);
-      ctx.lineTo(
-        Math.cos(a + 0.35) * radius * 0.6,
-        Math.sin(a + 0.35) * radius * 0.6 - 12,
-      );
-      ctx.stroke();
-    }
-  } else {
-    ctx.fillStyle = hexToRgba(effect.color, 0.1);
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = hexToRgba(effect.color, 0.45);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.78, progress, progress + Math.PI * 1.8);
-    ctx.stroke();
-    const count = effect.theme === "tho" ? 6 : 10;
-    for (let i = 0; i < count; i++) {
-      const a = (i * Math.PI * 2) / count + progress * 0.5;
-      ctx.save();
-      ctx.translate(Math.cos(a) * radius * 0.82, Math.sin(a) * radius * 0.82);
-      ctx.rotate(a);
-      ctx.fillStyle = effect.color;
-      ctx.strokeStyle = effect.color;
-      if (effect.theme === "tho") {
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-12, 0);
-        ctx.lineTo(-4, -5);
-        ctx.lineTo(-1, 3);
-        ctx.lineTo(8, -4);
-        ctx.lineTo(14, 0);
-        ctx.stroke();
-      } else if (effect.theme === "hoa") {
-        ctx.beginPath();
-        ctx.moveTo(0, -15 * fade);
-        ctx.quadraticCurveTo(-10, 0, 0, 8);
-        ctx.quadraticCurveTo(10, 0, 0, -15 * fade);
-        ctx.fill();
-      } else if (effect.theme === "moc") {
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 9, 4, 0.5, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(0, -12);
-        ctx.lineTo(5, 0);
-        ctx.lineTo(0, 12);
-        ctx.lineTo(-5, 0);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-  }
-  ctx.restore();
+  drawBattleEffect(ctx, effect, now);
 }
 
 function drawFloatingText(floatingText: FloatingText, now: number): void {
@@ -3008,17 +2897,18 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.fill();
   if (loot.item) {
     const rare = loot.item.rarity === "Hiếm" || loot.item.rarity === "Cực phẩm";
-    ctx.fillStyle = hexToRgba(color, 0.14);
+    drawGlow(ctx, 0, 0, 30, color, 0.45);
+    ctx.fillStyle = hexToRgba(color, 0.25);
     ctx.beginPath();
     ctx.ellipse(0, 4, 18 + Math.sin(now / 220) * 2, 7, 0, 0, Math.PI * 2);
     ctx.fill();
     if (rare && progress === 1) {
-      ctx.fillStyle = hexToRgba(color, 0.18);
+      ctx.fillStyle = hexToRgba(color, 0.32);
       ctx.beginPath();
-      ctx.moveTo(-6, 0);
-      ctx.lineTo(-2, -62);
-      ctx.lineTo(2, -62);
-      ctx.lineTo(6, 0);
+      ctx.moveTo(-12, 0);
+      ctx.lineTo(-4, -115);
+      ctx.lineTo(4, -115);
+      ctx.lineTo(12, 0);
       ctx.fill();
       for (let i = 0; i < 3; i++) {
         const t = (now / 1100 + i / 3) % 1;
@@ -3031,13 +2921,13 @@ function drawLoot(loot: GroundLoot, now: number): void {
     ctx.save();
     ctx.translate(0, -height - 5);
     ctx.rotate((1 - progress) * 2.2);
-    drawEquipmentIcon(ctx, loot.item.slot, color, 25);
+    drawEquipmentIcon(ctx, loot.item.slot, color, 42);
     ctx.restore();
     if (progress === 1) {
       ctx.textAlign = "center";
-      ctx.font = "600 9px sans-serif";
+      ctx.font = "700 12px sans-serif";
       ctx.fillStyle = color;
-      drawOutlinedText(loot.item.name, 0, 26);
+      drawOutlinedText(loot.item.name, 0, 33);
       ctx.textAlign = "left";
     }
   } else {
@@ -3055,60 +2945,24 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.restore();
 }
 function drawProjectile(projectile: Projectile, now: number): void {
-  const t = clamp((now - projectile.startedAt) / projectile.duration, 0, 1);
   if (now < projectile.startedAt) return;
-  const to = { x: projectile.target.x, y: projectile.target.y - 22 };
+  const t = clamp((now - projectile.startedAt) / projectile.duration, 0, 1);
+  const to = { x: projectile.target.x, y: projectile.target.y - 30 };
   const x = projectile.from.x + (to.x - projectile.from.x) * t;
   const y =
     projectile.from.y +
     (to.y - projectile.from.y) * t -
-    Math.sin(t * Math.PI) * 14;
-  const angle = Math.atan2(to.y - projectile.from.y, to.x - projectile.from.x);
-  const color = ELEMENTS[projectile.theme].color;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  for (let i = 4; i > 0; i--) {
-    ctx.globalAlpha = (1 - i / 5) * 0.7;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.ellipse(-i * 10, 0, 8 - i, 4 - i * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = "#ffefc2";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  if (projectile.theme === "hoa") {
-    ctx.moveTo(10, 0);
-    ctx.quadraticCurveTo(1, -11, -16, -5);
-    ctx.lineTo(-8, 0);
-    ctx.lineTo(-16, 5);
-    ctx.quadraticCurveTo(1, 11, 10, 0);
-  } else if (projectile.theme === "tho") {
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-3, -6);
-    ctx.lineTo(0, -1);
-    ctx.lineTo(-15, -3);
-    ctx.lineTo(-5, 6);
-    ctx.lineTo(-6, 1);
-    ctx.closePath();
-  } else {
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-6, -6);
-    ctx.lineTo(-13, 0);
-    ctx.lineTo(-6, 6);
-    ctx.closePath();
-  }
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#fff6d4";
-  ctx.beginPath();
-  ctx.arc(0, 0, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+    Math.sin(t * Math.PI) * 18;
+  drawVfxProjectile(
+    ctx,
+    x,
+    y,
+    Math.atan2(to.y - projectile.from.y, to.x - projectile.from.x),
+    projectile.theme,
+    now,
+  );
 }
+
 function drawPickupFlight(
   pickup: CombatState["pickups"][number],
   now: number,
@@ -3348,14 +3202,34 @@ function drawHeroSprite(
     motion.facingY = facingY;
     ctx.scale(0.9, 0.9);
     drawAnimatedHero(ctx, "wudang", "male", motion, now);
-  } else if (game)
+  } else if (game) {
+    const bestGear = Object.values(game.player.equipment).reduce<
+      Item | undefined
+    >(
+      (best, item) =>
+        !best || equipmentTier(item.rarity) > equipmentTier(best.rarity)
+          ? item
+          : best,
+      undefined,
+    );
     drawAnimatedHero(
       ctx,
       game.player.factionId,
       game.player.sex,
       game.combat.motion,
       now,
+      {
+        weaponColor: game.player.equipment.weapon?.color ?? "#ffe5a3",
+        armorColor:
+          equipmentTier(game.player.equipment.armor?.rarity) >= 2
+            ? game.player.equipment.armor!.color
+            : "",
+        auraColor: bestGear?.color ?? "#ffe5a3",
+        tier: equipmentTier(bestGear?.rarity),
+        enhancement: game.player.equipment.weapon?.enhance ?? 0,
+      },
     );
+  }
   if (
     !remote &&
     game &&
@@ -3379,7 +3253,7 @@ function drawPlayer(player: Player, now: number): void {
   ctx.restore();
   drawBar(
     player.x - 25,
-    player.y - 67,
+    player.y - 103,
     50,
     5,
     player.hp / player.maxHp,
@@ -3391,7 +3265,7 @@ function drawPlayer(player: Player, now: number): void {
   drawOutlinedText(
     `${player.name} · Cấp ${player.level}`,
     player.x,
-    player.y - 74,
+    player.y - 112,
   );
   ctx.textAlign = "left";
 }
@@ -3404,14 +3278,14 @@ function drawRemotePlayer(
   ctx.translate(remote.x, remote.y + Math.sin(now / 190 + remote.x) * 1.2);
   drawHeroSprite(SECTS.thuy, 1, 0, now, true);
   ctx.restore();
-  drawBar(remote.x - 23, remote.y - 62, 46, 4, 1, "#72b9e8");
+  drawBar(remote.x - 23, remote.y - 96, 46, 4, 1, "#72b9e8");
   ctx.fillStyle = "#c5e4f2";
   ctx.font = "600 10px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
   drawOutlinedText(
     `${remote.name} · Cấp ${remote.level}`,
     remote.x,
-    remote.y - 69,
+    remote.y - 105,
   );
   ctx.textAlign = "left";
 }
@@ -3584,8 +3458,7 @@ function refreshUi(force = false): void {
 }
 
 function skillGlyphMarkup(skill: SkillKey, sectId: SectId): string {
-  const sprite = sectId === "kim" ? "sword" : sectId === "hoa" ? "fire" : "ice";
-  return `<span class="skill-glyph skill-${skill} sect-${sectId} illustrated-skill" aria-hidden="true">${spriteMarkup(sprite)}</span>`;
+  return skillMarkup(factionOf(game?.player.factionId, sectId).element, skill);
 }
 
 function renderSkillBar(): void {
@@ -3661,7 +3534,7 @@ function itemRow(item: Item, index: number, equipped = false): string {
     pendingSaleId === item.id
       ? `<button class="mini-button" data-cancel-sale>Hủy</button>`
       : "";
-  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${escapeHtml(item.icon)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span></div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
+  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${equipmentMarkup(item.slot, item.color, item.rarity)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span></div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
 }
 
 function supplyMarkup(): string {
@@ -3827,7 +3700,7 @@ function renderInventory(): void {
     <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ tốt</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
-      return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `<span>${escapeHtml(item.icon)}</span><small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
+      return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${equipmentMarkup(item.slot, item.color, item.rarity)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
     }).join("")}</div>
     ${supplyMarkup()}
     ${player.pendingItems.length ? `<div class="pending-rewards"><strong>Đồ chờ nhận · ${player.pendingItems.length} món</strong><p>Thưởng đã giữ lại, kể cả khi tải lại trang.</p><button class="outline-button" data-collect-pending ${player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Nhận vào túi</button></div>` : ""}
@@ -3932,7 +3805,7 @@ function prepareIdleWave(resetPosition = true): void {
 function collectIdleLoot(force = false): void {
   if (!game || !game.loot.length) return;
   const ready = game.loot.filter(
-    (loot) => force || nowMs() - (loot.bornAt ?? 0) >= 850,
+    (loot) => force || nowMs() - (loot.bornAt ?? 0) >= 1600,
   );
   if (!ready.length) return;
   const items: Item[] = [];
@@ -3978,7 +3851,7 @@ function updateIdleProgress(now: number): void {
     return;
   }
   if (!idleNextWave) {
-    idleNextWave = now + 850;
+    idleNextWave = now + 2200;
     return;
   }
   if (now < idleNextWave) return;
@@ -4069,6 +3942,9 @@ function refreshIdleUi(): void {
     .querySelector(".quest-panel")!
     .classList.toggle("hidden", progress.enabled);
   document
+    .getElementById("legacy-training")!
+    .classList.toggle("hidden", progress.enabled || game.mapMode === "dungeon");
+  document
     .querySelector("#gift-btn")!
     .classList.toggle("available", progress.dailyClaim !== dailyDate());
   text(
@@ -4113,7 +3989,7 @@ function refreshIdleUi(): void {
     )
       .map((slot) => {
         const item = player.equipment[slot];
-        return `<button class="equipment-slot ${item ? "equipped" : ""}" data-enhance-slot="${slot}" style="--rarity-color:${item?.color ?? "#45584d"}" ${item ? "" : "disabled"} aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${item.name}, cường hóa +${item.enhance}` : ": trống"}">${item ? `<span class="equipment-icon">${GEAR_SLOTS[slot].icon}</span><small>${escapeHtml(item.name)}</small><b>+${item.enhance}</b>` : `<span>${GEAR_SLOTS[slot].name}</span>`}</button>`;
+        return `<button class="equipment-slot ${item ? "equipped" : ""}" data-enhance-slot="${slot}" style="--rarity-color:${item?.color ?? "#45584d"}" ${item ? "" : "disabled"} aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${item.name}, cường hóa +${item.enhance}` : ": trống"}">${item ? `${equipmentMarkup(item.slot, item.color, item.rarity, "equipment-icon")}<small>${escapeHtml(item.name)}</small><b>+${item.enhance}</b>` : `<span>${GEAR_SLOTS[slot].name}</span>`}</button>`;
       })
       .join("");
     document.getElementById("attribute-list")!.innerHTML = (
@@ -4165,7 +4041,7 @@ function showItemDetail(item: Item): void {
   const attribute = item.slot === "weapon" ? "công" : "phòng";
   openUtility(
     item.name,
-    `<div class="item-detail"><span style="color:${item.color}">${escapeHtml(item.icon)}</span><b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · +${power(item)} ${attribute}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p></div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${diff} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}`,
+    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · +${power(item)} ${attribute}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p></div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${diff} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}`,
   );
 }
 function openDailyRewards(): void {
@@ -4531,7 +4407,13 @@ function bindIdleUi(): void {
       "Luyện công tại ải hiện tại: tự đánh, dùng chiêu và thu hồi vật phẩm.",
     );
     persistGame();
+    refreshUi(true);
   });
+  document
+    .getElementById("legacy-training-btn")!
+    .addEventListener("click", () =>
+      document.getElementById("training-btn")!.click(),
+    );
   document.getElementById("town-btn")!.addEventListener("click", () => {
     if (!game || game.mapMode === "dungeon")
       return showToast("Hãy rời phụ bản trước khi về thành.");

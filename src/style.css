@@ -834,6 +834,81 @@ h3 small {
   font-size: 26px;
   color: var(--rarity-color);
 }
+.gear-art {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.gear-art.tier-1 {
+  filter: drop-shadow(0 0 3px var(--gear-color));
+}
+.gear-art.tier-2,
+.gear-art.tier-3 {
+  filter: drop-shadow(0 0 5px var(--gear-color));
+}
+.gear-art.tier-2 .gear-sparkle,
+.gear-art.tier-3 .gear-sparkle {
+  animation: gear-sparkle 1.8s ease-in-out infinite alternate;
+}
+.bag-slot .gear-art {
+  width: 88%;
+  height: 88%;
+}
+.equipment-slot .gear-art {
+  width: 45px;
+  height: 45px;
+  max-height: 65%;
+}
+.item-icon .gear-art {
+  width: 46px;
+  height: 46px;
+}
+.loot-notice .gear-art {
+  width: 28px;
+  height: 28px;
+}
+.item-detail .detail-gear-art {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 12px;
+}
+.release-stamp {
+  padding: 9px;
+  margin: 3px 0 12px;
+  color: #e8cf79;
+  border: 1px solid #8b7b45;
+  text-align: center;
+  font-size: 11px;
+  background: #1b2b24;
+}
+.legacy-training {
+  border: 1px solid #d3b965;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 9px;
+  background: #253a29;
+  color: #f5d88d;
+}
+.legacy-training p {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #c9d7c2;
+  margin: 5px 0 8px;
+}
+@keyframes gear-sparkle {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gear-sparkle {
+    animation: none !important;
+  }
+}
 .equipment-slot small {
   font-size: 8px;
   line-height: 10px;
@@ -1021,7 +1096,7 @@ h3 small {
 }
 .item-row {
   display: grid;
-  grid-template-columns: 29px 1fr;
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: 6px;
   align-items: center;
   padding: 7px;

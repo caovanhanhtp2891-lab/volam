@@ -1,4 +1,5 @@
 import { spriteMarkup } from "./art";
+import { APP_VERSION, RELEASE_NAME } from "./release";
 
 export function idleShell(): string {
   return `
@@ -23,6 +24,7 @@ export function idleShell(): string {
     </section>
     <main class="game-layout">
       <section class="world-panel tab-page" data-page="log">
+        <div id="legacy-training" class="legacy-training hidden"><b>Sân luyện mới đã sẵn sàng</b><p>Vào luyện công để nhân vật tự tìm quái, ra chiêu và nhặt trang bị. Giữ nguyên cấp độ, hành trang và nhiệm vụ của bạn.</p><button id="legacy-training-btn" class="outline-button">Vào luyện công</button></div>
         <div class="todo-card"><b>Việc cần làm</b><button id="todo-reward" class="mini-button">Có quà chờ nhận</button><button class="mini-button" data-idle-open="dungeon">Phụ bản</button></div>
         <div class="stage-card"><div><strong id="stage-name">Hoa Sơn · Ải 1/10</strong><small id="stage-description">Chọn môn phái để bắt đầu</small></div><div class="stage-actions"><button id="stage-prev" aria-label="Ải trước">◀</button><button id="stage-push" aria-pressed="true">Vượt ải</button><button id="stage-next" aria-label="Ải tiếp theo">▶</button></div></div>
         <section class="quest-panel"><button id="quest-toggle" class="quest-toggle" aria-label="Mở nhiệm vụ" aria-expanded="false">⌄</button><b id="quest-title">Dấu chân trong Rừng Trúc</b><p id="quest-text"></p><div class="quest-progress"><span id="quest-kill-progress"></span><span id="quest-boss-progress"></span></div><small id="quest-reward"></small></section>
@@ -46,6 +48,7 @@ export function idleShell(): string {
         <div id="inventory-content"></div>
       </section>
       <section class="settings-panel tab-page" data-page="more">
+        <div class="release-stamp">v${APP_VERSION} · ${RELEASE_NAME}</div>
         <h3>Nhân vật</h3><div class="card"><label class="form-row">Tên <input id="settings-name" maxlength="16" placeholder="Tân thủ"></label><label class="form-row">Giới tính <select id="settings-sex"><option value="male">Nam</option><option value="female">Nữ</option></select></label><button id="save-name" class="outline-button">Lưu tên và giới tính</button></div>
         <h3>Tốc độ game</h3><div class="card"><label class="form-row">Tốc độ <select id="game-speed"><option value="1">x1</option><option value="1.5">x1.5</option><option value="2.5">x2.5</option></select></label><small class="dim">Tăng tốc mô phỏng chiến đấu và hồi chiêu.</small></div>
         <h3>Lưu game</h3><div class="card"><p class="dim">Tự lưu mỗi 10 giây. Ba nhân vật lưu riêng trên thiết bị này. Xuất file để sao lưu hoặc chuyển thiết bị.</p><div class="btnrow"><button id="save-btn" class="outline-button">Lưu tiến trình</button><button id="load-btn" class="outline-button">Tải tiến trình</button></div><div class="btnrow"><button id="export-save" class="outline-button">Tải file lưu</button><button id="import-save" class="outline-button">Nạp từ file</button></div><button id="restore-backup" class="mini-button">Khôi phục bản sao lưu trước</button><input id="save-file" type="file" accept=".json,.volamsave" hidden><textarea id="save-code" rows="3" placeholder="Mã lưu game" aria-label="Mã lưu game"></textarea><div class="btnrow"><button id="export-code" class="mini-button">Xuất mã</button><button id="import-code" class="mini-button">Nhập mã</button></div></div>

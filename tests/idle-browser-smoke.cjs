@@ -78,6 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.2.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -157,6 +158,7 @@ async function fit(page, width, height) {
     console.log("PASS daily gift awarded once, including after a page reload");
 
     await tab(page, "more");
+    assert.match(await page.locator(".release-stamp").textContent(), /v0\.2\.0/);
     await page.locator("#settings-name").fill("");
     await page.locator("#settings-name").pressSequentially("WASD Lữ");
     await page.locator("#settings-sex").selectOption("female");
@@ -223,7 +225,59 @@ async function fit(page, width, height) {
 
     await seed(page, (s) => {
       s.player.idle.inTown = true;
+      const slots = [
+        "weapon",
+        "armor",
+        "helmet",
+        "boots",
+        "belt",
+        "necklace",
+        "ring",
+        "ring2",
+        "bracelet",
+        "pendant",
+        "horse",
+      ];
+      const rarities = ["Thường", "Tốt", "Hiếm", "Cực phẩm"];
+      const colors = ["#c9d5df", "#6ad69b", "#64b5f6", "#c88aff"];
+      const gear = slots.map((slot, i) => ({
+        id: `visual-${slot}`,
+        name: `Trang bị ${slot}`,
+        slot,
+        rarity: rarities[i % 4],
+        color: colors[i % 4],
+        icon: "◈",
+        level: 10,
+        power: 20,
+        enhance: 0,
+      }));
+      s.player.inventory = gear;
+      s.player.equipment = Object.fromEntries(
+        gear.map((item) => [
+          item.slot,
+          { ...item, id: `equipped-${item.slot}` },
+        ]),
+      );
     });
+    await tab(page, "char");
+    assert.equal(await page.locator(".equipment-slot svg").count(), 11);
+    await tab(page, "inv");
+    assert.equal(await page.locator(".bag-slot svg").count(), 11);
+    // Click the picture itself, rather than its parent, to exercise SVG event targets.
+    await page
+      .locator('.bag-slot[data-inspect-item="visual-boots"] svg')
+      .click();
+    assert.match(
+      await page.locator("#utility-content").textContent(),
+      /Trang bị|Cực phẩm/,
+    );
+    assert.equal(await page.locator(".detail-gear-art").isVisible(), true);
+    await page.locator("[data-inspect-equip]").click();
+    assert.equal((await state(page)).player.equipment.boots.id, "visual-boots");
+    assert.equal(await page.locator("#utility-overlay").isVisible(), false);
+    console.log(
+      "PASS illustrated gear in all eleven slots, image-tap comparison and equip",
+    );
     for (const [width, height] of [
       [320, 568],
       [360, 640],
@@ -248,6 +302,7 @@ async function fit(page, width, height) {
     assert.equal(await page.locator(".character-panel").isVisible(), true);
     assert.equal(await page.locator("#compact-btn").getAttribute("aria-pressed"), "false");
     console.log("PASS arena expansion and menu navigation restore the selected panel");
+    const beforeMigration = await save(page);
     await seed(page, (s) => {
       delete s.player.idle;
       delete s.player.factionId;
@@ -255,7 +310,26 @@ async function fit(page, width, height) {
       delete s.player.sex;
     });
     assert.equal((await state(page)).player.idle.enabled, false);
-    assert.equal((await state(page)).player.inventory.length, offline.player.inventory.length);
+    assert.equal((await state(page)).player.inventory.length, beforeMigration.player.inventory.length);
+    await tab(page, "log");
+    assert.equal(await page.locator("#legacy-training").isVisible(), true);
+    const legacy = await save(page);
+    await page.locator("#legacy-training-btn").click();
+    const trained = await state(page);
+    assert.equal(trained.player.idle.enabled, true);
+    assert.equal(await page.locator("#mobile-auto").getAttribute("aria-pressed"), "true");
+    assert.equal(trained.player.level, legacy.player.level);
+    assert.deepEqual(trained.player.inventory, legacy.player.inventory);
+    assert.deepEqual(trained.player.equipment, legacy.player.equipment);
+    assert.equal(
+      trained.player.questRewardClaimed,
+      legacy.player.questRewardClaimed,
+    );
+    assert.equal(trained.player.skillPoints, legacy.player.skillPoints);
+    assert.equal(await page.locator("#legacy-training").isVisible(), false);
+    console.log(
+      "PASS old character enters animated training without losing level, gear, quest or skill points",
+    );
     await tab(page, "more");
     await page.locator("#online-btn").click();
     await page.waitForFunction(() => document.querySelector("#connection-pill").dataset.status === "online");

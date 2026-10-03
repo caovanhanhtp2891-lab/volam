@@ -10,12 +10,13 @@ Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát tr
 - Tự tìm quái, dùng võ công, dùng thuốc và nhặt đồ. WASD hoặc joystick chuyển sang điều khiển tay; bấm **Tự động** để tiếp tục. Khắc chế ngũ hành tăng 25% hoặc giảm 20% sát thương.
 - Nhân vật có tay/chân chuyển động theo quãng đường thật, quay mặt theo tám hướng, động tác đánh/thi triển và lướt có thời gian. Camera bám mềm; chuyển đợt giữ vị trí nhân vật. Quái có động tác lao đánh, phản ứng trúng đòn và ngã xuống.
 - Đánh thường cận chiến có vệt chém, đòn tầm xa có đạn bay và gây sát thương khi chạm mục tiêu. Hiệu ứng theo năm hệ: kim nhận, lá/ám khí, băng, lửa và lôi. Chiêu ngoài tầm không tiêu hao MP hoặc hồi chiêu.
-- Trang bị bật ra rồi rơi xuống đất, có icon theo vị trí, tên và màu phẩm chất; đồ Hiếm/Cực phẩm có cột sáng. Chạm đồ để đi tới nhặt hoặc dùng **E**. Đồ tự nhặt bay về nhân vật, thông báo có thể mở so sánh với trang bị đang dùng. Đồ chưa nhặt được lưu cùng nhân vật; túi đầy vẫn nhặt được bạc, trang bị tự nhặt được giữ trong Đồ chờ nhận.
+- Trang bị bật ra rồi rơi xuống đất, có hình kiếm, áo, mũ, giày, nhẫn và thú cưỡi theo vị trí; màu và ánh sáng theo phẩm chất dùng chung trên đất, Hành trang, Nhân vật và màn so sánh. Đồ Hiếm/Cực phẩm có cột sáng và quầng sáng dưới chân khi mặc; vũ khí phát sáng theo màu trang bị. Đồ nằm trên sân ít nhất 1,6 giây trước khi tự nhặt. Chạm đồ để đi tới nhặt hoặc dùng **E**. Đồ tự nhặt bay về nhân vật, thông báo có thể mở so sánh với trang bị đang dùng. Đồ chưa nhặt được lưu cùng nhân vật; túi đầy vẫn nhặt được bạc, trang bị tự nhặt được giữ trong Đồ chờ nhận.
 - Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Cộng/rút tiềm năng thay đổi chỉ số thật. Võ công nâng đến bậc 20, có thể rút các điểm đã nâng, giữ bậc nhập môn.
 - Nhân vật có 11 vị trí trang bị và 60 ô hành trang, tự mặc đồ tốt hơn nếu bật tùy chọn; đồ vượt sức chứa vẫn được giữ trong **Đồ chờ nhận**. Có cửa hàng, cường hóa, bình HP/MP, về thành và quay lại ải.
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
-- Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm.
+- Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
+- Tab **Khác** hiển thị bản **v0.2.0 · Hoạt ảnh & trang bị** để xác định bản đang tải.
 
 Ảnh đại diện, quái và NPC dùng atlas gốc của `volam`; nhân vật, hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -112,7 +113,7 @@ VOLAM_TEST_URL=http://127.0.0.1:5173 \
 node tests/idle-browser-smoke.cjs
 ```
 
-Bộ này kiểm tra 10 màn chọn phái, chiến đấu tự động thật, đánh trùm/mở vùng, cộng/rút điểm, thưởng ngày chống nhận lặp, import/export/khôi phục bản sao lưu, ba ô nhân vật, thưởng vắng mặt không lặp, save cũ, online và sáu kích thước viewport từ 320×568 đến 1440×900. Test boss dùng fixture mạnh để kiểm tra luồng; không thay thế playtest cân bằng toàn bộ 160 ải.
+Bộ này kiểm tra 10 màn chọn phái, chiến đấu tự động thật, đánh trùm/mở vùng, cộng/rút điểm, thưởng ngày chống nhận lặp, import/export/khôi phục bản sao lưu, ba ô nhân vật, thưởng vắng mặt không lặp, save cũ, online và sáu kích thước viewport từ 320×568 đến 1440×900. Kiểm tra thêm hình trang bị ở cả 11 vị trí, chạm trực tiếp vào hình để so sánh/mặc và bật sân luyện từ nhân vật cũ mà giữ cấp độ, đồ, nhiệm vụ và điểm võ học. Test boss dùng fixture mạnh để kiểm tra luồng; không thay thế playtest cân bằng toàn bộ 160 ải.
 
 Kiểm tra chuyển động, lướt, đạn bay và luồng đồ rơi bằng cùng các biến môi trường:
 
@@ -126,4 +127,4 @@ Browser test kiểm tra mua/bán, bình hồi phục, migrate save, kích thư�
 
 Giao diện chiếm một viewport, hỗ trợ màn hình dọc và điện thoại xoay ngang: sân đấu ở trên, menu ở dưới, minimap theo vị trí thật, joystick, Auto và nút kỹ năng tròn. Các tab thông tin cuộn nội bộ, không kéo cả trang. Nút thu gọn/mở rộng cho phép tập trung vào sân đấu. Sát thương thường xuất hiện bằng số nổi và nhật ký, không bật toast liên tục che menu.
 
-Đồ họa dùng hình 2D phẳng, ít màu: một atlas **19 KB** cho ảnh đại diện, quái, boss, NPC và icon chiêu. Nhân vật có các khớp tay/chân vẽ trên Canvas, màu áo và vũ khí theo phái; không tải thêm ảnh animation. Nền/cây/đá vẽ bằng hình đơn giản và lưu sẵn, không tải ảnh nền lớn. Game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; số hiệu ứng/đạn và đồ bay được giới hạn để nhẹ trên điện thoại. Chi tiết nguồn ảnh và ngân sách nằm trong [src/assets/README.md](./src/assets/README.md). Server authoritative cho chiến đấu, tổ đội online và bang hội vẫn là các mốc kế tiếp.
+Đồ họa dùng hình 2D phẳng: một atlas **19 KB** cho ảnh đại diện, quái, boss và NPC. Nhân vật lớn hơn, có khớp gối/tay và áo/dây buộc chuyển động trên Canvas; màu áo và vũ khí phản ánh trang bị đang mặc. Hình trang bị và nút chiêu dùng SVG nội tuyến, không tải thêm ảnh animation. Nền/cây/đá vẽ bằng hình đơn giản và lưu sẵn. Game vẽ tối đa 60 FPS, minimap khoảng 5 lần/giây; quầng sáng được tạo một lần rồi dùng lại, số hiệu ứng/đạn và đồ bay được giới hạn. Chi tiết nguồn ảnh và ngân sách nằm trong [src/assets/README.md](./src/assets/README.md). Server authoritative cho chiến đấu, tổ đội online và bang hội vẫn là các mốc kế tiếp.
