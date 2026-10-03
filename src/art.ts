@@ -1,26 +1,10 @@
-// One small atlas: 16 simple sprites, each contained in an equal-size cell.
+// One 5x4 atlas: ten sects, then ten shared monsters/NPCs/loot sprites.
 export const ATLAS_URL = new URL("./assets/simple-atlas.webp", import.meta.url).href;
 
-const SPRITES = {
-  kim: [0, 0, .25, .25],
-  hoa: [.25, 0, .25, .25],
-  thuy: [.5, 0, .25, .25],
-  bandit: [.75, 0, .25, .25],
-  wolf: [0, .25, .25, .25],
-  alpha: [.25, .25, .25, .25],
-  beetle: [.5, .25, .25, .25],
-  undead: [.75, .25, .25, .25],
-  guide: [0, .5, .25, .25],
-  smith: [.25, .5, .25, .25],
-  portal: [.5, .5, .25, .25],
-  guardian: [.75, .5, .25, .25],
-  sword: [0, .75, .25, .25],
-  fire: [.25, .75, .25, .25],
-  ice: [.5, .75, .25, .25],
-  loot: [.75, .75, .25, .25],
-} as const;
+const IDS = ["thieu-lam", "thien-vuong", "duong-mon", "ngu-doc", "nga-mi", "thuy-yen", "cai-bang", "thien-nhan", "vo-dang", "con-lon", "bandit", "wolf", "alpha", "beetle", "undead", "guide", "smith", "portal", "guardian", "loot"] as const;
+export type SpriteId = typeof IDS[number];
+const SPRITES = Object.fromEntries(IDS.map((id, index) => [id, [index % 5 / 5, Math.floor(index / 5) / 4, .2, .25] as const])) as Record<SpriteId, readonly [number, number, number, number]>;
 
-export type SpriteId = keyof typeof SPRITES;
 
 function loadImage(url: string): HTMLImageElement {
   const image = new Image();

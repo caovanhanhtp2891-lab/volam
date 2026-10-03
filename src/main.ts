@@ -4,27 +4,13 @@ import { drawSprite, spriteMarkup, type SpriteId } from "./art";
 import { createMapArt } from "./map-art";
 import { BAG_CAPACITY, DUNGEONS, POTIONS, MAX_POTIONS, buyPotion, usePotion, normalizeSupplies, itemSalePrice, storeRewardItems, recoverPendingItems, canEnterDungeon, type PotionKind, type DungeonId } from "./progression";
 
-type SectId = "kim" | "hoa" | "thuy";
+import { SECTS, SKILL_KEYS, HERO_SIZE, resolveSectId, selectSkillTargets, type SectId, type Sect, type SkillKey, type SkillDefinition } from "./sects";
+import { drawSectEffect, skillIconMarkup, type SectEffect } from "./sect-effects";
 type ItemSlot = "weapon" | "armor";
 type Rarity = "Thường" | "Tốt" | "Hiếm" | "Cực phẩm";
 type PanelTab = "bag" | "smith" | "skills" | "dungeon" | "shop";
-type SkillKey = "skill1" | "skill2" | "ultimate";
 
-interface Sect {
-  id: SectId;
-  name: string;
-  title: string;
-  description: string;
-  color: string;
-  accent: string;
-  baseHp: number;
-  baseMp: number;
-  baseAttack: number;
-  baseDefense: number;
-  speed: number;
-  skills: [string, string];
-  ultimate: string;
-}
+
 
 interface Item {
   id: string;
@@ -105,6 +91,12 @@ interface Enemy {
   bossCooldown: number;
   hitFlash: number;
   defenseDownUntil: number;
+  slowUntil: number;
+  slowFactor: number;
+  stunUntil: number;
+  poisonUntil: number;
+  poisonNextTick: number;
+  poisonDamage: number;
 }
 
 interface GroundLoot {
@@ -126,15 +118,16 @@ interface Telegraph {
   label: string;
 }
 
-interface SkillEffect {
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
+interface SkillEffect extends SectEffect {
   startedAt: number;
   duration: number;
-  kind: "slash" | "burst" | "orb" | "heal" | "shield";
-  angle?: number;
+}
+
+interface SkillZone extends SkillEffect {
+  nextTick: number;
+  multiplier: number;
+  slow: number;
+  source: string;
 }
 
 interface FloatingText {
@@ -155,13 +148,13 @@ interface GameState {
   loot: GroundLoot[];
   telegraphs: Telegraph[];
   effects: SkillEffect[];
+  zones: SkillZone[];
   floatingTexts: FloatingText[];
   logs: string[];
   targetId: string | null;
   moveTarget: { x: number; y: number } | null;
   cameraX: number;
   cameraY: number;
-  screenFlash: number;
   lastBossDefeatedAt: number;
   mapMode: "world" | "dungeon";
   dungeonTimeLeft: number;
@@ -183,53 +176,7 @@ const RENDER_INTERVAL_MS = 1000 / 30;
 const PLAYER_START = { x: 300, y: 360 };
 const SAVE_KEY = "giang-ho-di-truyen-prototype";
 
-const SECTS: Record<SectId, Sect> = {
-  kim: {
-    id: "kim",
-    name: "Kim Phong",
-    title: "Kiếm khách cận chiến",
-    description: "Áp sát nhanh, phá giáp và dồn sát thương vào một mục tiêu.",
-    color: "#f2c14e",
-    accent: "#fff2ba",
-    baseHp: 145,
-    baseMp: 90,
-    baseAttack: 21,
-    baseDefense: 9,
-    speed: 165,
-    skills: ["Phá Giáp Trảm", "Phi Kiếm Bộ"],
-    ultimate: "Vạn Kiếm Quy Tông",
-  },
-  hoa: {
-    id: "hoa",
-    name: "Xích Diệm",
-    title: "Hỏa pháp tầm xa",
-    description: "Gọi lửa từ xa, dọn nhiều quái bằng vùng sát thương rộng.",
-    color: "#ff765c",
-    accent: "#ffd0a9",
-    baseHp: 105,
-    baseMp: 125,
-    baseAttack: 26,
-    baseDefense: 5,
-    speed: 145,
-    skills: ["Liệt Hỏa Cầu", "Hỏa Trận"],
-    ultimate: "Thiên Hỏa Giáng Lâm",
-  },
-  thuy: {
-    id: "thuy",
-    name: "Huyền Thủy",
-    title: "Thủy pháp sinh tồn",
-    description: "Đóng băng, hồi phục và tạo khiên để trụ lâu trong chiến đấu.",
-    color: "#57b7ff",
-    accent: "#c8ecff",
-    baseHp: 125,
-    baseMp: 140,
-    baseAttack: 18,
-    baseDefense: 7,
-    speed: 150,
-    skills: ["Hàn Băng Chưởng", "Thủy Thuẫn"],
-    ultimate: "Băng Hà Thiên Vũ",
-  },
-};
+
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Không tìm thấy #app");
@@ -314,8 +261,8 @@ app.innerHTML = `
           </div>
           <div class="mobile-action-rail" aria-label="Menu nhanh">
             <button class="mobile-action" type="button" data-mobile-tab="dungeon" aria-label="Mở phụ bản">${spriteMarkup("portal")}<small>Phụ bản</small></button>
-            <button class="mobile-action" type="button" data-mobile-tab="skills" aria-label="Xem nhân vật">${spriteMarkup("kim", "character-shortcut")}<small>Nhân vật</small></button>
-            <button class="mobile-action mobile-auto-button" id="mobile-auto" type="button" aria-label="Bật tự động chiến đấu" aria-pressed="false">${spriteMarkup("sword")}<small>Auto</small></button>
+            <button class="mobile-action" type="button" data-mobile-tab="skills" aria-label="Xem nhân vật">${spriteMarkup("thien-vuong", "character-shortcut")}<small>Nhân vật</small></button>
+            <button class="mobile-action mobile-auto-button" id="mobile-auto" type="button" aria-label="Bật tự động chiến đấu" aria-pressed="false">${skillIconMarkup(SECTS["vo-dang"].kit.skill1, "skill1", "#e9c875")}<small>Auto</small></button>
           </div>
           <div class="mobile-chat" id="mobile-chat" aria-live="polite"></div>
           <div class="mobile-hud" id="mobile-hud" aria-label="Điều khiển trên điện thoại">
@@ -336,7 +283,7 @@ app.innerHTML = `
           <div id="log-list" class="log-list"></div>
         </div>
         <nav class="mobile-bottom-nav" aria-label="Thanh menu mobile">
-          <button class="mobile-nav-button" type="button" data-mobile-tab="skills">${spriteMarkup("sword")}<small>Kỹ năng</small></button>
+          <button class="mobile-nav-button" type="button" data-mobile-tab="skills">${skillIconMarkup(SECTS["vo-dang"].kit.skill1, "skill1", "#e9c875")}<small>Kỹ năng</small></button>
           <button class="mobile-nav-button" type="button" data-mobile-guild="true">${spriteMarkup("guide")}<small>Bang</small></button>
           <button class="mobile-nav-button" type="button" data-mobile-tab="smith">${spriteMarkup("smith")}<small>Rèn</small></button>
           <button class="mobile-nav-button" type="button" data-mobile-tab="bag">${spriteMarkup("loot")}<small>Túi đồ</small></button>
@@ -371,13 +318,14 @@ app.innerHTML = `
 
     <div class="mobile-sheet-backdrop" id="mobile-sheet-backdrop"></div>
 
-    <div class="sect-overlay" id="sect-overlay">
+    <div class="sect-overlay" id="sect-overlay" role="dialog" aria-modal="true" aria-labelledby="sect-heading">
       <div class="sect-dialog">
         <div class="dialog-eyebrow">CHƯƠNG 01 · THANH KHÊ TRẤN</div>
-        <h1>Chọn con đường nhập môn</h1>
-        <p class="dialog-lead">Mỗi môn phái có nhịp chiến đấu riêng. Bạn có thể thử lại bằng nút Chơi lại.</p>
+        <h1 id="sect-heading">Thập đại môn phái</h1>
+        <p class="dialog-lead">Chọn phái · Xem võ công · Gia nhập giang hồ</p>
         <div class="sect-cards" id="sect-cards"></div>
-        <div class="dialog-footer"><span>Hành trình bắt đầu tại Rừng Trúc</span><span>Chạm để đi · Joystick để di chuyển</span></div>
+        <div id="sect-detail" class="sect-detail"></div>
+        <div class="sect-join-actions"><button class="outline-button" id="resume-sect">Tải tiến trình</button><button class="outline-button" id="join-sect">Gia nhập</button></div>
       </div>
     </div>
 
@@ -445,6 +393,9 @@ let lastMiniMapDraw = 0;
 let lastUiUpdate = 0;
 let toastTimer = 0;
 let renderedSkillSect: SectId | null = null;
+let selectedSectId: SectId = "thieu-lam";
+let previewSkill: SkillKey = "skill1";
+let previewCanvas: HTMLCanvasElement | null = null;
 let pendingSaleId: string | null = null;
 let inventoryRenderKey = "";
 const touchInput = { x: 0, y: 0 };
@@ -620,6 +571,12 @@ function createEnemy(
     bossCooldown: 3.5,
     hitFlash: 0,
     defenseDownUntil: 0,
+    slowUntil: 0,
+    slowFactor: 1,
+    stunUntil: 0,
+    poisonUntil: 0,
+    poisonNextTick: 0,
+    poisonDamage: 0,
   };
 }
 
@@ -646,7 +603,7 @@ function createGame(sectId: SectId): GameState {
   const sect = SECTS[sectId];
   const player: Player = {
     ...PLAYER_START,
-    radius: 18,
+    radius: HERO_SIZE.radius,
     sect: sectId,
     level: 1,
     xp: 0,
@@ -689,13 +646,13 @@ function createGame(sectId: SectId): GameState {
     loot: [],
     telegraphs: [],
     effects: [],
+    zones: [],
     floatingTexts: [],
     logs: [],
     targetId: null,
     moveTarget: null,
     cameraX: 0,
     cameraY: 0,
-    screenFlash: 0,
     lastBossDefeatedAt: 0,
     mapMode: "world",
     dungeonTimeLeft: 0,
@@ -758,11 +715,13 @@ function skillScale(skill: SkillKey, base: number): number {
 function addSkillEffect(effect: Omit<SkillEffect, "startedAt">): void {
   if (!game) return;
   game.effects.push({ ...effect, startedAt: nowMs() });
+  if (game.effects.length > 24) game.effects.shift();
 }
 
 function addFloatingText(x: number, y: number, text: string, color: string, size = 18): void {
   if (!game) return;
   game.floatingTexts.push({ x, y, text, color, startedAt: nowMs(), duration: 900, size });
+  if (game.floatingTexts.length > 40) game.floatingTexts.shift();
 }
 
 function upgradeSkill(skill: SkillKey): void {
@@ -784,7 +743,7 @@ function upgradeSkill(skill: SkillKey): void {
   }
   player.skillPoints -= 1;
   player.skillRanks[skill] = Math.max(0, player.skillRanks[skill]) + 1;
-  addLog(`Đã nâng ${skill === "ultimate" ? SECTS[player.sect].ultimate : SECTS[player.sect].skills[skill === "skill1" ? 0 : 1]} lên bậc ${player.skillRanks[skill]}.`);
+  addLog(`Đã nâng ${SECTS[player.sect].kit[skill].name} lên bậc ${player.skillRanks[skill]}.`);
   refreshUi(true);
 }
 
@@ -826,6 +785,7 @@ function enterDungeon(id: DungeonId): void {
   game.loot = [];
   game.telegraphs = [];
   game.effects = [];
+  game.zones = [];
   game.floatingTexts = [];
   resetJoystick();
   keys.clear();
@@ -878,6 +838,7 @@ function leaveDungeon(): void {
   game.loot = game.worldLoot;
   game.worldLoot = [];
   game.effects = [];
+  game.zones = [];
   game.floatingTexts = [];
   resetJoystick();
   keys.clear();
@@ -999,10 +960,8 @@ function movePlayer(dx: number, dy: number): void {
   const player = game.player;
   const length = Math.hypot(dx, dy);
   if (length > 0) {
-    dx /= length;
-    dy /= length;
-    player.facingX = dx;
-    player.facingY = dy;
+    player.facingX = dx / length;
+    player.facingY = dy / length;
   }
   const nextX = player.x + dx;
   const nextY = player.y + dy;
@@ -1048,117 +1007,91 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string): void {
   if (enemy.hp <= 0) killEnemy(enemy);
 }
 
-function dealAreaDamage(x: number, y: number, radius: number, multiplier: number, source: string): void {
-  if (!game) return;
-  const targets = game.enemies.filter((enemy) => !enemy.dead && distance({ x, y }, enemy) <= radius + enemy.radius);
-  if (targets.length === 0) {
-    addLog(`${source} không đánh trúng mục tiêu nào.`);
-    return;
-  }
-  for (const target of targets) dealDamage(target, multiplier, source);
-}
+
 
 function playerBasicAttack(): void {
   if (!game || game.player.attackCooldown > 0) return;
   const target = currentTarget();
   if (!target) return;
-  const range = 95 + game.player.radius + target.radius;
+  const range = SECTS[game.player.sect].basicRange + target.radius;
   if (distance(game.player, target) > range) return;
   game.player.attackCooldown = 0.62;
   dealDamage(target, 1, "Đánh thường");
 }
 
-function castSkill(skill: "skill1" | "skill2" | "ultimate"): void {
+function dashToTarget(player: Player, target: Enemy): boolean {
+  const angle = Math.atan2(target.y - player.y, target.x - player.x);
+  const travel = Math.max(0, distance(player, target) - target.radius - player.radius - 8);
+  const steps = Math.ceil(travel / 6);
+  // Check every segment: an endpoint beyond a rock does not allow crossing it.
+  for (let step = 0; step < steps; step++) {
+    const length = Math.min(6, travel - step * 6);
+    const x = player.x + Math.cos(angle) * length, y = player.y + Math.sin(angle) * length;
+    if (isBlocked(x, y, player.radius)) break;
+    player.x = x; player.y = y;
+  }
+  player.facingX = Math.cos(angle); player.facingY = Math.sin(angle);
+  return distance(player, target) <= target.radius + player.radius + 18;
+}
+
+function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier: number, now: number): void {
+  if (enemy.dead) return;
+  if (definition.breakArmor) enemy.defenseDownUntil = now + definition.breakArmor * 1000;
+  if (definition.slow) { enemy.slowUntil = now + 3000; enemy.slowFactor = definition.slow; }
+  if (definition.stun) enemy.stunUntil = now + Math.min(definition.stun, enemy.kind === "boss" ? .35 : 2) * 1000;
+  if (definition.poison) {
+    enemy.poisonUntil = now + definition.poison * 1000;
+    enemy.poisonNextTick = now + 1000;
+    enemy.poisonDamage = multiplier * .28;
+  }
+}
+
+function castSkill(key: SkillKey): void {
   if (!game) return;
-  onlineClient.sendSkill(skill);
-  const player = game.player;
-  const sect = SECTS[player.sect];
-  if (skill === "ultimate") {
-    if (player.level < 5) {
-      addLog("Tuyệt chiêu mở ở cấp 5.");
-      return;
-    }
-    if (player.rage < 100) {
-      addLog("Chưa đủ nộ để thi triển tuyệt chiêu.");
-      return;
-    }
-    if (player.cooldowns.ultimate > 0) return;
-    player.rage = 0;
-    player.cooldowns.ultimate = 15;
-    let ultimateX = player.x;
-    let ultimateY = player.y;
-    if (player.sect === "kim") dealAreaDamage(player.x, player.y, 210, skillScale("ultimate", 3.1), sect.ultimate);
-    if (player.sect === "hoa") {
-      const target = currentTarget() ?? nearestEnemy(440);
-      if (target) {
-        ultimateX = target.x;
-        ultimateY = target.y;
-        dealAreaDamage(target.x, target.y, 180, skillScale("ultimate", 3.35), sect.ultimate);
-      }
-    }
-    if (player.sect === "thuy") {
-      dealAreaDamage(player.x, player.y, 180, skillScale("ultimate", 1.55), sect.ultimate);
-      const heal = Math.floor(player.maxHp * 0.38);
-      player.hp = clamp(player.hp + heal, 0, player.maxHp);
-      addFloatingText(player.x, player.y - 40, `+${heal}`, "#b8edff", 21);
-    }
-    addSkillEffect({ x: ultimateX, y: ultimateY, radius: player.sect === "hoa" ? 180 : 210, color: sect.color, duration: 720, kind: "burst" });
-    game.screenFlash = 0.35;
-    addLog(`${sect.ultimate} đã được thi triển.`);
-    return;
+  const player = game.player, sect = SECTS[player.sect], definition = sect.kit[key];
+  if (player.level < definition.unlock) return addLog(`${definition.name} mở ở cấp ${definition.unlock}.`);
+  if (player.cooldowns[key] > 0) return;
+  if (player.mp < definition.mp) return addLog(`Cần ${definition.mp} MP để dùng ${definition.name}.`);
+  if (key === "ultimate" && player.rage < 100) return addLog("Chưa đủ 100 nộ để thi triển tuyệt chiêu.");
+  // A selected distant target stays selected: never silently cast at a different enemy.
+  const target = currentTarget() ?? nearestEnemy(definition.range);
+  const selection = selectSkillTargets(definition, player, game.enemies, target);
+  if (!selection.valid) return addLog(`${definition.name} cần mục tiêu trong tầm ${definition.range}.`);
+  if (definition.dash && target && !dashToTarget(player, target)) {
+    game.targetId = null;
+    return addLog("Đường lướt bị vật cản chặn. Hãy chọn vị trí khác.");
   }
-  if (player.cooldowns[skill] > 0) return;
-  if (skill === "skill2" && player.level < 3) {
-    addLog("Chiêu thứ hai mở ở cấp 3.");
-    return;
+  const now = nowMs();
+  player.mp -= definition.mp;
+  player.cooldowns[key] = definition.cooldown;
+  onlineClient.sendSkill(key);
+  const multiplier = skillScale(key, definition.damage);
+  for (const [index, enemy] of selection.targets.entries()) {
+    applySkillStatus(enemy, definition, multiplier, now);
+    const falloff = definition.shape === "chain" ? .8 ** index : 1;
+    if (definition.damage > 0) for (let hit = 0; hit < (definition.hits ?? 1); hit++) dealDamage(enemy, multiplier * falloff, definition.name);
+    if (definition.shape === "chain") addSkillEffect({ x: enemy.x, y: enemy.y, radius: 35, color: sect.color, duration: 500, kind: definition.motif, skill: key });
   }
-  const target = currentTarget() ?? nearestEnemy(360);
-  if (skill === "skill1") {
-    player.cooldowns.skill1 = 4;
-    if (player.sect === "kim") {
-      if (!target || distance(player, target) > 155) return addLog("Phá Giáp Trảm cần một mục tiêu trong tầm.");
-      target.defenseDownUntil = nowMs() + 4000;
-      dealDamage(target, skillScale("skill1", 1.75), sect.skills[0]);
-      addSkillEffect({ x: target.x, y: target.y, radius: 82, color: sect.color, duration: 420, kind: "slash", angle: Math.atan2(target.y - player.y, target.x - player.x) });
-    } else if (player.sect === "hoa") {
-      if (!target) return addLog("Chưa có mục tiêu để phóng hỏa cầu.");
-      dealAreaDamage(target.x, target.y, 105, skillScale("skill1", 1.35), sect.skills[0]);
-      addSkillEffect({ x: target.x, y: target.y, radius: 105, color: sect.color, duration: 560, kind: "orb" });
-    } else {
-      const heal = Math.floor(player.maxHp * 0.22);
-      player.hp = clamp(player.hp + heal, 0, player.maxHp);
-      if (target && distance(player, target) <= 160) dealDamage(target, skillScale("skill1", 0.82), sect.skills[0]);
-      addFloatingText(player.x, player.y - 36, `+${heal}`, "#b8edff", 18);
-      addSkillEffect({ x: player.x, y: player.y, radius: 70, color: sect.color, duration: 720, kind: "heal" });
-      addLog(`${sect.skills[0]} hồi ${heal} HP.`);
-    }
-    player.rage = clamp(player.rage + 10, 0, 100);
-  } else {
-    player.cooldowns.skill2 = 7;
-    if (player.sect === "kim") {
-      if (!target || distance(player, target) > 285) return addLog("Phi Kiếm Bộ cần một mục tiêu trong tầm.");
-      const angle = Math.atan2(player.y - target.y, player.x - target.x);
-      const dashX = target.x + Math.cos(angle) * 58;
-      const dashY = target.y + Math.sin(angle) * 58;
-      if (!isBlocked(dashX, dashY, player.radius)) {
-        player.x = dashX;
-        player.y = dashY;
-      }
-      dealDamage(target, skillScale("skill2", 1.4), sect.skills[1]);
-      addSkillEffect({ x: target.x, y: target.y, radius: 68, color: sect.color, duration: 420, kind: "slash", angle: Math.atan2(target.y - player.y, target.x - player.x) });
-    } else if (player.sect === "hoa") {
-      dealAreaDamage(player.x, player.y, 135, skillScale("skill2", 1.2), sect.skills[1]);
-      addSkillEffect({ x: player.x, y: player.y, radius: 135, color: sect.color, duration: 680, kind: "burst" });
-    } else {
-      player.shield = Math.floor(player.maxHp * 0.28);
-      player.shieldUntil = nowMs() + 5000;
-      if (target && distance(player, target) <= 150) dealDamage(target, skillScale("skill2", 0.95), sect.skills[1]);
-      addFloatingText(player.x, player.y - 37, `+${player.shield} khiên`, "#a9dcff", 14);
-      addSkillEffect({ x: player.x, y: player.y, radius: 62, color: sect.color, duration: 520, kind: "shield" });
-      addLog(`${sect.skills[1]} tạo khiên ${player.shield} điểm trong 5 giây.`);
-    }
-    player.rage = clamp(player.rage + 14, 0, 100);
+  if (definition.heal && (!definition.healOnHit || selection.targets.length)) {
+    const heal = Math.min(player.maxHp - player.hp, Math.floor(player.maxHp * (definition.heal + Math.max(0, player.skillRanks[key] - 1) * .025)));
+    player.hp += heal;
+    if (heal > 0) addFloatingText(player.x, player.y - 34, `+${heal}`, sect.accent, 15);
   }
+  if (definition.shield) {
+    player.shield = Math.max(player.shield, Math.floor(player.maxHp * (definition.shield + Math.max(0, player.skillRanks[key] - 1) * .025)));
+    player.shieldUntil = now + 5000;
+  }
+  const visualRadius = definition.shape === "line" ? definition.range : definition.shape === "target" || definition.shape === "chain" ? 45 : definition.radius;
+  const visual = { ...selection.center, radius: Math.min(205, visualRadius), color: sect.color, kind: definition.motif, skill: key, angle: selection.angle, duration: key === "ultimate" ? 750 : 520 };
+  addSkillEffect(visual);
+  if (definition.zone) {
+    game.zones.push({ ...visual, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
+    if (game.zones.length > 6) game.zones.shift();
+  }
+  // Damage ticks build rage; casting an ultimate itself always consumes all rage.
+  player.rage = key === "ultimate" ? 0 : clamp(player.rage + (key === "skill1" ? 10 : 14), 0, 100);
+  addLog(`${definition.name} · -${definition.mp} MP.`);
+  refreshUi(true);
 }
 
 function rewardExperience(amount: number): void {
@@ -1184,11 +1117,11 @@ function rewardExperience(amount: number): void {
     addLog("Nhận 1 điểm võ học. Mở tab Võ công để nâng chiêu.");
     if (player.level >= 3 && player.skillRanks.skill2 === 0) {
       player.skillRanks.skill2 = 1;
-      addLog(`Đã mở ${SECTS[player.sect].skills[1]} — nhấn phím 2.`);
+      addLog(`Đã mở ${SECTS[player.sect].kit.skill2.name} — nhấn phím 2.`);
     }
     if (player.level >= 5 && player.skillRanks.ultimate === 0) {
       player.skillRanks.ultimate = 1;
-      addLog(`Đã mở tuyệt chiêu ${SECTS[player.sect].ultimate} — tích đủ 100 nộ rồi nhấn phím 3.`);
+      addLog(`Đã mở tuyệt chiêu ${SECTS[player.sect].kit.ultimate.name} — tích đủ 100 nộ rồi nhấn phím 3.`);
     }
   }
 }
@@ -1361,7 +1294,12 @@ function loadGame(): void {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return showToast("Chưa có tiến trình nào được lưu.");
     const snapshot = JSON.parse(raw) as { player: Player; enemies: Enemy[] };
-    if (!snapshot.player || !SECTS[snapshot.player.sect]) throw new Error("save-invalid");
+    const sectId = resolveSectId(snapshot.player?.sect);
+    if (!snapshot.player || !sectId) throw new Error("save-invalid");
+    snapshot.player.sect = sectId;
+    snapshot.player.radius = HERO_SIZE.radius;
+    snapshot.player.shield = 0;
+    snapshot.player.shieldUntil = 0;
     snapshot.player.skillPoints ??= 0;
     snapshot.player.skillRanks ??= { skill1: 1, skill2: 0, ultimate: 0 };
     snapshot.player.questRewardClaimed ??= false;
@@ -1378,13 +1316,13 @@ function loadGame(): void {
       loot: [],
       telegraphs: [],
       effects: [],
+      zones: [],
       floatingTexts: [],
       logs: [],
       targetId: null,
       moveTarget: null,
       cameraX: 0,
       cameraY: 0,
-      screenFlash: 0,
       lastBossDefeatedAt: 0,
       mapMode: "world",
       dungeonTimeLeft: 0,
@@ -1494,6 +1432,7 @@ function update(dt: number, now: number): void {
   player.cooldowns.skill2 = Math.max(0, player.cooldowns.skill2 - dt);
   player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
   player.potionCooldown = Math.max(0, player.potionCooldown - dt);
+  player.mp = Math.min(player.maxMp, player.mp + dt * 1.6);
   if (player.shieldUntil <= now) player.shield = 0;
   player.rage = clamp(player.rage + dt * 1.1, 0, 100);
   if (game.autoBattle && !currentTarget()) {
@@ -1508,7 +1447,8 @@ function update(dt: number, now: number): void {
   onlineClient.sendInput(inputX, inputY);
   if (inputX !== 0 || inputY !== 0) {
     game.moveTarget = null;
-    movePlayer(inputX * player.speed * dt, inputY * player.speed * dt);
+    const inputLength = Math.max(1, Math.hypot(inputX, inputY));
+    movePlayer(inputX / inputLength * player.speed * dt, inputY / inputLength * player.speed * dt);
   } else if (game.moveTarget) {
     const d = distance(player, game.moveTarget);
     if (d < 8) game.moveTarget = null;
@@ -1517,7 +1457,7 @@ function update(dt: number, now: number): void {
     const target = currentTarget();
     if (target) {
       const d = distance(player, target);
-      if (d > 88) movePlayer(((target.x - player.x) / d) * player.speed * dt, ((target.y - player.y) / d) * player.speed * dt);
+      if (d > SECTS[player.sect].basicRange + target.radius - 4) movePlayer(((target.x - player.x) / d) * player.speed * dt, ((target.y - player.y) / d) * player.speed * dt);
       else playerBasicAttack();
     }
   }
@@ -1529,12 +1469,20 @@ function update(dt: number, now: number): void {
         enemy.dead = false;
         enemy.hp = enemy.maxHp;
         enemy.attackCooldown = 1;
+        enemy.poisonUntil = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = 0;
         enemy.x += randomBetween(-22, 22);
         enemy.y += randomBetween(-22, 22);
       }
       continue;
     }
+    if (enemy.poisonNextTick > 0 && enemy.poisonNextTick <= now && enemy.poisonNextTick <= enemy.poisonUntil) {
+      enemy.poisonNextTick += 1000;
+      dealDamage(enemy, enemy.poisonDamage, "Độc");
+      if (enemy.dead) continue;
+    }
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
+    if (enemy.stunUntil > now) continue;
+    const enemySpeed = enemy.speed * (enemy.slowUntil > now ? enemy.slowFactor : 1);
     const d = distance(enemy, player);
     if (enemy.kind === "boss") {
       enemy.bossCooldown -= dt;
@@ -1548,16 +1496,16 @@ function update(dt: number, now: number): void {
       }
       if (d > 175 && d < 550) {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        const nextX = enemy.x + Math.cos(angle) * enemy.speed * dt;
-        const nextY = enemy.y + Math.sin(angle) * enemy.speed * dt;
+        const nextX = enemy.x + Math.cos(angle) * enemySpeed * dt;
+        const nextY = enemy.y + Math.sin(angle) * enemySpeed * dt;
         if (!isBlocked(nextX, enemy.y, enemy.radius)) enemy.x = nextX;
         if (!isBlocked(enemy.x, nextY, enemy.radius)) enemy.y = nextY;
       }
     } else if (d < 330) {
       if (d > 54) {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        const nextX = enemy.x + Math.cos(angle) * enemy.speed * dt;
-        const nextY = enemy.y + Math.sin(angle) * enemy.speed * dt;
+        const nextX = enemy.x + Math.cos(angle) * enemySpeed * dt;
+        const nextY = enemy.y + Math.sin(angle) * enemySpeed * dt;
         if (!isBlocked(nextX, enemy.y, enemy.radius)) enemy.x = nextX;
         if (!isBlocked(enemy.x, nextY, enemy.radius)) enemy.y = nextY;
       } else {
@@ -1571,6 +1519,14 @@ function update(dt: number, now: number): void {
     }
   }
 
+  for (const zone of game.zones) if (now >= zone.nextTick && zone.nextTick <= zone.startedAt + zone.duration) {
+    zone.nextTick += 1000;
+    for (const enemy of game.enemies) if (!enemy.dead && distance(zone, enemy) <= zone.radius + enemy.radius) {
+      if (zone.slow < 1) { enemy.slowUntil = now + 1500; enemy.slowFactor = zone.slow; }
+      dealDamage(enemy, zone.multiplier, zone.source);
+    }
+  }
+  game.zones = game.zones.filter(zone => now - zone.startedAt <= zone.duration);
   const remainingTelegraphs: Telegraph[] = [];
   for (const telegraph of game.telegraphs) {
     if (now >= telegraph.triggerAt) {
@@ -1588,7 +1544,6 @@ function update(dt: number, now: number): void {
   game.loot = game.loot.filter((loot) => loot.expiresAt > now);
   game.cameraX = clamp(player.x - VIEW_WIDTH / 2, 0, WORLD_WIDTH - VIEW_WIDTH);
   game.cameraY = clamp(player.y - VIEW_HEIGHT / 2, 0, WORLD_HEIGHT - VIEW_HEIGHT);
-  game.screenFlash = Math.max(0, game.screenFlash - dt);
 }
 
 function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number): void {
@@ -1651,6 +1606,7 @@ function drawWorld(now: number): void {
     for (const npc of NPCS) drawNpc(npc, now);
   }
 
+  for (const zone of game.zones) drawSectEffect(ctx, zone, ((now - zone.startedAt) % 1200) / 1200, true);
   for (const effect of game.effects) drawSkillEffect(effect, now);
   for (const loot of game.loot) drawLoot(loot, now);
   for (const enemy of game.enemies) if (!enemy.dead) drawEnemy(enemy, now);
@@ -1669,10 +1625,8 @@ function drawWorld(now: number): void {
   }
   ctx.restore();
 
-  if (game.screenFlash > 0) {
-    ctx.fillStyle = `rgba(255, 225, 160, ${game.screenFlash * 0.5})`;
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-  }
+
+
   drawMinimap(now);
 }
 
@@ -1720,7 +1674,7 @@ function drawNpc(npc: Npc, now: number): void {
   ctx.ellipse(0, 19, 20, 6, 0, 0, Math.PI * 2);
   ctx.fill();
   const sprite: SpriteId = npc.id === "dungeon" ? "portal" : npc.id === "merchant" ? "guide" : npc.id;
-  if (!drawSprite(ctx, sprite, 0, 20, npc.id === "dungeon" ? 84 : 62, npc.id === "dungeon" ? 84 : 70)) {
+  if (!drawSprite(ctx, sprite, 0, 20, npc.id === "dungeon" ? 60 : 44, npc.id === "dungeon" ? 60 : 50)) {
     ctx.fillStyle = npc.color;
     ctx.beginPath();
     ctx.arc(0, 0, 17, 0, Math.PI * 2);
@@ -1741,86 +1695,16 @@ function drawNpc(npc: Npc, now: number): void {
   ctx.fillStyle = "#e2eadc";
   ctx.font = "600 11px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  drawOutlinedText(npc.name, 0, -67);
+  drawOutlinedText(npc.name, 0, -45);
   ctx.fillStyle = "rgba(210, 224, 214, .65)";
   ctx.font = "9px 'DM Sans', sans-serif";
-  drawOutlinedText(npc.title, 0, -55);
+  drawOutlinedText(npc.title, 0, -34);
   ctx.textAlign = "left";
   ctx.restore();
 }
 
 function drawSkillEffect(effect: SkillEffect, now: number): void {
-  const elapsed = now - effect.startedAt;
-  const progress = clamp(elapsed / effect.duration, 0, 1);
-  const fade = Math.sin(Math.PI * progress);
-  const radius = effect.radius * (0.55 + progress * 0.55);
-  ctx.save();
-  ctx.translate(effect.x, effect.y);
-  ctx.globalAlpha = fade;
-  ctx.globalCompositeOperation = "source-over";
-  if (effect.kind === "slash") {
-    ctx.rotate(effect.angle ?? 0);
-    for (let index = 0; index < 2; index += 1) {
-      ctx.strokeStyle = effect.color;
-      ctx.lineWidth = 7 - index * 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * (0.72 + index * 0.08), -0.8 - index * 0.08, 0.72 + index * 0.08);
-      ctx.stroke();
-    }
-  } else if (effect.kind === "orb") {
-    const orb = Math.max(9, radius * 0.24);
-    ctx.fillStyle = hexToRgba(effect.color, 0.26);
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = effect.color;
-    ctx.beginPath();
-    ctx.arc(Math.cos(now / 130) * radius * 0.18, Math.sin(now / 130) * radius * 0.18, orb, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = hexToRgba(effect.color, 0.88);
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.66, now / 300, now / 300 + Math.PI * 1.5);
-    ctx.stroke();
-  } else if (effect.kind === "heal") {
-    ctx.strokeStyle = effect.color;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-    ctx.stroke();
-    ctx.fillStyle = effect.color;
-    ctx.fillRect(-5, -22 - progress * 6, 10, 29);
-    ctx.fillRect(-15, -12 - progress * 6, 30, 10);
-  } else if (effect.kind === "shield") {
-    ctx.strokeStyle = effect.color;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = hexToRgba(effect.color, 0.4);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.8, -now / 500, -now / 500 + Math.PI * 1.3);
-    ctx.stroke();
-  } else {
-    ctx.fillStyle = hexToRgba(effect.color, .16);
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = effect.color;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * (0.62 + progress * 0.25), 0, Math.PI * 2);
-    ctx.stroke();
-    for (let index = 0; index < 8; index += 1) {
-      const angle = index * Math.PI / 4 + now / 700;
-      ctx.fillStyle = effect.color;
-      ctx.beginPath();
-      ctx.arc(Math.cos(angle) * radius * 0.8, Math.sin(angle) * radius * 0.8, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.restore();
+  drawSectEffect(ctx, effect, clamp((now - effect.startedAt) / effect.duration, 0, 1));
 }
 
 function drawFloatingText(floatingText: FloatingText, now: number): void {
@@ -1876,7 +1760,7 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.beginPath();
   ctx.arc(0, 0, loot.item ? 21 : 17, 0, Math.PI * 2);
   ctx.fill();
-  if (drawSprite(ctx, loot.item?.slot === "weapon" ? "sword" : "loot", 0, 14, 30, 30)) {
+  if (drawSprite(ctx, "loot", 0, 14, 30, 30)) {
     ctx.restore();
     return;
   }
@@ -2056,92 +1940,21 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.textAlign = "left";
 }
 
-function drawHeroSprite(sect: Sect, facingX: number, facingY: number, now: number, remote = false): void {
-  const bob = Math.sin(now / 170) * (remote ? 0.9 : 1.5);
-  ctx.save();
-  ctx.translate(0, bob);
-  ctx.scale(remote ? 0.9 : 1, remote ? 0.9 : 1);
-  ctx.fillStyle = "rgba(0,0,0,.32)";
-  ctx.beginPath();
-  ctx.ellipse(0, 17, 21, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.save();
+function drawHeroSprite(sect: Sect, facingX: number, _facingY: number, now: number, remote = false): void {
   const moving = remote || Boolean(game?.moveTarget) || keys.size > 0 || Boolean(touchInput.x || touchInput.y);
-  if (moving) ctx.rotate(Math.sin(now / 95) * .035);
-  const illustrated = drawSprite(ctx, sect.id, 0, 21, 76, 83, facingX < 0);
-  ctx.restore();
-  if (!illustrated) {
-    ctx.fillStyle = hexToRgba(sect.color, 0.92);
-    ctx.beginPath();
-    ctx.moveTo(0, -21);
-    ctx.lineTo(15, -5);
-    ctx.lineTo(14, 17);
-    ctx.lineTo(-14, 17);
-    ctx.lineTo(-15, -5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#f0c5a4";
-    ctx.beginPath();
-    ctx.arc(0, -12, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#202538";
-    ctx.beginPath();
-    ctx.arc(0, -15, 10, Math.PI, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = sect.accent;
-    ctx.fillRect(-8, -5, 16, 3);
-    const angle = Math.atan2(facingY, facingX);
-    ctx.save();
-    ctx.rotate(angle);
-    if (sect.id === "kim") {
-      ctx.strokeStyle = "#eef4e9";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(6, 2);
-      ctx.lineTo(30, 2);
-      ctx.stroke();
-      ctx.strokeStyle = sect.accent;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(10, -4);
-      ctx.lineTo(10, 8);
-      ctx.stroke();
-    } else if (sect.id === "hoa") {
-      ctx.strokeStyle = "#8f6a4b";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(4, 12);
-      ctx.lineTo(4, -17);
-      ctx.stroke();
-      ctx.fillStyle = "#ffbd66";
-      ctx.beginPath();
-      ctx.arc(4, -21, 6 + Math.sin(now / 90) * 1.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#fff0a4";
-      ctx.beginPath();
-      ctx.arc(2, -23, 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = sect.accent;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(3, 10);
-      ctx.quadraticCurveTo(20, 0, 7, -13);
-      ctx.quadraticCurveTo(20, -4, 29, -9);
-      ctx.stroke();
-      ctx.fillStyle = "#bcecff";
-      ctx.beginPath();
-      ctx.arc(28, -9, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
+  ctx.save();
+  ctx.translate(0, moving ? Math.sin(now / 170) * .8 : 0);
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.beginPath(); ctx.ellipse(0, 10, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
+  if (moving) ctx.rotate(Math.sin(now / 95) * .025);
+  if (!drawSprite(ctx, sect.id, 0, 12, HERO_SIZE.width, HERO_SIZE.height, facingX < 0)) {
+    ctx.fillStyle = sect.color; ctx.fillRect(-9, -13, 18, 22);
+    ctx.fillStyle = "#efc6a0"; ctx.beginPath(); ctx.arc(0, -19, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = sect.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(18, -18); ctx.stroke();
   }
   if (!remote && game?.player.shieldUntil && game.player.shieldUntil > now && game.player.shield > 0) {
-    ctx.strokeStyle = hexToRgba(sect.accent, 0.7);
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, 29 + Math.sin(now / 120) * 2, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.strokeStyle = hexToRgba(sect.accent, .7); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -8, 22, 0, Math.PI * 2); ctx.stroke();
   }
   ctx.restore();
 }
@@ -2152,24 +1965,24 @@ function drawPlayer(player: Player, now: number): void {
   ctx.translate(player.x, player.y);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
-  drawBar(player.x - 25, player.y - 67, 50, 5, player.hp / player.maxHp, "#66db9c");
+  drawBar(player.x - 16, player.y - 42, 32, 4, player.hp / player.maxHp, "#66db9c");
   ctx.fillStyle = "#e8eff1";
   ctx.font = "700 11px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  drawOutlinedText(`Bạn · Cấp ${player.level}`, player.x, player.y - 74);
+  drawOutlinedText(`Bạn · Cấp ${player.level}`, player.x, player.y - 49);
   ctx.textAlign = "left";
 }
 
 function drawRemotePlayer(remote: OnlineSnapshot["players"][number], now: number): void {
   ctx.save();
   ctx.translate(remote.x, remote.y + Math.sin(now / 190 + remote.x) * 1.2);
-  drawHeroSprite(SECTS.thuy, 1, 0, now, true);
+  drawHeroSprite(SECTS["vo-dang"], 1, 0, now, true);
   ctx.restore();
-  drawBar(remote.x - 23, remote.y - 62, 46, 4, 1, "#72b9e8");
+  drawBar(remote.x - 16, remote.y - 42, 32, 4, 1, "#72b9e8");
   ctx.fillStyle = "#c5e4f2";
   ctx.font = "600 10px 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  drawOutlinedText(`${remote.name} · Cấp ${remote.level}`, remote.x, remote.y - 69);
+  drawOutlinedText(`${remote.name} · Cấp ${remote.level}`, remote.x, remote.y - 49);
   ctx.textAlign = "left";
 }
 
@@ -2268,8 +2081,8 @@ function refreshUi(force = false): void {
 }
 
 function skillGlyphMarkup(skill: SkillKey, sectId: SectId): string {
-  const sprite = sectId === "kim" ? "sword" : sectId === "hoa" ? "fire" : "ice";
-  return `<span class="skill-glyph skill-${skill} sect-${sectId} illustrated-skill" aria-hidden="true">${spriteMarkup(sprite)}</span>`;
+  const sect = SECTS[sectId];
+  return `<span class="skill-glyph skill-${skill} illustrated-skill" style="--skill-color:${sect.color}" aria-hidden="true">${skillIconMarkup(sect.kit[skill], skill, sect.color)}</span>`;
 }
 
 function renderSkillBar(): void {
@@ -2280,19 +2093,16 @@ function renderSkillBar(): void {
   }
   const player = game.player;
   const sect = SECTS[player.sect];
-  const skillData = [
-    { key: "skill1" as const, number: "1", name: sect.skills[0], icon: sect.id === "kim" ? "✧" : sect.id === "hoa" ? "☄" : "❄" },
-    { key: "skill2" as const, number: "2", name: sect.skills[1], icon: sect.id === "kim" ? "➶" : sect.id === "hoa" ? "◉" : "◌" },
-    { key: "ultimate" as const, number: "3", name: sect.ultimate, icon: "✦" },
-  ];
+  const skillData = SKILL_KEYS.map((key, index) => ({ key, number: String(index + 1), name: sect.kit[key].name }));
+
   if (renderedSkillSect !== player.sect) {
-    skillBar.innerHTML = skillData.map((skill) => `<button class="skill-button" data-skill="${skill.key}" title="${skill.name}"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`).join("");
+    skillBar.innerHTML = skillData.map((skill) => `<button class="skill-button" data-skill="${skill.key}" title="${skill.name} · ${sect.kit[skill.key].mp} MP · ${sect.kit[skill.key].cooldown}s"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`).join("");
     renderedSkillSect = player.sect;
   }
   for (const skill of skillData) {
     const locked = skill.key === "skill2" && player.level < 3 || skill.key === "ultimate" && player.level < 5;
     const cooldown = player.cooldowns[skill.key];
-    const coolText = locked ? "KHÓA" : cooldown > 0 ? `${cooldown.toFixed(1)}s` : skill.key === "ultimate" ? `${Math.floor(player.rage)}% nộ` : "SẴN SÀNG";
+    const coolText = locked ? "KHÓA" : cooldown > 0 ? `${cooldown.toFixed(1)}s` : player.mp < sect.kit[skill.key].mp ? "THIẾU MP" : skill.key === "ultimate" ? `${Math.floor(player.rage)}% nộ` : `${sect.kit[skill.key].mp} MP`;
     const button = skillBar.querySelector<HTMLButtonElement>(`[data-skill="${skill.key}"]`)!;
     button.classList.toggle("locked", locked);
     button.setAttribute("aria-label", `${skill.name}: ${coolText}`);
@@ -2352,17 +2162,14 @@ function renderInventory(): void {
   }
   if (activeTab === "skills") {
     const sect = SECTS[player.sect];
-    const skillRows: Array<{ key: SkillKey; name: string; description: string; unlock: number; icon: string }> = [
-      { key: "skill1", name: sect.skills[0], description: "Chiêu chủ lực, tăng sát thương theo bậc.", unlock: 1, icon: "✧" },
-      { key: "skill2", name: sect.skills[1], description: "Kỹ năng mở rộng cho nhịp chiến đấu của môn phái.", unlock: 3, icon: "➶" },
-      { key: "ultimate", name: sect.ultimate, description: "Tuyệt chiêu dùng nộ, tạo khác biệt ở boss.", unlock: 5, icon: "✦" },
-    ];
+    const skillRows = SKILL_KEYS.map(key => ({ key, ...sect.kit[key] }));
+
     inventoryContent.innerHTML = `
       <div class="skill-points-card"><span class="skill-points-icon">✦</span><div><strong>${player.skillPoints} điểm võ học</strong><p>Mỗi lần lên cấp nhận 1 điểm. Tối đa bậc 5.</p></div></div>
       <div class="skill-list">${skillRows.map((skill) => {
         const rank = player.skillRanks[skill.key] ?? 0;
         const unlocked = player.level >= skill.unlock;
-        return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skillGlyphMarkup(skill.key, sect.id)}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${skill.description}</span><small>${unlocked ? `Bậc ${rank}/5 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 5 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 5 ? "TỐI ĐA" : "NÂNG +1"}</button></div>`;
+        return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skillGlyphMarkup(skill.key, sect.id)}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span>${skill.description} · ${skill.mp} MP · Hồi ${skill.cooldown}s</span><small>${unlocked ? `Bậc ${rank}/5 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 5 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 5 ? "TỐI ĐA" : "NÂNG +1"}</button></div>`;
       }).join("")}</div>
     `;
     return;
@@ -2410,16 +2217,26 @@ function startGame(sect: SectId): void {
 }
 
 function renderSectCards(): void {
-  sectCards.innerHTML = Object.values(SECTS).map((sect) => `
-    <button class="sect-card" data-sect="${sect.id}" style="--sect-color:${sect.color};--sect-accent:${sect.accent}">
-      ${spriteMarkup(sect.id, "sect-character-art")}
-      <span class="sect-card-top"><span class="sect-emblem sect-${sect.id}"><span class="sect-art" aria-hidden="true"></span></span><span class="sect-role">${sect.title}</span></span>
-      <strong>${sect.name}</strong>
-      <span class="sect-description">${sect.description}</span>
-      <span class="sect-skills"><b>1</b> ${sect.skills[0]} <b>2</b> ${sect.skills[1]}</span>
-      <span class="sect-select">Gia nhập môn phái <span>→</span></span>
-    </button>
-  `).join("");
+  sectCards.innerHTML = Object.values(SECTS).map(sect => `<button class="sect-card" data-sect="${sect.id}" aria-pressed="${sect.id === selectedSectId}" style="--sect-color:${sect.color}">${spriteMarkup(sect.id, "sect-character-art")}<span class="sect-card-copy"><strong>${sect.name}</strong><small>${sect.element} · ${sect.title.split(" · ")[0]}</small></span></button>`).join("");
+  renderSectDetail();
+}
+
+function renderSectDetail(): void {
+  const sect = SECTS[selectedSectId], definition = sect.kit[previewSkill];
+  for (const button of sectCards.querySelectorAll<HTMLButtonElement>("[data-sect]")) button.setAttribute("aria-pressed", String(button.dataset.sect === selectedSectId));
+  document.querySelector("#sect-detail")!.innerHTML = `<div class="sect-detail-heading"><strong style="color:${sect.accent}">${sect.name}</strong><span>${sect.title}</span></div><div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillGlyphMarkup(key, sect.id)}<span>${sect.kit[key].name}<small>Cấp ${sect.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><strong>${definition.name}</strong><span>${definition.description}</span><small>${definition.mp} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
+  previewCanvas = document.querySelector<HTMLCanvasElement>("#sect-preview");
+  document.querySelector("#join-sect")!.textContent = `Gia nhập ${sect.name}`;
+}
+
+function drawSectPreview(now: number): void {
+  if (!previewCanvas || sectOverlay.classList.contains("hidden")) return;
+  const pc = previewCanvas.getContext("2d")!;
+  const sect = SECTS[selectedSectId], definition = sect.kit[previewSkill];
+  pc.clearRect(0, 0, 128, 86);
+  pc.fillStyle = "#182e29"; pc.fillRect(0, 0, 128, 86);
+  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: sect.color, kind: definition.motif, skill: previewSkill, angle: 0 }, (now % 1800) / 1800);
+  drawSprite(pc, selectedSectId, 56, 76, HERO_SIZE.width, HERO_SIZE.height);
 }
 
 function closeMobileSheet(): void {
@@ -2532,7 +2349,7 @@ canvas.addEventListener("click", (event) => selectAt(screenToWorld(event)));
 sectCards.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-sect]");
   const sect = button?.dataset.sect as SectId | undefined;
-  if (sect && SECTS[sect]) startGame(sect);
+  if (sect) { selectedSectId = sect; previewSkill = "skill1"; renderSectDetail(); }
 });
 
 inventoryContent.addEventListener("click", (event) => {
@@ -2630,6 +2447,12 @@ onlineButton.addEventListener("click", () => {
   void onlineClient.connect(`Tân nhân ${SECTS[game.player.sect].name}`);
 });
 
+document.querySelector("#join-sect")!.addEventListener("click", () => startGame(selectedSectId));
+document.querySelector("#resume-sect")!.addEventListener("click", loadGame);
+document.querySelector("#sect-detail")!.addEventListener("click", event => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-preview-skill]");
+  if (button) { previewSkill = button.dataset.previewSkill as SkillKey; renderSectDetail(); }
+});
 renderSectCards();
 refreshUi(true);
 
@@ -2639,6 +2462,7 @@ function frame(now: number): void {
   update(dt, now);
   if (now - lastDrawTime >= RENDER_INTERVAL_MS) {
     drawWorld(now);
+    drawSectPreview(now);
     lastDrawTime = now - (now - lastDrawTime) % RENDER_INTERVAL_MS;
   }
   refreshUi();

@@ -59,7 +59,8 @@ async function audit(page, width, height) {
     page.on('pageerror', e => errors.push(e.message));
     page.on('response', r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
     await page.goto(url, { waitUntil: 'networkidle' });
-    await page.locator('[data-sect="kim"]').click();
+    await page.locator('[data-sect="thien-vuong"]').click();
+    await page.locator('#join-sect').click();
     await seed(page, {}, true);
     await page.locator('#save-btn').evaluate(el => el.click());
     let state = (await saved(page)).player;
@@ -233,7 +234,8 @@ async function audit(page, width, height) {
 
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await desktop.goto(url);
-    await desktop.locator('[data-sect="thuy"]').click();
+    await desktop.locator('[data-sect="nga-mi"]').click();
+    await desktop.locator('#join-sect').click();
     await desktop.locator('#sect-overlay').waitFor({ state: 'hidden' });
     await desktop.waitForTimeout(350);
     await desktop.locator('.inventory-panel [data-tab="shop"]').click();
