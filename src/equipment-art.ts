@@ -1,3 +1,4 @@
+import { rarityTier } from "./equipment.ts";
 export const EQUIPMENT_SHAPES = {
   weapon: "M17 50l5-10L43 9l6-4-1 8-24 30-5 9z M17 37l13 9-3 4-14-9z",
   armor: "M22 9l10 6 10-6 14 11-8 12-7-4 5 28H18l5-28-7 4L8 20z",
@@ -30,10 +31,7 @@ const GEMS: Record<Slot, string> = {
   horse: "M25 24h10v12H25z",
 };
 export function equipmentTier(rarity?: string): number {
-  return Math.max(
-    0,
-    ["Thường", "Tốt", "Hiếm", "Cực phẩm"].indexOf(rarity ?? "Thường"),
-  );
+  return rarityTier(rarity);
 }
 export function equipmentMarkup(
   slot: string,
@@ -44,7 +42,7 @@ export function equipmentMarkup(
   const key = Object.hasOwn(EQUIPMENT_SHAPES, slot) ? (slot as Slot) : "weapon";
   const safeColor = /^#[a-fA-F0-9]{6}$/.test(color) ? color : "#c9d5df";
   const tier = equipmentTier(rarity);
-  return `<svg class="gear-art tier-${tier} ${extraClass}" viewBox="0 0 64 64" aria-hidden="true" focusable="false" style="--gear-color:${safeColor}"><circle class="gear-halo" cx="32" cy="32" r="26" fill="${safeColor}" opacity=".14"/><path d="${EQUIPMENT_SHAPES[key]}" fill="${safeColor}" fill-rule="evenodd" stroke="#121e2c" stroke-width="3" stroke-linejoin="round"/><path d="${EQUIPMENT_SHAPES[key]}" fill="none" stroke="#eff9ff" stroke-width="1" opacity=".65"/><path d="${GEMS[key]}" fill="${tier >= 2 ? "#ffd96e" : "#8bf0ff"}" stroke="#193644" stroke-width="1.5"/><path d="M10 12v8m-4-4h8M51 44v10m-5-5h10" fill="none" stroke="#fff7c4" stroke-width="2" class="gear-sparkle" opacity="${tier >= 2 ? 1 : 0.25}"/></svg>`;
+  return `<svg class="gear-art tier-${tier} ${extraClass}" viewBox="0 0 64 64" aria-hidden="true" focusable="false" style="--gear-color:${safeColor}">${tier === 4 ? '<path d="M32 2l8 6 15 1 6 13-3 20-12 14-14 6-14-6L6 42 3 22 9 9l15-1z" fill="none" stroke="#ffd35a" stroke-width="2"/><path d="M32 3l2 4-2 4-2-4z" fill="#fff4bc"/>' : ""}<circle class="gear-halo" cx="32" cy="32" r="26" fill="${safeColor}" opacity=".14"/><path d="${EQUIPMENT_SHAPES[key]}" fill="${safeColor}" fill-rule="evenodd" stroke="#121e2c" stroke-width="3" stroke-linejoin="round"/><path d="${EQUIPMENT_SHAPES[key]}" fill="none" stroke="#eff9ff" stroke-width="1" opacity=".65"/><path d="${GEMS[key]}" fill="${tier >= 2 ? "#ffd96e" : "#8bf0ff"}" stroke="#193644" stroke-width="1.5"/><path d="M10 12v8m-4-4h8M51 44v10m-5-5h10" fill="none" stroke="#fff7c4" stroke-width="2" class="gear-sparkle" opacity="${tier >= 2 ? 1 : 0.25}"/></svg>`;
 }
 const paths = new Map<string, Path2D>();
 export function drawEquipmentIcon(

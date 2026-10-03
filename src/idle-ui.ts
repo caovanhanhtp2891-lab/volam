@@ -6,7 +6,7 @@ export function idleShell(): string {
   <div class="app-shell" data-page="log">
     <header class="topbar">
       <div class="hero-portrait"><div class="avatar-orb" id="avatar-orb">劍</div><b id="idle-level">1</b></div>
-      <div class="topmid"><div class="hero-row"><strong id="character-name">Giang Hồ Dị Truyện</strong><span id="idle-stage-label">Võ lâm · Idle</span></div><div class="meter xp-meter"><span id="xp-bar"></span><small id="xp-label">Hành tẩu giang hồ</small></div></div>
+      <div class="topmid"><div class="hero-row"><strong id="character-name">Giang Hồ Dị Truyện</strong><span id="header-combat-power" aria-label="Lực chiến">⚔ 0</span></div><span id="idle-stage-label" class="hidden">Võ lâm · Idle</span><div class="meter xp-meter"><span id="xp-bar"></span><small id="xp-label">Hành tẩu giang hồ</small></div></div>
       <div class="gold-header"><i>◆</i><b id="gold-label">0</b></div>
       <button class="icon-button gift-button" id="gift-btn" aria-label="Phần thưởng hằng ngày">🎁<i></i></button>
       <button class="icon-button" id="compact-btn" aria-label="Thu gọn hoặc mở rộng sân đấu" aria-pressed="false">⛶</button>
@@ -27,6 +27,7 @@ export function idleShell(): string {
         <div id="legacy-training" class="legacy-training hidden"><b>Sân luyện mới đã sẵn sàng</b><p>Vào luyện công để nhân vật tự tìm quái, ra chiêu và nhặt trang bị. Giữ nguyên cấp độ, hành trang và nhiệm vụ của bạn.</p><button id="legacy-training-btn" class="outline-button">Vào luyện công</button></div>
         <div class="todo-card"><b>Việc cần làm</b><button id="todo-reward" class="mini-button">Có quà chờ nhận</button><button class="mini-button" data-idle-open="dungeon">Phụ bản</button></div>
         <div class="stage-card"><div><strong id="stage-name">Hoa Sơn · Ải 1/10</strong><small id="stage-description">Chọn môn phái để bắt đầu</small></div><div class="stage-actions"><button id="stage-prev" aria-label="Ải trước">◀</button><button id="stage-push" aria-pressed="true">Vượt ải</button><button id="stage-next" aria-label="Ải tiếp theo">▶</button></div></div>
+        <div class="card golden-card"><div><b>✦ Boss Hoàng Kim</b><small id="golden-status">12:00 · 19:00 · 21:00 (VN)</small></div><button id="golden-boss-btn" class="mini-button">Lịch boss</button></div>
         <section class="quest-panel"><button id="quest-toggle" class="quest-toggle" aria-label="Mở nhiệm vụ" aria-expanded="false">⌄</button><b id="quest-title">Dấu chân trong Rừng Trúc</b><p id="quest-text"></p><div class="quest-progress"><span id="quest-kill-progress"></span><span id="quest-boss-progress"></span></div><small id="quest-reward"></small></section>
         <div class="log-panel"><div id="log-list" class="log-list"></div></div>
         <div class="target-panel"><div id="target-content"></div></div>

@@ -36,6 +36,8 @@ import {
 } from "./combat";
 import { drawAnimatedHero, drawEquipmentIcon } from "./combat-art";
 import { equipmentMarkup, equipmentTier } from "./equipment-art";
+import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, totalGearStats, gearScore, rollGearBonuses, equipBestGear, discardCandidates, validBonuses, equipmentGrade, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
+import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
 import {
   drawBattleEffect,
   drawGlow,
@@ -79,7 +81,6 @@ type ItemSlot =
   | "bracelet"
   | "pendant"
   | "horse";
-type Rarity = "Thường" | "Tốt" | "Hiếm" | "Cực phẩm";
 type PanelTab = "bag" | "smith" | "skills" | "dungeon" | "shop";
 type SkillKey = "skill1" | "skill2" | "ultimate";
 
@@ -93,6 +94,7 @@ interface Item {
   enhance: number;
   color: string;
   icon: string;
+  bonuses?: Partial<GearStats>;
 }
 
 interface Player {
@@ -134,6 +136,7 @@ interface Player {
   pendingItems: Item[];
   facingX: number;
   facingY: number;
+  goldenClears: string[];
 }
 
 interface Npc {
@@ -299,6 +302,7 @@ interface GameState {
   dungeonRewardClaimed: boolean;
   dungeonId: DungeonId | null;
   dungeonWave: number;
+  goldenEncounter?: { window: GoldenWindow; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
   onlinePlayers: OnlineSnapshot["players"];
   autoBattle: boolean;
 }
@@ -566,14 +570,7 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function itemColor(rarity: Rarity): string {
-  return {
-    Thường: "#a6b3bd",
-    Tốt: "#73d19b",
-    Hiếm: "#64b5f6",
-    "Cực phẩm": "#cf91ff",
-  }[rarity];
-}
+function itemColor(rarity: Rarity): string { return RARITY_COLORS[rarity]; }
 
 function itemRarity(): Rarity {
   const roll = Math.random();
@@ -589,6 +586,7 @@ function itemPower(level: number, rarity: Rarity, slot: ItemSlot): number {
     Tốt: 1.18,
     Hiếm: 1.42,
     "Cực phẩm": 1.8,
+    "Hoàng Kim": 2.5,
   };
   const base = slot === "weapon" ? 9 + level * 2.1 : 8 + level * 2.4;
   return Math.floor(base * rarityMultiplier[rarity] + randomBetween(-2, 3));
@@ -614,6 +612,7 @@ function createItem(
     Tốt: "Thanh",
     Hiếm: "Tử Vân",
     "Cực phẩm": "Thiên Cơ",
+    "Hoàng Kim": "Hoàng Kim",
   };
   const icon = GEAR_SLOTS[slot].icon;
   return {
@@ -623,6 +622,7 @@ function createItem(
     rarity,
     level,
     power: itemPower(level, rarity, slot),
+    bonuses: rollGearBonuses(level, rarity, slot),
     enhance: 0,
     color: itemColor(rarity),
     icon,
@@ -637,6 +637,7 @@ function createStarterItem(slot: ItemSlot, sect: SectId, sectName = SECTS[sect].
     rarity: "Tốt",
     level: 1,
     power: slot === "weapon" ? 13 : 10,
+    bonuses: rollGearBonuses(1, "Tốt", slot),
     enhance: 0,
     color: itemColor("Tốt"),
     icon: slot === "weapon" ? "⚔" : "◈",
@@ -821,6 +822,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     dungeonClears: { tomb: 0, bamboo: 0 },
     ...normalizeSupplies({}),
     pendingItems: [],
+    goldenClears: [],
     facingX: 1,
     facingY: 0,
   };
@@ -881,23 +883,12 @@ function showToast(message: string): void {
   toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2300);
 }
 
-function equipmentAttack(): number {
-  if (!game) return 0;
-  const item = game.player.equipment.weapon;
-  return item ? item.power + Math.floor(item.power * item.enhance * 0.04) : 0;
+function equipmentBonuses(): GearStats {
+  return totalGearStats(game ? Object.values(game.player.equipment) : []);
 }
-
-function equipmentDefense(): number {
-  if (!game) return 0;
-  return Object.values(game.player.equipment).reduce(
-    (total, item) =>
-      total +
-      (item.slot === "weapon"
-        ? 0
-        : item.power + Math.floor(item.power * item.enhance * 0.04)),
-    0,
-  );
-}
+function equipmentAttack(): number { return equipmentBonuses().attack; }
+function equipmentDefense(): number { return equipmentBonuses().defense; }
+function criticalChance(): number { return Math.min(40, 12 + equipmentBonuses().crit); }
 
 function effectiveAttack(): number {
   return game
@@ -916,11 +907,12 @@ function effectiveDefense(): number {
 }
 
 function currentCombatPower(): number {
-  return combatPower(
+  const gear = equipmentBonuses();
+  return Math.floor(combatPower(
     effectiveAttack(),
     effectiveDefense(),
     game?.player.maxHp ?? 0,
-  );
+  ) + gear.mp * .1 + gear.crit * 8 + gear.speed * 2);
 }
 
 function skillScale(skill: SkillKey, base: number): number {
@@ -1008,6 +1000,7 @@ function checkMainQuest(): void {
 
 function enterDungeon(id: DungeonId): void {
   if (!game) return;
+  if (game.goldenEncounter) return showToast("Rời boss Hoàng Kim trước khi vào phụ bản.");
   const dungeon = DUNGEONS[id];
   if (!dungeon) return;
   if (game.mapMode === "dungeon") {
@@ -1244,10 +1237,10 @@ function syncStats(fullHeal = false): void {
     sect.baseHp +
     (player.level - 1) * 34 +
     Math.floor(equipmentDefense() * 1.45) +
-    player.idle.attributes.vitality * 12;
+    player.idle.attributes.vitality * 12 + equipmentBonuses().hp;
   player.maxMp =
-    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8;
-  player.speed = sect.speed + player.idle.attributes.dexterity;
+    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp;
+  player.speed = sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed;
   if (fullHeal) {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
@@ -1266,6 +1259,7 @@ function isBlocked(x: number, y: number, radius: number): boolean {
   )
     return true;
   if (
+    game?.goldenEncounter ||
     game?.mapMode === "dungeon" ||
     (game?.player.idle.enabled && !game.player.idle.inTown)
   )
@@ -1323,7 +1317,7 @@ function nearestEnemy(
 
 function dealDamage(enemy: Enemy, multiplier: number, source: string): void {
   if (!game || enemy.dead) return;
-  const critical = Math.random() < 0.12;
+  const critical = Math.random() < criticalChance() / 100;
   const raw =
     effectiveAttack() *
     multiplier *
@@ -1614,6 +1608,7 @@ function rewardExperience(amount: number): void {
 
 function killEnemy(enemy: Enemy): void {
   if (!game || enemy.dead) return;
+  if (game.goldenEncounter && enemy.id.startsWith("golden-")) { killGoldenBoss(enemy); return; }
   enemy.dead = true;
   game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
   if (game.combat.corpses.length > 16) game.combat.corpses.shift();
@@ -1752,7 +1747,8 @@ function damagePlayer(amount: number, source: string): void {
     addLog(
       "Bạn đã ngã xuống và được đưa về điểm hồi sinh. Không mất trang bị.",
     );
-    if (inDungeon) leaveDungeon();
+    if (game.goldenEncounter) leaveGoldenBoss("Thất bại. Có thể khiêu chiến lại trong khung giờ này.");
+    else if (inDungeon) leaveDungeon();
     else if (player.idle.enabled) {
       player.idle.stage = Math.max(1, player.idle.stage - 1);
       player.idle.wave = 1;
@@ -1883,8 +1879,8 @@ function persistGame(): boolean {
   const snapshot = {
     version: 2,
     savedAt: Date.now(),
-    player: game.player,
-    groundLoot: game.loot.map(({ id, x, y, item, gold, stones }) => ({
+    player: game.goldenEncounter ? { ...game.player, x: game.goldenEncounter.x, y: game.goldenEncounter.y, idle: { ...game.player.idle, inTown: game.goldenEncounter.inTown } } : game.player,
+    groundLoot: [...(game.goldenEncounter?.loot ?? []), ...game.loot].map(({ id, x, y, item, gold, stones }) => ({
       id,
       x,
       y,
@@ -2184,7 +2180,12 @@ function update(dt: number, now: number): void {
   if (!game) return;
   const player = game.player;
   const before = { x: player.x, y: player.y };
-  if (player.idle.inTown && game.mapMode === "world") {
+  if (game.goldenEncounter && Date.now() >= game.goldenEncounter.window.endsAt) {
+    leaveGoldenBoss("Khung giờ boss đã kết thúc.");
+    return;
+  }
+  if (game.goldenEncounter && player.idle.autoLoot) collectIdleLoot();
+  if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
       player.x - VIEW_WIDTH / 2,
       0,
@@ -2409,8 +2410,9 @@ function update(dt: number, now: number): void {
     if (now >= telegraph.triggerAt) {
       if (distance(player, telegraph) <= telegraph.radius + player.radius) {
         const modeBeforeHit = game.mapMode;
+        const encounterBeforeHit = game.goldenEncounter;
         damagePlayer(telegraph.damage, telegraph.label);
-        if (game.mapMode !== modeBeforeHit) return;
+        if (game.mapMode !== modeBeforeHit || game.goldenEncounter !== encounterBeforeHit) return;
       }
     } else remainingTelegraphs.push(telegraph);
   }
@@ -2508,7 +2510,7 @@ function drawWorld(now: number): void {
       550,
     );
   } else {
-    if (playerIdleActive()) {
+    if (playerIdleActive() || game.goldenEncounter) {
       ctx.drawImage(
         trainingArt(game.player.idle.stage),
         0,
@@ -2523,7 +2525,7 @@ function drawWorld(now: number): void {
     ctx.fillStyle = "#dde8cd";
     ctx.font = "12px 'DM Sans', sans-serif";
     drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
-    if (!playerIdleActive()) for (const npc of NPCS) drawNpc(npc, now);
+    if (!playerIdleActive() && !game.goldenEncounter) for (const npc of NPCS) drawNpc(npc, now);
   }
 
   for (const zone of game.zones) drawSectEffect(ctx, { ...zone, kind: zone.kind as EffectMotif }, ((now - zone.startedAt) % 1200) / 1200, true);
@@ -2591,7 +2593,7 @@ function drawMinimap(now: number): void {
   mc.clearRect(0, 0, miniMap.width, miniMap.height);
   const background =
     game.mapMode === "world"
-      ? playerIdleActive()
+      ? playerIdleActive() || game.goldenEncounter
         ? trainingArt(game.player.idle.stage)
         : worldArt
       : dungeonArts[game.dungeonId!];
@@ -2756,7 +2758,7 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.ellipse(0, 5, 13 - height / 10, 4, 0, 0, Math.PI * 2);
   ctx.fill();
   if (loot.item) {
-    const rare = loot.item.rarity === "Hiếm" || loot.item.rarity === "Cực phẩm";
+    const rare = equipmentTier(loot.item.rarity) >= 2;
     drawGlow(ctx, 0, 0, 30, color, 0.45);
     ctx.fillStyle = hexToRgba(color, 0.25);
     ctx.beginPath();
@@ -2857,7 +2859,7 @@ function drawEnemySprite(enemy: Enemy, now: number): void {
   const isInsect = enemy.name.includes("Trùng");
   const isUndead =
     enemy.name.includes("U Binh") || enemy.name.includes("Mộ Tướng");
-  const sprite: SpriteId = isWolf
+  const sprite: SpriteId = game?.goldenEncounter && enemy.id.startsWith("golden-") ? game.goldenEncounter.window.boss.sprite : isWolf
     ? enemy.kind === "boss"
       ? "alpha"
       : "wolf"
@@ -3024,6 +3026,12 @@ function drawEnemy(enemy: Enemy, now: number): void {
     ctx.arc(0, 0, enemy.radius + 8 + Math.sin(now / 160) * 2, 0, Math.PI * 2);
     ctx.stroke();
   }
+  if (enemy.id.startsWith("golden-")) {
+    ctx.strokeStyle = "#ffd35a"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 5, enemy.radius + 6, 13, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#ffd35a"; ctx.font = "18px Georgia"; ctx.textAlign = "center";
+    ctx.fillText("✦", 0, -enemy.radius * 2.5);
+  }
   drawEnemySprite(enemy, now);
   ctx.restore();
   const barWidth =
@@ -3172,6 +3180,7 @@ function drawRemotePlayer(
 function refreshUi(force = false): void {
   if (!game) {
     document.querySelector("#character-name")!.textContent = "Lữ khách";
+    document.querySelector("#header-combat-power")!.textContent = "⚔ 0";
     document.querySelector("#character-sect")!.textContent =
       "Chưa gia nhập môn phái";
     mobileChat.innerHTML = `<span class="mobile-chat-system">[Hệ thống]</span> Chọn môn phái để bắt đầu hành trình.`;
@@ -3297,6 +3306,9 @@ function refreshUi(force = false): void {
   statGrid.innerHTML = `
     <div><span>CÔNG</span><strong>${formatNumber(effectiveAttack())}</strong></div>
     <div><span>PHÒNG</span><strong>${formatNumber(effectiveDefense())}</strong></div>
+    <div><span>HP TỐI ĐA</span><strong>${formatNumber(player.maxHp)}</strong></div>
+    <div><span>MP TỐI ĐA</span><strong>${formatNumber(player.maxMp)}</strong></div>
+    <div><span>CHÍ MẠNG</span><strong>${criticalChance()}%</strong></div>
     <div><span>NỘ</span><strong>${formatNumber(player.rage)}%</strong></div>
     <div><span>TỐC</span><strong>${formatNumber(player.speed)}</strong></div>
   `;
@@ -3403,8 +3415,7 @@ function renderSkillBar(): void {
 }
 
 function itemRow(item: Item, index: number, equipped = false): string {
-  const statLabel =
-    item.slot === "weapon" ? `+${item.power} công` : `+${item.power} phòng`;
+  const statLabel = `${equipmentGrade(item.level)} · LC ${formatNumber(gearScore(item))}`;
   const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>+ Cường hóa</button>`;
   const equipButton = equipped
     ? ""
@@ -3416,7 +3427,7 @@ function itemRow(item: Item, index: number, equipped = false): string {
     pendingSaleId === item.id
       ? `<button class="mini-button" data-cancel-sale>Hủy</button>`
       : "";
-  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${equipmentMarkup(item.slot, item.color, item.rarity)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span></div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
+  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${equipmentMarkup(item.slot, item.color, item.rarity)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span>${gearStatsMarkup(item)}</div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
 }
 
 function supplyMarkup(): string {
@@ -3552,7 +3563,7 @@ function renderInventory(): void {
     .map((item, index) => itemRow(item, index))
     .join("");
   inventoryContent.innerHTML = `
-    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ tốt</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
+    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
       return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${equipmentMarkup(item.slot, item.color, item.rarity)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
@@ -3575,6 +3586,7 @@ function playerIdleActive(): boolean {
   return Boolean(
     game?.player.idle.enabled &&
       !game.player.idle.inTown &&
+      !game.goldenEncounter &&
       game.mapMode === "world",
   );
 }
@@ -3589,7 +3601,7 @@ function trainingArt(stage: number): HTMLCanvasElement {
   return trainingArts.get(region)!;
 }
 function prepareIdleWave(resetPosition = true): void {
-  if (!game || !game.player.idle.enabled) return;
+  if (!game || !game.player.idle.enabled || game.goldenEncounter) return;
   const progress = game.player.idle;
   idleNextWave = 0;
   game.targetId = null;
@@ -3675,22 +3687,119 @@ function collectIdleLoot(force = false): void {
   if (game.player.idle.autoEquip) autoEquipBest();
   persistGame();
 }
-function autoEquipBest(): void {
-  if (!game) return;
-  for (const slot of Object.keys(GEAR_SLOTS) as ItemSlot[]) {
-    const candidates = game.player.inventory.filter(
-      (item) => item.slot === slot,
-    );
-    const power = (item: Item) => item.power * (1 + item.enhance * 0.04);
-    const best = candidates.sort((a, b) => power(b) - power(a))[0];
-    const old = game.player.equipment[slot];
-    if (!best || (old && power(old) >= power(best))) continue;
-    game.player.inventory.splice(game.player.inventory.indexOf(best), 1);
-    game.player.equipment[slot] = best;
-    if (old) game.player.inventory.push(old);
-  }
+function autoEquipBest(): number {
+  if (!game) return 0;
+  const changed = equipBestGear(game.player);
   syncStats();
+  return changed;
 }
+
+function gearStatsMarkup(item: Item, current?: Item): string {
+  const stats = gearStats(item), old = current ? gearStats(current) : null;
+  return `<div class="gear-stat-lines">${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => stats[key] || old?.[key]).map(key => {
+    const diff = stats[key] - (old?.[key] ?? 0);
+    return `<span><small>${STAT_LABELS[key]}</small><b>+${stats[key]}${key === "crit" ? "%" : ""}</b>${old ? `<em class="${diff < 0 ? "weaker" : ""}">${diff > 0 ? "+" : ""}${diff}</em>` : ""}</span>`;
+  }).join("")}</div>`;
+}
+let discardPreview: { filter: DiscardFilter; ids: Set<string> } | null = null;
+function openDiscardFilter(): void {
+  if (!game) return;
+  discardPreview = null;
+  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ Hoàng Kim, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
+}
+function previewDiscard(): void {
+  if (!game) return;
+  const maxLevel = Number(document.querySelector<HTMLInputElement>("#discard-level")!.value);
+  if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > 160) return showToast("Cấp trang bị phải từ 1 đến 160.");
+  const filter = { maxRarity: Number(document.querySelector<HTMLSelectElement>("#discard-rarity")!.value), maxLevel, weakerOnly: document.querySelector<HTMLInputElement>("#discard-weaker")!.checked };
+  const items = discardCandidates(game.player, filter);
+  discardPreview = { filter, ids: new Set(items.map(item => item.id)) };
+  document.getElementById("discard-preview")!.innerHTML = `<p><b>${items.length} món sẽ bị vứt</b> · Không nhận bạc.</p><ul class="discard-list">${items.map(item => `<li style="color:${item.color}">${escapeHtml(item.name)} · ${item.rarity} · Cấp ${item.level}</li>`).join("")}</ul><div class="btnrow"><button class="outline-button danger-text" id="confirm-discard" ${items.length ? "" : "disabled"}>Xác nhận vứt ${items.length} món</button><button class="outline-button" id="cancel-discard">Hủy</button></div>`;
+}
+function confirmDiscard(): void {
+  if (!game || !discardPreview) return;
+  const ids = new Set(discardCandidates(game.player, discardPreview.filter).filter(item => discardPreview!.ids.has(item.id)).map(item => item.id));
+  game.player.inventory = game.player.inventory.filter(item => !ids.has(item.id));
+  discardPreview = null; pendingSaleId = null; closeUtility();
+  addLog(`Đã vứt ${ids.size} món theo bộ lọc.`);
+  persistGame(); refreshUi(true);
+}
+function openGoldenBoss(): void {
+  if (!game) return;
+  openUtility("Boss Hoàng Kim", `<p class="dim">Giờ Việt Nam (UTC+7). Mỗi boss xuất hiện 20 phút; mỗi nhân vật nhận thưởng một lần mỗi khung giờ. Cần cấp 5.</p><div class="golden-schedule">${goldenWindows(Date.now()).map(window => `<div class="card"><b>${window.boss.name}</b><span>${window.boss.hour}:00 – ${window.boss.hour}:20</span><small>Hệ ${ELEMENTS[window.boss.element].name} · ${game!.player.goldenClears.includes(window.id) ? "Đã hạ hôm nay" : "1 trang bị Hoàng Kim chắc chắn · 15% rơi thêm"}</small></div>`).join("")}</div><div id="golden-dialog-status" class="card"></div><button id="golden-enter" class="outline-button">Khiêu chiến</button><button id="golden-leave" class="outline-button hidden">Rời boss và thu hồi đồ</button>`);
+  refreshGoldenUi();
+}
+function refreshGoldenUi(): void {
+  if (!game) return;
+  const now = Date.now(), encounter = game.goldenEncounter, status = goldenStatus(now, game.player.goldenClears);
+  const message = encounter ? `${encounter.window.boss.name} · Còn ${countdown(encounter.window.endsAt - now)}` : status.active ? `${status.active.boss.name} · ${status.defeated ? "Đã hạ lượt này" : `Đang xuất hiện · ${countdown(status.active.endsAt - now)}`}` : `${status.next.boss.name} · Sau ${countdown(status.next.startsAt - now)}`;
+  document.getElementById("golden-status")!.textContent = message;
+  document.getElementById("golden-boss-btn")!.textContent = encounter ? "Đang đấu" : status.active && !status.defeated ? "Khiêu chiến" : "Lịch boss";
+  const dialog = document.getElementById("golden-dialog-status");
+  if (dialog) {
+    dialog.textContent = message;
+    const enter = document.querySelector<HTMLButtonElement>("#golden-enter")!;
+    enter.disabled = !status.active || status.defeated || Boolean(encounter) || game.player.level < 5 || game.mapMode === "dungeon";
+    enter.textContent = game.player.level < 5 ? "Cần cấp 5" : game.mapMode === "dungeon" ? "Hãy rời phụ bản trước" : status.defeated ? "Đã nhận thưởng lượt này" : !status.active ? "Chưa đến giờ xuất hiện" : "Khiêu chiến";
+    document.getElementById("golden-leave")!.classList.toggle("hidden", !encounter);
+  }
+  if (encounter) {
+    document.getElementById("stage-name")!.textContent = encounter.window.boss.name;
+    document.getElementById("stage-description")!.textContent = `Đấu trường Hoàng Kim · Còn ${countdown(encounter.window.endsAt - now)}`;
+    document.getElementById("mobile-map-name")!.textContent = "HOÀNG KIM";
+    canvasBadge.textContent = "ĐẤU TRƯỜNG HOÀNG KIM";
+  }
+}
+function enterGoldenBoss(): void {
+  if (!game || game.goldenEncounter || game.mapMode !== "world" || game.player.level < 5) return;
+  const status = goldenStatus(Date.now(), game.player.goldenClears);
+  if (!status.active || status.defeated) return showToast("Boss chưa xuất hiện hoặc bạn đã nhận thưởng lượt này.");
+  persistGame();
+  game.goldenEncounter = { window: status.active, enemies: game.enemies, loot: game.loot, x: game.player.x, y: game.player.y, inTown: game.player.idle.inTown, autoBattle: game.autoBattle };
+  const enemy = createEnemy(`golden-${status.active.id}`, status.active.boss.name, "boss", 950, 490, Math.min(160, game.player.level + 2), itemColor("Hoàng Kim"));
+  enemy.element = status.active.boss.element;
+  enemy.maxHp = Math.floor(enemy.maxHp * 1.8); enemy.hp = enemy.maxHp;
+  enemy.attack = Math.floor(enemy.attack * 1.25);
+  game.enemies = [enemy]; game.loot = [];
+  game.telegraphs = []; game.effects = []; game.zones = []; game.combat = freshCombat();
+  game.targetId = enemy.id; game.moveTarget = null;
+  game.player.idle.inTown = false;
+  game.player.x = 950; game.player.y = 650;
+  game.autoBattle = true; idleNextWave = 0;
+  resetJoystick(); keys.clear(); closeUtility(); showIdlePage("log");
+  addLog(`${enemy.name} đã xuất hiện! Né vùng đỏ; boss cuồng nộ khi còn dưới 50% sinh lực.`);
+  refreshUi(true);
+}
+function killGoldenBoss(enemy: Enemy): void {
+  if (!game?.goldenEncounter) return;
+  if (!claimGoldenKill(game.player.goldenClears, game.goldenEncounter.window, Date.now())) {
+    leaveGoldenBoss("Khung giờ đã đóng hoặc phần thưởng đã được nhận."); return;
+  }
+  enemy.dead = true; enemy.respawnAt = Infinity;
+  game.telegraphs = [];
+  game.autoBattle = false;
+  game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
+  game.targetId = null; rewardExperience(900);
+  const count = Math.random() < .15 ? 2 : 1;
+  for (let i = 0; i < count; i++) game.loot.push({ id: `golden-loot-${game.goldenEncounter.window.id}-${i}`, x: enemy.x + i * 30, y: enemy.y, item: createItem(enemy.level, "Hoàng Kim"), gold: i ? 0 : 800, stones: i ? 0 : 8, expiresAt: Infinity, bornAt: nowMs(), fromX: enemy.x, fromY: enemy.y - 12 });
+  addLog(`Đã hạ ${enemy.name}! Rơi ${count} trang bị Hoàng Kim · 800 bạc · 8 đá. Nhặt đồ hoặc bấm Rời boss để thu hồi.`);
+  persistGame(); refreshUi(true);
+}
+function leaveGoldenBoss(message = "Đã rời boss Hoàng Kim và thu hồi đồ rơi."): void {
+  if (!game?.goldenEncounter) return;
+  collectIdleLoot(true);
+  const encounter = game.goldenEncounter;
+  game.goldenEncounter = undefined;
+  game.enemies = encounter.enemies; game.loot = encounter.loot;
+  game.player.x = encounter.x; game.player.y = encounter.y;
+  game.player.idle.inTown = encounter.inTown; game.autoBattle = encounter.autoBattle;
+  game.targetId = null; game.moveTarget = null;
+  game.telegraphs = []; game.effects = []; game.zones = []; game.combat = freshCombat();
+  idleNextWave = 0; resetJoystick(); keys.clear(); closeUtility();
+  canvasBadge.textContent = game.player.idle.enabled ? `${stageInfo(game.player.idle.stage).name.toLocaleUpperCase("vi")} · ẢI ${stageInfo(game.player.idle.stage).localStage}` : "RỪNG TRÚC · KÊNH 01";
+  addLog(message); persistGame(); refreshUi(true);
+}
+
 function updateIdleProgress(now: number): void {
   if (!playerIdleActive() || !game) return;
   if (now - lastAutoAction > 450) {
@@ -3778,7 +3887,7 @@ function refreshIdleUi(): void {
     "rotation-btn",
     progress.autoSkills ? "⟳ Xoay chiêu: Bật" : "⟳ Xoay chiêu: Tắt",
   );
-  text("town-btn", progress.inTown ? "Trở lại\nải" : "Về\nthành");
+  text("town-btn", game.goldenEncounter ? "Rời\nboss" : progress.inTown ? "Trở lại\nải" : "Về\nthành");
   document
     .querySelector<HTMLButtonElement>("#stage-push")!
     .setAttribute("aria-pressed", String(progress.push));
@@ -3786,9 +3895,9 @@ function refreshIdleUi(): void {
     .querySelector<HTMLButtonElement>("#rotation-btn")!
     .setAttribute("aria-pressed", String(progress.autoSkills));
   document.querySelector<HTMLButtonElement>("#stage-prev")!.disabled =
-    progress.stage <= 1 || game.mapMode === "dungeon";
+    progress.stage <= 1 || game.mapMode === "dungeon" || Boolean(game.goldenEncounter);
   document.querySelector<HTMLButtonElement>("#stage-next")!.disabled =
-    progress.stage >= progress.maxStage || game.mapMode === "dungeon";
+    progress.stage >= progress.maxStage || game.mapMode === "dungeon" || Boolean(game.goldenEncounter);
   document
     .querySelector(".quest-panel")!
     .classList.toggle("hidden", progress.enabled);
@@ -3806,6 +3915,9 @@ function refreshIdleUi(): void {
   );
   const cultivation = cultivationForPower(currentCombatPower());
   text("combat-power", formatNumber(cultivation.power));
+  text("header-combat-power", `⚔ ${formatNumber(cultivation.power)}`);
+  document.getElementById("header-combat-power")!.title = `Lực chiến ${formatNumber(cultivation.power)}`;
+  refreshGoldenUi();
   text("realm-name", cultivation.realm.name);
   text("realm-phase", cultivation.phase);
   text(
@@ -3912,17 +4024,15 @@ function openRealmGuide(): void {
 function showItemDetail(item: Item): void {
   if (!game) return;
   const current = game.player.equipment[item.slot];
-  const power = (value?: Item) =>
-    value ? value.power + Math.floor(value.power * value.enhance * 0.04) : 0;
-  const diff = power(item) - power(current);
+  const diff = Math.floor(gearScore(item)) - Math.floor(gearScore(current));
   const inBag = game.player.inventory.some(
     (candidate) => candidate.id === item.id,
   );
   const equipped = current?.id === item.id;
-  const attribute = item.slot === "weapon" ? "công" : "phòng";
+  const attribute = "lực chiến";
   openUtility(
     item.name,
-    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · +${power(item)} ${attribute}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p></div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${diff} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}`,
+    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · LC ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearStatsMarkup(item, current)}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${diff} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}`,
   );
 }
 function openDailyRewards(): void {
@@ -4011,6 +4121,7 @@ function validateSave(value: unknown): {
   if (player.x > WORLD_WIDTH || player.y > WORLD_HEIGHT)
     throw new Error("save-invalid");
   player.radius = HERO_SIZE.radius;
+  player.goldenClears = normalizeGoldenClears(player.goldenClears);
 
   player.facingX = Number.isFinite(player.facingX)
     ? clamp(player.facingX, -1, 1)
@@ -4052,7 +4163,8 @@ function validateSave(value: unknown): {
         typeof item.name === "string" &&
         item.name.length < 150 &&
         Object.hasOwn(GEAR_SLOTS, item.slot) &&
-        ["Thường", "Tốt", "Hiếm", "Cực phẩm"].includes(item.rarity) &&
+        RARITIES.includes(item.rarity) &&
+        validBonuses(item.bonuses) &&
         Number.isFinite(item.power) &&
         item.power >= 0 &&
         item.power <= 1e7 &&
@@ -4108,10 +4220,12 @@ function validateSave(value: unknown): {
   )
     throw new Error("save-invalid");
   for (const item of [
+    ...(data.groundLoot ?? []).flatMap(loot => loot.item ? [loot.item] : []),
     ...player.inventory,
     ...Object.values(player.equipment),
     ...(player.pendingItems ?? []),
   ]) {
+    item.color = itemColor(item.rarity);
     if (
       typeof item.icon !== "string" ||
       item.icon.length > 30 ||
@@ -4237,6 +4351,7 @@ function bindIdleUi(): void {
     if (
       !game ||
       game.mapMode === "dungeon" ||
+      game.goldenEncounter ||
       !goToStage(game.player.idle, stage)
     )
       return;
@@ -4278,6 +4393,7 @@ function bindIdleUi(): void {
   });
   document.getElementById("training-btn")!.addEventListener("click", () => {
     if (!game) return;
+    if (game.goldenEncounter) leaveGoldenBoss();
     if (game.mapMode === "dungeon")
       return showToast("Hãy hoàn thành phụ bản trước.");
     game.player.idle.enabled = true;
@@ -4298,6 +4414,7 @@ function bindIdleUi(): void {
       document.getElementById("training-btn")!.click(),
     );
   document.getElementById("town-btn")!.addEventListener("click", () => {
+    if (game?.goldenEncounter) { leaveGoldenBoss(); return; }
     if (!game || game.mapMode === "dungeon")
       return showToast("Hãy rời phụ bản trước khi về thành.");
     collectIdleLoot(true);
@@ -4334,8 +4451,22 @@ function bindIdleUi(): void {
   });
   document
     .getElementById("utility-content")!
+    .addEventListener("change", (event) => {
+      if ((event.target as HTMLElement).matches("#discard-rarity,#discard-level,#discard-weaker")) {
+        discardPreview = null;
+        const preview = document.getElementById("discard-preview");
+        if (preview) preview.textContent = "Bộ lọc đã thay đổi. Bấm Xem đồ sẽ vứt để kiểm tra lại.";
+      }
+    });
+  document
+    .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      if (target.closest("#preview-discard")) previewDiscard();
+      if (target.closest("#confirm-discard")) confirmDiscard();
+      if (target.closest("#cancel-discard")) { discardPreview = null; closeUtility(); }
+      if (target.closest("#golden-enter")) enterGoldenBoss();
+      if (target.closest("#golden-leave")) leaveGoldenBoss();
       if (target.closest("#claim-daily") && game) {
         const reward = claimDaily(game.player.idle);
         if (!reward) return;
@@ -4508,12 +4639,14 @@ function bindIdleUi(): void {
     .addEventListener("click", () =>
       openUtility(
         "Hành tẩu giang hồ",
-        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, 4 độ hiếm và cường hóa đến +10. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
+        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, 5 phẩm chất, nhiều dòng chỉ số và cường hóa đến +10. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
       ),
     );
+  document.getElementById("golden-boss-btn")!.addEventListener("click", openGoldenBoss);
   document.getElementById("slot-btn")!.addEventListener("click", openSlots);
   document.getElementById("adventure-btn")!.addEventListener("click", () => {
     if (!game || game.mapMode === "dungeon") return;
+    if (game.goldenEncounter) leaveGoldenBoss();
     collectIdleLoot();
     game.player.idle.enabled = false;
     game.player.idle.inTown = false;
@@ -4527,6 +4660,7 @@ function bindIdleUi(): void {
   });
   document.getElementById("idle-mode-btn")!.addEventListener("click", () => {
     if (!game || game.mapMode === "dungeon") return;
+    if (game.goldenEncounter) leaveGoldenBoss();
     game.player.idle.enabled = true;
     game.player.idle.inTown = false;
     prepareIdleWave();
@@ -4765,7 +4899,8 @@ inventoryContent.addEventListener("click", (event) => {
   if (target.closest("[data-save-progress]")) saveGame();
   if (target.closest("[data-load-progress]")) loadGame();
   if (target.closest("[data-auto-equip]")) {
-    autoEquipBest();
+    const changed = autoEquipBest();
+    addLog(changed ? `Đã thay ${changed} món có lực chiến cao hơn.` : "Đã mặc bộ trang bị mạnh nhất hiện có.");
     persistGame();
     refreshUi(true);
   }
@@ -4776,6 +4911,7 @@ inventoryContent.addEventListener("click", (event) => {
     );
     if (item) showItemDetail(item);
   }
+  if (target.closest("[data-discard-filter]")) openDiscardFilter();
   if (target.closest("[data-open-shop]")) openMobileSheet("shop");
   if (target.closest("[data-open-bag]")) openMobileSheet("bag");
   if (target.closest("[data-cancel-sale]")) {

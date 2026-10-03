@@ -17,13 +17,25 @@ Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát tr
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.4.0 · Thập đại môn phái** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.5.0 · Hoàng Kim tái xuất** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
+## Trang bị và boss Hoàng Kim · v0.5.0
+
+- 11 hình trang bị vector dùng chung trên đất, trong túi và trên nhân vật. Không thêm ảnh bitmap: atlas vẫn 28 KB. Bậc trang bị 1–16 theo mỗi 10 cấp; cấp trang bị biểu thị sức mạnh, chưa có yêu cầu cấp để mặc.
+- 5 phẩm chất: **Thường (xám), Tốt (lục), Hiếm (lam), Cực phẩm (tím), Hoàng Kim (vàng)**. Hoàng Kim có khung viền vàng/ký hiệu riêng và cột sáng vàng khi rơi. Trang bị mới có 1/2/3/4/6 dòng phụ theo phẩm chất, cùng chỉ số chính; các dòng trùng loại cộng chung khi hiển thị.
+- Dòng phụ gồm công, phòng, sinh lực, nội lực, chí mạng và tốc độ di chuyển. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng chỉ số chính và từng dòng phụ 4% mỗi bậc, tối đa +10. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
+- **Hành trang → Mặc đồ mạnh nhất** chọn món tăng tổng điểm lực chiến cao nhất cho từng vị trí, kể cả chỉ số phụ/cường hóa. Món cũ về túi; không mất đồ khi túi đầy.
+- **Vứt đồ theo lọc** chọn phẩm chất tối đa, cấp trang bị tối đa, chỉ đồ yếu hơn/bằng món đang mặc. Xem danh sách rồi xác nhận hoặc hủy. Luôn giữ đồ Hoàng Kim, đồ +1 trở lên, đồ đang mặc và Đồ chờ nhận. Đổi bộ lọc phải xem lại trước khi xác nhận; không vứt cả đồ mới nhặt sau khi xem trước.
+- Boss xuất hiện theo giờ Việt Nam **12:00–12:20 Kim Giáp Lang Vương, 19:00–19:20 Hoàng Kim Thủ Vệ, 21:00–21:20 Xích Diệm Ma Vương**. Tab Giang hồ hiển thị đếm ngược và lịch. Từ cấp 5 có thể vào đấu trường trong khung giờ; có đòn báo vùng đỏ và cuồng nộ dưới 50% HP.
+- Hạ boss chắc chắn rơi **1 món Hoàng Kim**, 15% rơi thêm món thứ hai; thưởng 900 XP, 800 bạc, 8 đá. Mỗi nhân vật nhận một lần mỗi khung giờ; lưu cả dấu đã hạ và đồ chưa nhặt. Rời đấu trường thu hồi đồ; túi đầy chuyển Đồ chờ nhận. Hết giờ/chết/rời sớm không cấp thưởng hạ boss. Trận đang đánh không tiếp tục sau reload, có thể vào lại nếu chưa hạ và còn giờ. Luyện ải và nhiệm vụ Lang Vương được giữ riêng.
+
+Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết bị, lưu trên trình duyệt; chưa dùng giờ server hay chống chỉnh save/đồng hồ. Việc chuẩn hóa bằng server nằm trong P3/P5 của PLAN.
+
 ## Cảnh giới theo lực chiến
 
-Lực chiến = phần nguyên của **Công × 3 + Phòng × 2 + HP tối đa × 0,15**, bao gồm trang bị đã mặc/cường hóa và tiềm năng. Cảnh giới dùng chính con số này; thay đồ hoặc phân phối lại tiềm năng sẽ cập nhật tên và vòng sáng ngay. HP đang mất khi chiến đấu không làm tụt cảnh giới. Tiến trình cũ không cần thêm trường lưu hoặc tạo lại nhân vật.
+Lực chiến = phần nguyên của **Công × 3 + Phòng × 2 + HP tối đa × 0,15**, cộng phần nguyên của tổng điểm phụ từ trang bị: **MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Bao gồm trang bị đã mặc/cường hóa và tiềm năng; hiển thị cạnh tên nhân vật trên thanh đầu. Chí mạng chiến đấu = 12% cơ bản + trang bị, giới hạn 40%; hệ số điểm lực chiến vẫn tính toàn bộ dòng trang bị để so sánh bộ đồ. Cảnh giới dùng chính con số này; thay đồ hoặc phân phối lại tiềm năng sẽ cập nhật tên và vòng sáng ngay. HP đang mất khi chiến đấu không làm tụt cảnh giới. Tiến trình cũ không cần thêm trường lưu hoặc tạo lại nhân vật.
 
 | Bậc | Cảnh giới        | Lực chiến từ |
 | --- | ---------------- | -----------: |
@@ -159,6 +171,14 @@ node tests/cultivation-browser-smoke.cjs
 ```
 
 Bộ này mặc đổi đồ mạnh/yếu qua giao diện thật, kiểm tra cảnh giới sau reload, 19 tên được vẽ trên đầu dù giữ nguyên cấp nhân vật, màu sáng thực trên Canvas, vòng sáng chuyển động khi đứng yên, bảng ngưỡng và sáu kích thước màn hình. Ảnh chụp mặc định lưu vào `/tmp/volam-cultivation`; có thể đổi bằng `VOLAM_CAPTURE_DIR`.
+
+Kiểm tra trang bị nhiều dòng, mặc bộ mạnh nhất, lọc/vứt đồ và lịch boss bằng cùng các biến môi trường:
+
+```bash
+node tests/equipment-browser.cjs
+```
+
+Bộ này kiểm tra sáu dòng cộng thật khi mặc, tải lại, xem trước/hủy/bảo vệ đồ khi lọc, boss trước/đúng/hết giờ Việt Nam, đồ Hoàng Kim dưới đất sau reload, không nhận lượt hai, túi đầy chuyển hàng chờ và sáu kích thước màn hình. Fixture mạnh chỉ kiểm tra luồng nhận thưởng, không thay thế playtest boss.
 
 Browser test kiểm tra mua/bán, bình hồi phục, migrate save, kích thước mobile, hai phụ bản/đợt/boss, nhận thưởng lặp, túi đầy, tải lại, chết và timeout. Bài kiểm tra clear phụ bản dùng fixture nhân vật mạnh để kiểm chứng luồng nhanh; không thay thế playtest cân bằng ở cấp tối thiểu.
 

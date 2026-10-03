@@ -10,6 +10,17 @@ Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot 
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
 
+Lát trang bị và boss local ngày 03/10/2026 · **v0.5.0 Hoàng Kim tái xuất**:
+
+- [x] Phẩm chất xám/lục/lam/tím/vàng, 11 icon SVG/Canvas riêng, bậc trang bị 1–16; không thêm bitmap vào ngân sách atlas 28 KB.
+- [x] Chỉ số chính và 1/2/3/4/6 dòng phụ theo phẩm chất. Công/phòng/HP/MP/chí mạng/tốc độ cộng thật khi mặc, cường hóa tăng mỗi dòng. Giữ đồ cũ thiếu dòng phụ, kiểm tra dữ liệu nhập và không reroll khi reload.
+- [x] Lực chiến cạnh tên ở thanh trên; chi tiết trang bị có các dòng/chênh lệch và tổng điểm. Chí mạng cơ bản 12%, giới hạn chiến đấu 40%.
+- [x] Mặc bộ mạnh nhất theo tổng điểm lực chiến cả dòng phụ; giữ món cũ trong túi. Vứt đồ theo phẩm chất/cấp/độ mạnh có xem trước/xác nhận/hủy, bảo vệ Hoàng Kim/+1/đang mặc/chờ nhận.
+- [x] 3 boss theo khung giờ Việt Nam 12:00, 19:00, 21:00, cửa sổ 20 phút, yêu cầu cấp 5; giao diện lịch/đếm ngược, trận thật dùng sprite có sẵn/viền vàng, đòn báo đỏ và cuồng nộ.
+- [x] Một lần hạ mỗi nhân vật/khung giờ; 1 món Hoàng Kim chắc chắn + 15% món thứ hai, 900 XP/800 bạc/8 đá. Lưu dấu nhận và đồ rơi cùng nhau, reload giữ thưởng; rời/timeout thu hồi đồ đã rơi vào túi/hàng chờ, không cấp thưởng nếu chưa hạ. Trận boss không làm đổi tiến trình ải hoặc nhiệm vụ Lang Vương.
+- [x] Kiểm tra local: 66 unit test; sáu bộ browser cho trang bị/boss, phụ bản, idle, combat, cảnh giới và 10 phái. Kiểm tra boss chết/hết giờ, đồ dưới đất sau reload, túi đầy, bảo vệ bộ lọc và viewport 320×568 đến desktop; build production với base `/volam/`.
+- [ ] Lịch theo giờ server, giao dịch loot authority/ledger/DB và chống chỉnh save: chưa hoàn thành, thuộc P3/P5. Trận đang chạy không khôi phục sau reload; quay lại nếu còn giờ và chưa hạ. Playtest/drop balance trên điện thoại thật còn cần thực hiện.
+
 Lát môn phái local ngày 03/10/2026 · **v0.4.0 Thập đại môn phái**:
 
 - [x] 10 ảnh nhân vật riêng, cùng atlas 28 KB, giảm kích thước vẽ xuống 46 × 50; bóng/HP/nhãn gọn.
