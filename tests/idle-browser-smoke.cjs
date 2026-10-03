@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.9.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.10.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -145,6 +145,7 @@ async function fit(page, width, height) {
     assert.equal(snapshot.player.skillPoints, 5);
     console.log("PASS eleven equipment slots and point conservation for attributes and skills");
 
+    await tab(page, "log");
     await page.locator("#gift-btn").click();
     await page.locator("#claim-daily").click();
     assert.equal((await state(page)).player.gold, 1100);
@@ -159,7 +160,7 @@ async function fit(page, width, height) {
     console.log("PASS daily gift awarded once, including after a page reload");
 
     await tab(page, "more");
-    assert.match(await page.locator(".release-stamp").textContent(), /v0\.9\.0/);
+    assert.match(await page.locator(".release-stamp").textContent(), /v0\.10\.0/);
     await page.locator("#settings-name").fill("");
     await page.locator("#settings-name").pressSequentially("WASD Lữ");
     await page.locator("#settings-sex").selectOption("female");
@@ -263,6 +264,29 @@ async function fit(page, width, height) {
     });
     await tab(page, "char");
     assert.equal(await page.locator(".equipment-slot svg").count(), 11);
+    assert.equal(await page.locator("#character-preview").isVisible(), true);
+    assert.equal(await page.locator(".canvas-frame").isVisible(), false);
+    const equipmentLayout = await page.evaluate(() => {
+      const middle = document.querySelector(".paper-doll-center").getBoundingClientRect();
+      const slots = [...document.querySelectorAll(".equipment-slot")].map((el) => el.getBoundingClientRect());
+      return { left: slots.filter((r) => r.right <= middle.x + 1).length, right: slots.filter((r) => r.x >= middle.right - 1).length };
+    });
+    assert.deepEqual(equipmentLayout, { left: 6, right: 5 });
+    const beforeInspect = await state(page);
+    await page.locator('[data-equipped-preview="weapon"] svg').click();
+    assert.equal((await state(page)).player.gold, beforeInspect.player.gold, "viewing equipped gear must not spend currency");
+    await page.locator("[data-detail-enhance]").click();
+    assert.equal((await state(page)).player.gold, beforeInspect.player.gold, "enhancement preview must not spend currency");
+    await page.locator("[data-confirm-enhance]").click();
+    const enhanced = await state(page);
+    assert.equal(enhanced.player.equipment.weapon.enhance, 1);
+    assert.equal(enhanced.player.gold, beforeInspect.player.gold - 45);
+    assert.equal(enhanced.player.refiningStones, beforeInspect.player.refiningStones - 1);
+    await page.locator("#utility-close").click();
+    await page.locator("#character-close").click();
+    assert.equal(await page.locator(".canvas-frame").isVisible(), true);
+    await tab(page, "char");
+    console.log("PASS classic character preview, equipment on both sides, inspection without spending and explicit enhancement");
     await tab(page, "inv");
     assert.equal(await page.locator(".bag-slot svg").count(), 11);
     // Click the picture itself, rather than its parent, to exercise SVG event targets.
@@ -300,6 +324,7 @@ async function fit(page, width, height) {
       console.log(`PASS ${width}x${height}: all five tabs, reachable controls, no overflow or overlaps`);
     }
     await page.setViewportSize({ width: 390, height: 844 });
+    await tab(page, "log");
     await page.locator("#compact-btn").click();
     assert.equal(await page.locator(".game-layout").isVisible(), false);
     await tab(page, "char");

@@ -22,18 +22,8 @@ async function seed(page, mutate) {
 }
 async function auraPixels(page) {
   return page.evaluate((key) => {
-    const p = JSON.parse(localStorage.getItem(key)).player;
-    const c = document.querySelector("#game-canvas");
-    const cx = Math.max(0, Math.min(1900 - c.width, p.x - c.width / 2));
-    const cy = Math.max(0, Math.min(1200 - c.height, p.y - c.height / 2));
-    const pixels = c
-      .getContext("2d")
-      .getImageData(
-        Math.round(p.x - cx - 110),
-        Math.round(p.y - cy),
-        220,
-        70,
-      ).data;
+    const c = document.querySelector("#character-preview");
+    const pixels = c.getContext("2d").getImageData(0, c.height - 110, c.width, 100).data;
     let bright = 0,
       hash = 2166136261;
     for (let i = 0; i < pixels.length; i += 4) {
@@ -112,11 +102,13 @@ async function auraPixels(page) {
       await page.locator("[data-inspect-equip]").click();
       await page.locator('[data-idle-tab="char"]').click();
       assert.equal(await page.locator("#realm-name").textContent(), expected);
+      await page.locator('[data-idle-tab="log"]').click();
       await page.waitForFunction(
         (name) =>
           window.__realmLabels.some((label) => label === name || label.startsWith(`${name} ·`)),
         expected,
       );
+      await page.locator('[data-idle-tab="char"]').click();
     }
     await page.reload({ waitUntil: "networkidle" });
     await page.locator('[data-idle-tab="char"]').click();
@@ -152,11 +144,13 @@ async function auraPixels(page) {
           energy: 0,
         };
       });
+      await page.locator('[data-idle-tab="log"]').click();
       await page.waitForFunction(
         (name) =>
           window.__realmLabels.some((label) => label === name || label.startsWith(`${name} ·`)),
         realms[rank].name,
       );
+      await page.locator('[data-idle-tab="char"]').click();
       assert.equal(
         (await read(page)).player.level,
         1,

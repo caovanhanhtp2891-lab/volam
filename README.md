@@ -44,6 +44,8 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 
 - Chọn một trong 10 môn phái thuộc 5 hệ ngũ hành, đặt tên và giới tính nhân vật. Mỗi phái có ngoại hình riêng và bộ 2 võ công + 1 tuyệt chiêu với hành vi chiến đấu khác nhau.
 - Sân đấu phủ phần màn hình phía trên menu, các bảng mở khi chạm năm tab **Giang hồ / Nhân vật / Võ công / Hành trang / Khác** nằm dưới. Giao diện xanh rêu, viền vàng, dùng chung trên điện thoại và desktop.
+- **Nhân vật** và **Túi đồ** mở thành màn riêng với khung vàng cổ theo ảnh tham chiếu. Nhân vật đứng giữa trên đài tu luyện có vòng cảnh giới chuyển động, trang bị xếp 6 ô bên trái và 5 ô bên phải. Chân dung có áo/vũ khí theo phái, giới tính và đồ đang mặc; HP/MP và bảy chỉ số hiện phía dưới. Chạm trang bị để xem chi tiết; cường hóa bằng nút có giá bạc/đá rồi xem trước và xác nhận, mở chi tiết không tự trừ tiền.
+- Túi đồ dùng lưới 60 ô có viền phẩm chất, hình trang bị, cấp độ và mức cường hóa. Màn túi có số ô đang dùng, bạc/đá, Mặc đồ mạnh nhất, Vứt đồ theo lọc, Lưu/Tải và Tiệm; danh sách để mặc/bán/cường hóa nằm dưới lưới, trang bị đang mặc nằm trong mục có thể mở rộng. Nút **×** đưa về sân đấu.
 - Có 16 vùng, 160 ải; mỗi ải có 4 đợt, trùm ở đợt cuối của mỗi ải thứ 10. **Vượt ải** mở ải kế tiếp; **Luyện công** lặp lại ải hiện tại. Chỉ đi tới vùng/ải đã mở.
 - Tự tìm quái, dùng võ công, dùng thuốc và nhặt đồ. WASD hoặc joystick chuyển sang điều khiển tay; bấm **Tự động** để tiếp tục. Khắc chế ngũ hành tăng 25% hoặc giảm 20% sát thương.
 - Nhân vật nhỏ 46 × 50, áo/tóc/vũ khí riêng cho từng phái; nhún/đảo hướng theo di chuyển, nghiêng người khi đánh/thi triển và lướt có thời gian. Camera bám mềm; chuyển đợt giữ vị trí nhân vật. Quái có động tác lao đánh, phản ứng trúng đòn và ngã xuống.
@@ -55,7 +57,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.9.0 · Phàm nhân nhập đạo** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.10.0 · Nhân vật & Túi đồ** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -240,7 +242,7 @@ VOLAM_TEST_URL=http://127.0.0.1:5173 \
 node tests/idle-browser-smoke.cjs
 ```
 
-Bộ này kiểm tra 10 màn chọn phái, chiến đấu tự động thật, đánh trùm/mở vùng, cộng/rút điểm, thưởng ngày chống nhận lặp, import/export/khôi phục bản sao lưu, ba ô nhân vật, thưởng vắng mặt không lặp, save cũ, online và sáu kích thước viewport từ 320×568 đến 1440×900. Kiểm tra thêm hình trang bị ở cả 11 vị trí, chạm trực tiếp vào hình để so sánh/mặc và bật sân luyện từ nhân vật cũ mà giữ cấp độ, đồ, nhiệm vụ và điểm võ học. Test boss dùng fixture mạnh để kiểm tra luồng; không thay thế playtest cân bằng toàn bộ 160 ải.
+Bộ này kiểm tra 10 màn chọn phái, chiến đấu tự động thật, đánh trùm/mở vùng, cộng/rút điểm, thưởng ngày chống nhận lặp, import/export/khôi phục bản sao lưu, ba ô nhân vật, thưởng vắng mặt không lặp, save cũ, online và sáu kích thước viewport từ 320×568 đến 1440×900. Kiểm tra thêm chân dung trong màn Nhân vật, trang bị ở hai bên, mở chi tiết/xem trước không trừ tiền, xác nhận cường hóa trừ đúng bạc/đá, chạm trực tiếp vào hình để so sánh/mặc và bật sân luyện từ nhân vật cũ mà giữ cấp độ, đồ, nhiệm vụ và điểm võ học. Test boss dùng fixture mạnh để kiểm tra luồng; không thay thế playtest cân bằng toàn bộ 160 ải.
 
 Kiểm tra chuyển động, lướt, đạn bay và luồng đồ rơi bằng cùng các biến môi trường:
 

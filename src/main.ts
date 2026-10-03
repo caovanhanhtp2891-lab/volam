@@ -34,7 +34,12 @@ import {
   withinReach,
   type ActorMotion,
 } from "./combat";
-import { drawAnimatedHero, drawEquipmentIcon } from "./combat-art";
+import {
+  drawAnimatedHero,
+  drawEquipmentIcon,
+  type HeroAppearance,
+} from "./combat-art";
+import { drawCharacterPreview } from "./character-preview";
 import { equipmentMarkup, equipmentTier } from "./equipment-art";
 import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, totalGearStats, gearScore, rollGearBonuses, equipBestGear, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
@@ -3170,6 +3175,24 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.textAlign = "left";
 }
 
+function currentHeroAppearance(): HeroAppearance {
+  const equipment = game?.player.equipment ?? {};
+  const bestGear = Object.values(equipment).reduce<Item | undefined>(
+    (best, item) =>
+      !best || equipmentTier(item.rarity) > equipmentTier(best.rarity)
+        ? item
+        : best,
+    undefined,
+  );
+  return {
+    weaponColor: equipment.weapon?.color ?? "#ffe5a3",
+    armorColor:
+      equipmentTier(equipment.armor?.rarity) >= 2 ? equipment.armor!.color : "",
+    auraColor: bestGear?.color ?? "#ffe5a3",
+    tier: equipmentTier(bestGear?.rarity),
+    enhancement: equipment.weapon?.enhance ?? 0,
+  };
+}
 function drawHeroSprite(
   sect: Sect,
   facingX: number,
@@ -3189,31 +3212,13 @@ function drawHeroSprite(
     ctx.scale(0.9, 0.9);
     drawAnimatedHero(ctx, "wudang", "male", motion, now);
   } else if (game) {
-    const bestGear = Object.values(game.player.equipment).reduce<
-      Item | undefined
-    >(
-      (best, item) =>
-        !best || equipmentTier(item.rarity) > equipmentTier(best.rarity)
-          ? item
-          : best,
-      undefined,
-    );
     drawAnimatedHero(
       ctx,
       game.player.factionId,
       game.player.sex,
       game.combat.motion,
       now,
-      {
-        weaponColor: game.player.equipment.weapon?.color ?? "#ffe5a3",
-        armorColor:
-          equipmentTier(game.player.equipment.armor?.rarity) >= 2
-            ? game.player.equipment.armor!.color
-            : "",
-        auraColor: bestGear?.color ?? "#ffe5a3",
-        tier: equipmentTier(bestGear?.rarity),
-        enhancement: game.player.equipment.weapon?.enhance ?? 0,
-      },
+      currentHeroAppearance(),
     );
   }
   if (
@@ -3432,15 +3437,20 @@ function refreshUi(force = false): void {
     if (bar) bar.style.width = width;
   }
   const statGrid = document.querySelector<HTMLDivElement>("#stat-grid")!;
-  statGrid.innerHTML = `
-    <div><span>CÔNG</span><strong>${formatNumber(effectiveAttack())}</strong></div>
-    <div><span>PHÒNG</span><strong>${formatNumber(effectiveDefense())}</strong></div>
-    <div><span>HP TỐI ĐA</span><strong>${formatNumber(player.maxHp)}</strong></div>
-    <div><span>MP TỐI ĐA</span><strong>${formatNumber(player.maxMp)}</strong></div>
-    <div><span>CHÍ MẠNG</span><strong>${criticalChance()}%</strong></div>
-    <div><span>NỘ</span><strong>${formatNumber(player.rage)}%</strong></div>
-    <div><span>TỐC</span><strong>${formatNumber(player.speed)}</strong></div>
-  `;
+  statGrid.innerHTML = [
+    ["weapon", "Công kích", formatNumber(effectiveAttack()), "#7ecfff"],
+    ["armor", "Phòng ngự", formatNumber(effectiveDefense()), "#d0c978"],
+    ["pendant", "Sinh lực", formatNumber(player.maxHp), "#ff8b74"],
+    ["necklace", "Nội lực", formatNumber(player.maxMp), "#8cb5ff"],
+    ["ring", "Chí mạng", `${criticalChance()}%`, "#ffd482"],
+    ["bracelet", "Nộ khí", `${formatNumber(player.rage)}%`, "#d2a0ff"],
+    ["boots", "Tốc độ", formatNumber(player.speed), "#7ed5a5"],
+  ]
+    .map(
+      ([slot, label, value, color]) =>
+        `<div class="classic-stat">${equipmentMarkup(slot, color)}<div><span>${label}</span><strong>${value}</strong></div></div>`,
+    )
+    .join("");
   if (target) {
     targetContent.classList.remove("target-empty");
     const status =
@@ -3595,6 +3605,13 @@ function renderInventory(): void {
   ]);
   if (renderKey === inventoryRenderKey) return;
   inventoryRenderKey = renderKey;
+  document.getElementById("inventory-title")!.textContent = {
+    bag: "Túi Đồ",
+    smith: "Cường Hóa",
+    skills: "Võ Công",
+    dungeon: "Phụ Bản",
+    shop: "Thương Nhân",
+  }[activeTab];
   document
     .querySelectorAll<HTMLButtonElement>(".tab-button")
     .forEach((button) => {
@@ -3688,6 +3705,7 @@ function renderInventory(): void {
     .map((item, index) => itemRow(item, index))
     .join("");
   inventoryContent.innerHTML = `
+    <div class="bag-summary"><span>◆ <b>${formatNumber(player.gold)}</b> bạc</span><span>✦ <b>${formatNumber(player.refiningStones)}</b> đá</span><strong>${player.inventory.length}/${BAG_CAPACITY} ô</strong></div>
     <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
@@ -3695,9 +3713,9 @@ function renderInventory(): void {
     }).join("")}</div>
     ${supplyMarkup()}
     ${player.pendingItems.length ? `<div class="pending-rewards"><strong>Đồ chờ nhận · ${player.pendingItems.length} món</strong><p>Thưởng đã giữ lại, kể cả khi tải lại trang.</p><button class="outline-button" data-collect-pending ${player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Nhận vào túi</button></div>` : ""}
-    <div class="equipped-block">${equipped}</div>
-    <div class="equipped-label bag-label">ĐỒ NHẶT ĐƯỢC</div>
+    <div class="equipped-label bag-label">TRANG BỊ TRONG TÚI</div>
     <div class="item-list">${bag || `<div class="empty-state">Hạ quái để tìm trang bị rơi dưới đất.</div>`}</div>
+    <details class="equipped-block equipped-summary"><summary>Trang bị đang mặc</summary>${equipped}</details>
   `;
 }
 
@@ -4067,6 +4085,28 @@ function refreshIdleUi(): void {
   document.querySelector(".mobile-map-card")!.classList.toggle("hidden", !player.preferences.minimap);
   refreshArenaObjective();
   refreshHuntUi();
+  text("preview-player-name", player.name);
+  text("preview-player-realm", cultivation.label);
+  document.getElementById("preview-player-realm")!.style.color =
+    cultivation.realm.color;
+  document
+    .getElementById("character-preview")!
+    .setAttribute(
+      "aria-label",
+      `${player.name} · ${cultivation.label}. Nhân vật đứng trên đài tu luyện, trang bị ở hai bên.`,
+    );
+  text(
+    "profile-hp-label",
+    `HP: ${formatNumber(player.hp)}/${formatNumber(player.maxHp)}`,
+  );
+  text(
+    "profile-mp-label",
+    `MP: ${formatNumber(player.mp)}/${formatNumber(player.maxMp)}`,
+  );
+  document.getElementById("profile-hp-bar")!.style.width =
+    `${(player.hp / player.maxHp) * 100}%`;
+  document.getElementById("profile-mp-bar")!.style.width =
+    `${(player.mp / player.maxMp) * 100}%`;
   text("combat-power", formatNumber(cultivation.power));
   text("header-combat-power", `⚔ ${compactNumber(cultivation.power)}`);
   document.getElementById("header-combat-power")!.title = `Lực chiến ${formatNumber(cultivation.power)}`;
@@ -4127,7 +4167,23 @@ function refreshIdleUi(): void {
     )
       .map((slot) => {
         const item = player.equipment[slot];
-        return `<button class="equipment-slot ${item ? "equipped" : ""}" data-enhance-slot="${slot}" style="--rarity-color:${item?.color ?? "#45584d"}" ${item ? "" : "disabled"} aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${item.name}, cường hóa +${item.enhance}` : ": trống"}">${item ? `${equipmentMarkup(item.slot, item.color, item.rarity, "equipment-icon")}<small>${escapeHtml(item.name)}</small><b>+${item.enhance}</b>` : `<span>${GEAR_SLOTS[slot].name}</span>`}</button>`;
+        const left: ItemSlot[] = [
+          "weapon",
+          "helmet",
+          "armor",
+          "belt",
+          "boots",
+          "horse",
+        ];
+        const right: ItemSlot[] = [
+          "necklace",
+          "bracelet",
+          "ring",
+          "ring2",
+          "pendant",
+        ];
+        const side = left.includes(slot) ? left : right;
+        return `<button class="equipment-slot ${item ? "equipped" : "empty-slot"}" data-equipped-preview="${slot}" style="--rarity-color:${item?.color ?? "#8a754b"};grid-column:${side === left ? 1 : 3};grid-row:${side.indexOf(slot) + 1}" ${item ? "" : "disabled"} title="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}` : ": trống"}" aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}, cường hóa +${item.enhance}` : ": trống"}">${equipmentMarkup(slot, item?.color ?? "#8a754b", item?.rarity, "equipment-icon")}<small>${GEAR_SLOTS[slot].name}</small>${item?.enhance ? `<b>+${item.enhance}</b>` : ""}</button>`;
       })
       .join("");
     document.getElementById("attribute-list")!.innerHTML = (
@@ -4269,7 +4325,7 @@ function showItemDetail(item: Item): void {
   const attribute = "lực chiến";
   openUtility(
     item.name,
-    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearStatsMarkup(item, current)}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}`,
+    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearStatsMarkup(item, current)}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${item.enhance >= 10 ? "Đã cường hóa tối đa +10" : `Cường hóa · ${45 + item.enhance * 35} bạc + 1 đá`}</button>` : ""}`,
   );
 }
 function openDailyRewards(): void {
@@ -4569,6 +4625,9 @@ function bindIdleUi(): void {
   document.getElementById("titles-btn")!.addEventListener("click", () => openTitles());
   document.getElementById("rebirth-btn")!.addEventListener("click", openRebirth);
   document
+    .getElementById("character-close")!
+    .addEventListener("click", () => showIdlePage("log"));
+  document
     .getElementById("realm-guide-btn")!
     .addEventListener("click", openRealmGuide);
   document
@@ -4793,6 +4852,11 @@ function bindIdleUi(): void {
           closeUtility();
         }
       }
+      const enhance = target.closest<HTMLElement>("[data-detail-enhance]");
+      if (enhance && game) {
+        const item = findOwnedItem(enhance.dataset.detailEnhance!);
+        if (item) openEnhancement(item);
+      }
       if (target.closest("#confirm-new")) {
         const previous = localStorage.getItem(SAVE_KEY);
         if (previous) localStorage.setItem(`${SAVE_KEY}-backup`, previous);
@@ -4819,8 +4883,11 @@ function bindIdleUi(): void {
         persistGame();
         refreshUi(true);
       }
-      const equipment = target.closest<HTMLElement>("[data-enhance-slot]");
-      if (equipment) enhanceItem(0, equipment.dataset.enhanceSlot as ItemSlot);
+      const equipment = target.closest<HTMLElement>("[data-equipped-preview]");
+      const item =
+        equipment &&
+        game.player.equipment[equipment.dataset.equippedPreview as ItemSlot];
+      if (item) showItemDetail(item);
     });
   document.getElementById("save-name")!.addEventListener("click", () => {
     if (!game) return;
@@ -5389,7 +5456,21 @@ function frame(now: number): void {
     lastAutoSave = now;
   }
   if (now - lastDrawTime >= RENDER_INTERVAL_MS) {
-    drawWorld(now);
+    const expanded = document
+      .querySelector(".app-shell")!
+      .classList.contains("arena-expanded");
+    if (game && idlePage === "char" && !expanded)
+      drawCharacterPreview(
+        document.querySelector<HTMLCanvasElement>("#character-preview")!,
+        {
+          factionId: game.player.factionId,
+          sex: game.player.sex,
+          appearance: currentHeroAppearance(),
+          cultivation: cultivationForPower(currentCombatPower()),
+        },
+        now,
+      );
+    else if (idlePage !== "inventory" || expanded) drawWorld(now);
     drawSectPreview(now);
     drawSkillArtPreview(now);
     drawTitlePreview(now);

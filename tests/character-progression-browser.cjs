@@ -47,7 +47,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.9.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.10.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;
@@ -105,7 +105,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     assert.deepEqual(reborn.equipment,before.equipment); assert.ok(reborn.inventory.some(i=>i.id==='keep-ground-item')); assert.equal(reborn.pendingItems[0].id,'keep-pending');
     assert.equal(reborn.gold,before.gold+15); assert.equal(reborn.refiningStones,before.refiningStones+2); assert.ok(reborn.journey.unlockedTitles.includes('reborn'));
     const backup = await page.evaluate(key=>JSON.parse(localStorage.getItem(`${key}-backup`)),key); assert.equal(backup.player.level,160); assert.equal(backup.player.journey.rebirths,0);
-    assert.equal(await stat(page,'CÔNG'),school.baseAttack + 30 + reborn.idle.attributes.strength*2 + REBIRTH_BONUS.attack);
+    assert.equal(await stat(page,'Công kích'),school.baseAttack + 30 + reborn.idle.attributes.strength*2 + REBIRTH_BONUS.attack);
     const cp = await page.locator('#header-combat-power').textContent(); await page.reload({waitUntil:'networkidle'}); assert.equal(await page.locator('#header-combat-power').textContent(),cp);
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.equal(await page.locator('#confirm-rebirth').isDisabled(),true); await page.locator('#utility-close').click();
     console.log("PASS rebirth preview/cancel, replay guard, permanent stats, backup, loot recovery, possessions and stage unlocks survive reload");
@@ -149,7 +149,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     await page.evaluate(()=>Storage.prototype.setItem=window.__setItem); await page.locator('#confirm-rebirth').click();
     assert.equal((await read(page)).player.journey.rebirths,2); assert.equal((await read(page)).player.level,1);
     assert.equal((await read(page)).player.inventory.length,60); assert.ok((await read(page)).player.pendingItems.some(item=>item.id==='full-ground-item'));
-    assert.equal(await stat(page,'CÔNG'),school.baseAttack+30+reborn.idle.attributes.strength*2+REBIRTH_BONUS.attack*2);
+    assert.equal(await stat(page,'Công kích'),school.baseAttack+30+reborn.idle.attributes.strength*2+REBIRTH_BONUS.attack*2);
     console.log("PASS failed backup leaves the old character intact; a second valid rebirth adds exactly one further bonus set");
 
     await seed(page,s=>{s.player.level=100;s.player.xp=0;s.player.preferences.xpMultiplier=5;s.player.attack=100000;s.player.defense=10000;s.player.idle.inTown=true;s.player.idle.autoLoot=false;s.player.goldenClears=[];});

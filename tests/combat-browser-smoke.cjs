@@ -20,8 +20,11 @@ async function seed(page, change) {
 async function pause(page) {
   if (
     (await page.locator("#mobile-auto").getAttribute("aria-pressed")) === "true"
-  )
+  ) {
+    if (!(await page.locator("#mobile-auto").isVisible()))
+      await page.locator('[data-idle-tab="log"]').click();
     await page.locator("#mobile-auto").click();
+  }
 }
 const item = (id) => ({
   id,

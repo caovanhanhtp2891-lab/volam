@@ -28,3 +28,5 @@ Tinh anh dùng sprite quái có sẵn với vòng/nhãn vàng. Lửa trại dùn
 URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`, `skill-art-browser.cjs`, `hud-browser.cjs`.
 
 Danh hiệu v0.7.0 dùng `src/title-art.ts`: 12 motif riêng (lá, mũi kiếm, tinh thể, vương miện, trận phù, kim tiền, tia lửa, song kiếm, tinh tú, mặt trời, sen và quỹ đạo), vài nét Canvas dưới chân, một danh hiệu được đeo. Preview dùng cùng hàm vẽ; không thêm sprite, texture hay hệ particle. Có thể tắt tên/hiệu ứng trong Cài đặt; atlas giữ 28.026 byte.
+
+`src/character-preview.ts` vẽ chân dung toàn thân trên Canvas 360 × 400 cho màn Nhân vật. Áo, vũ khí, giới tính và cảnh giới lấy cùng dữ liệu nhân vật đang chơi. Đài vàng được vẽ một lần rồi tái sử dụng; chân dung có nhịp thở/dải buộc chuyển động, vòng sáng dùng lại `cultivation-art`. Chỉ vẽ chân dung khi mở Nhân vật; sân đấu ẩn trong Nhân vật/Túi đồ được bỏ qua phần vẽ, mô phỏng vẫn tiếp tục. Khung và ô trang bị dùng CSS, không tải thêm ảnh từ game trong ảnh tham chiếu.

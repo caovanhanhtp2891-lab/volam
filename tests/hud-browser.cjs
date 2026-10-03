@@ -16,7 +16,7 @@ async function seed(page, change) {
     const context = await browser.newContext({ viewport:{width:390,height:844},isMobile:true,hasTouch:true });
     const page=await context.newPage(); page.on('pageerror',e=>errors.push(e.message));
     page.on('response',r=>{if(r.status()>=400 && r.url().startsWith(url))errors.push(`${r.status()} ${r.url()}`)});
-    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.9.0');
+    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.10.0');
     await page.locator('#hero-name-input').fill('Ngũ Độc Thanh Vân'); await page.locator('[data-faction="wudu"]').click(); await page.locator('#join-sect').click();
     await seed(page,s=>{s.player.idle.inTown=true; s.player.idle.autoEquip=false; s.player.attack=22; s.player.defense=5;});
     for (const [width,height] of [[320,568],[360,640],[390,844],[600,960],[844,390],[1440,900]]) {
@@ -56,7 +56,7 @@ async function seed(page, change) {
       await page.locator('[data-inspect-equip]').click(); await page.locator('[data-idle-tab="char"]').click(); assert.equal(await power(page),before+diff,'gear comparison predicts exact character CP including the defense-derived HP floor');
       assert.equal(await page.locator('#header-combat-power').getAttribute('title'),`Lực chiến ${await page.locator('#combat-power').textContent()}`);
     }
-    await page.locator('[data-enhance-slot="weapon"]').click();
+    await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     const prediction=Number((await page.locator('#enhance-character-power').textContent()).split(' → ')[1].slice(0,-1).replaceAll('.',''));
     await page.locator('[data-confirm-enhance]').click(); await page.locator('#utility-close').click(); assert.equal(await power(page),prediction,'enhancement predicts the same CP that actually reaches the character');
     const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).player,key);

@@ -42,7 +42,7 @@ async function clickEnemy(page, enemy) {
       p.inventory = [gear("bag-armor", "armor", { bonuses: { hp: 10 } })];
     });
     const base = (await save(page)).player;
-    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-enhance-slot="weapon"]').click();
+    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     assert.match(await page.locator(".enhancement-cost").textContent(), /45 bạc.*100%/);
     assert.equal((await read(page)).player.gold, base.gold, "preview does not charge");
     const preview = await page.locator('[data-enhance-stat="attack"] td').allTextContents(); assert.deepEqual(preview, ["Tấn công", "12", "14", "+2"]);
@@ -65,7 +65,7 @@ async function clickEnemy(page, enemy) {
 
     await seed(page, s => { s.player.equipment.weapon.enhance = 3; s.player.gold = 1000; s.player.refiningStones = 20; });
     await page.evaluate(() => window.__roll = .9);
-    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-enhance-slot="weapon"]').click();
+    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     const beforeFail = (await save(page)).player; await page.locator('[data-confirm-enhance]').click();
     const failed = (await read(page)).player;
     assert.equal(failed.equipment.weapon.enhance, 3); assert.equal(failed.gold, 850); assert.equal(failed.refiningStones, 19);
@@ -73,7 +73,7 @@ async function clickEnemy(page, enemy) {
     await page.locator("#utility-close").click();
     for (const mode of ["poor", "capped"]) {
       await seed(page, s => { s.player.equipment.weapon.enhance = mode === "capped" ? 10 : 0; s.player.gold = mode === "poor" ? 0 : 1000; });
-      await page.locator('[data-enhance-slot="weapon"]').click(); assert.equal(await page.locator('[data-confirm-enhance]').isDisabled(), true); await page.locator("#utility-close").click();
+      await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click(); assert.equal(await page.locator('[data-confirm-enhance]').isDisabled(), true); await page.locator("#utility-close").click();
     }
     console.log("PASS failed, insufficient-material and +10 limit attempts keep stats and charge only valid attempts");
 
@@ -123,14 +123,14 @@ async function clickEnemy(page, enemy) {
         assert.equal(fit.w, width); assert.equal(fit.h, height); assert.equal(fit.overflow, false);
       }
       await page.locator('[data-idle-tab="char"]').click();
-      if (await page.locator('[data-enhance-slot="weapon"]').isEnabled()) { await page.locator('[data-enhance-slot="weapon"]').click(); await page.locator('[data-confirm-enhance]').scrollIntoViewIfNeeded(); assert.ok(await page.locator('[data-confirm-enhance]').isVisible()); const b = await page.locator('[data-confirm-enhance]').boundingBox(); assert.ok(b.y >= 0 && b.y + b.height <= height); await page.locator("#utility-close").click(); }
+      if (await page.locator('[data-equipped-preview="weapon"]').isEnabled()) { await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click(); await page.locator('[data-confirm-enhance]').scrollIntoViewIfNeeded(); assert.ok(await page.locator('[data-confirm-enhance]').isVisible()); const b = await page.locator('[data-confirm-enhance]').boundingBox(); assert.ok(b.y >= 0 && b.y + b.height <= height); await page.locator("#utility-close").click(); }
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-enhance-slot="weapon"]').click();
+    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     await page.screenshot({ path: "/tmp/volam-enhancement-mobile.png" }); await page.locator("#utility-close").click();
     await page.locator('[data-idle-tab="inv"]').click(); await page.locator('[data-tab="dungeon"]').click();
     await page.locator('[data-dungeon-action="enter"][data-dungeon-id="tomb"]').click();
-    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-enhance-slot="weapon"]').click();
+    await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     assert.equal(await page.locator('[data-confirm-enhance]').isDisabled(), true); assert.match(await page.locator('[data-confirm-enhance]').textContent(), /Rời phụ bản/);
     console.log("PASS enhancement is blocked inside an unsaved dungeon encounter");
     assert.deepEqual(errors, []); console.log("PASS enhancement and elite/campfire UI fit six phone/desktop viewports without page scrolling");
