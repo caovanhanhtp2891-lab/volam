@@ -4,6 +4,12 @@ export type EffectMotif = "staff" | "bell" | "spear" | "arrows" | "trap" | "pois
 export const HERO_SIZE = { width: 46, height: 50, radius: 12 } as const;
 export const SKILL_KEYS: SkillKey[] = ["skill1", "skill2", "ultimate"];
 
+// Keep the saved faction IDs from the idle campaign stable.
+export const SECT_BY_FACTION: Record<string, SectId> = {
+  shaolin: "thieu-lam", tianwang: "thien-vuong", tangmen: "duong-mon", wudu: "ngu-doc", emei: "nga-mi",
+  cuiyan: "thuy-yen", gaibang: "cai-bang", tianren: "thien-nhan", wudang: "vo-dang", kunlun: "con-lon",
+};
+
 export interface SkillDefinition {
   name: string;
   description: string;

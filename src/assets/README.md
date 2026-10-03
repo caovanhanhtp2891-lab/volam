@@ -1,22 +1,24 @@
 # Hình 2D đơn giản, nhẹ
 
-Theo yêu cầu người dùng: hình phẳng, ít màu, ít chi tiết và nhẹ trên điện thoại.
-
-`simple-atlas.webp` là ảnh duy nhất game cần tải: **19.044 byte**, 384 × 384 px, nền trong suốt, tối đa 64 màu. Atlas 4 × 4 chứa 16 ô 96 × 96 px. Mỗi sprite nằm trọn trong ô, có khoảng trống xung quanh; tọa độ ở `src/art.ts`.
+`simple-atlas.webp` là ảnh duy nhất game cần tải: **28.026 byte**, 480 × 384 px, trong suốt, tối đa 64 màu. Atlas 5 × 4 chứa 20 ô 96 × 96 px. Tọa độ nằm trong `src/art.ts`.
 
 | Hàng | Nội dung từ trái sang phải |
 | --- | --- |
-| 1 | Kiếm khách Kim Phong, hỏa pháp Xích Diệm, thủy pháp Huyền Thủy, sơn tặc |
-| 2 | Sói, Lang Vương, bọ, u binh |
-| 3 | Người dẫn đường, thợ rèn, cổng phụ bản, boss cổ mộ |
-| 4 | Kiếm, lửa, băng và túi loot |
+| 1 | Thiếu Lâm, Thiên Vương, Đường Môn, Ngũ Độc, Nga Mi |
+| 2 | Thúy Yên, Cái Bang, Thiên Nhẫn, Võ Đang, Côn Lôn |
+| 3 | Sơn tặc, sói, Lang Vương, bọ, u binh |
+| 4 | Người dẫn đường, thợ rèn, cổng phụ bản, boss cổ mộ, loot |
 
-Ảnh được tạo riêng bằng công cụ tạo ảnh OpenAI ngày 02/10/2026 theo mô tả cartoon 2D đơn giản: mặt tròn, mắt chấm, áo trơn, vũ khí ít nét, không họa tiết cầu kỳ. PNG gốc được đóng lại thành các ô đều nhau, thu nhỏ, giới hạn bảng màu và xuất WebP lossless. Không tải asset bên thứ ba.
+Mười nhân vật được tạo riêng bằng công cụ tạo ảnh OpenAI ngày 03/10/2026: hình cartoon phẳng, áo trơn, mặt ít nét, mỗi phái có tóc/mũ/vũ khí riêng. Thiếu Lâm đầu trọc/áo tu/côn; Thiên Vương giáp/chùm mũ đỏ/thương; Đường Môn che mặt/nỏ; Ngũ Độc tóc đôi/trượng; Nga Mi áo trắng hồng/sen; Thúy Yên áo xanh/quạt; Cái Bang mũ rơm/gậy/bầu rượu; Thiên Nhẫn áo đen đỏ/song đao; Võ Đang áo đạo/kiếm; Côn Lôn tóc trắng/mũ/pháp khí. Các ô quái/NPC/loot giữ ảnh tạo riêng ngày 02/10/2026.
 
-Nền Rừng Trúc, phụ bản, cây và đá dùng hình học Canvas trong `src/map-art.ts`, không có file ảnh nền/cảnh vật. Nền được vẽ một lần trên canvas 950 × 600 và tái sử dụng; nền phụ bản chỉ tạo khi người chơi vào đó. Vật cản được vẽ theo cùng dữ liệu collider của gameplay. Minimap dùng chung nền đã lưu.
+PNG gốc được cắt từng ô, trim, thu nhỏ tối đa 78 × 78, đặt vào ô 96 × 96, giới hạn 64 màu và xuất WebP lossless. PNG nguồn không nằm trong bundle. Không tải asset bên thứ ba. Ngân sách atlas dưới 32 KB được kiểm tra trong unit test.
 
-Game vẽ tối đa 30 FPS; mô phỏng/input vẫn theo vòng cập nhật hiện có. Minimap cập nhật khoảng 5 lần/giây. Kỹ năng dùng vòng tròn/cung đơn giản, không tạo gradient toàn màn hình; UI không cần backdrop blur.
+Nhân vật trong sân vẽ **46 × 50**, bán kính collider 12; bóng và thanh HP gọn. `src/combat-art.ts` dùng cùng sprite với màn chọn phái/ảnh đại diện, nhún theo quãng đường thật, đảo hướng và nghiêng người khi đánh/thi triển. Lướt chạy qua nhiều frame. Có một khung/phái, chưa có animation bốn hướng hoặc bộ sprite nam/nữ độc lập; giới tính vẫn được lưu, có điểm nhấn dây buộc đơn giản. Vòng trang bị và màu vũ khí vẫn hiển thị, không đổi áo đến mức mất nhận diện phái.
 
-Ngân sách cho atlas: dưới 32 KB. Nếu mở rộng nội dung, ưu tiên dùng lại sprite/đổi màu và giữ ít chi tiết. Nhân vật hiện chuyển động bằng nhún/đảo hướng sprite, chưa có bộ frame đi bộ 4 hướng.
+Ba mươi icon võ công dùng SVG nội tuyến và 16 nhóm nét vẽ Canvas trong `src/sect-effects.ts`, phân biệt bằng màu phái, hình và cấp chiêu: côn, chuông, thương, tiễn, bẫy, độc, sen, quạt, băng, rồng, xoáy, song đao, ảnh bộ, thái cực, kiếm và sét. Chiêu dùng tối đa 8 nét/cánh chính, không phát sáng hoặc flash toàn màn hình. Tối đa 24 hiệu ứng thoáng, 6 trận theo thời gian. Đạn thường, xác quái và đồ bay giữ giới hạn của hệ thống chiến đấu hiện có; sát thương đạn chỉ xử lý khi chạm.
 
-Bộ ảnh chi tiết trước đây (khoảng 2,06 MB) được thay thế; có thể khôi phục từ commit `c2e3511` trong lịch sử Git. Asset mới giảm dữ liệu ảnh tải khoảng **99,1%**. URL ảnh vẫn được Vite xử lý cho đường dẫn GitHub Pages `/volam/`.
+Nền Rừng Trúc/phụ bản/sân luyện được vẽ một lần từ dữ liệu trong `src/map-art.ts`, minimap tái sử dụng nền. Vật cản và collider dùng cùng dữ liệu. Game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; mô phỏng/input giữ cập nhật theo thời gian. UI không cần backdrop blur.
+
+`src/equipment-art.ts` giữ SVG/Path2D dùng chung cho trang bị trên đất, túi, nhân vật và so sánh. `src/cultivation-art.ts` vẫn vẽ vòng cảnh giới dưới chân theo 19 bậc, có giới hạn số vòng/phù văn/hạt và dùng quầng sáng đã lưu. Tên cảnh giới giữ bên trong chiều ngang sân đấu; nhãn đã đưa gần nhân vật nhỏ hơn.
+
+URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`.

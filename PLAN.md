@@ -1,14 +1,23 @@
 # PLAN — Game web kiếm hiệp 2D
 
 > Tài liệu thiết kế và kế hoạch phát triển cho repository `volam`.
-> Ngày lập: 01/10/2026. Cập nhật gameplay: 02/10/2026. Trạng thái: prototype local đã có vòng chiến đấu/loot/cường hóa/võ công, HUD mobile gọn, đồ họa 2D nhẹ, cửa hàng/bình hồi phục và hai phụ bản solo. P3 mới có nền session/World WebSocket; các gate online P3–P7, gồm authority, giao dịch, tổ đội và bang hội, chưa hoàn thành.
+> Ngày lập: 01/10/2026. Cập nhật môn phái: 03/10/2026. Trạng thái: prototype local đã có vòng chiến đấu/loot/cường hóa/võ công, HUD mobile gọn, đồ họa 2D nhẹ, cửa hàng/bình hồi phục và hai phụ bản solo. P3 mới có nền session/World WebSocket; các gate online P3–P7, gồm authority, giao dịch, tổ đội và bang hội, chưa hoàn thành.
 > Tên làm việc: **Giang Hồ Dị Truyện**; có thể đổi trước khi phát hành.
 
 Tài liệu này là bản thiết kế để bắt đầu lập trình. Các hệ thống gameplay và tiêu chí nghiệm thu là mục tiêu triển khai; số liệu cân bằng, thời gian và hiệu năng sẽ được cập nhật sau khi có bản chơi thử.
 
 Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot bằng atlas tạo riêng, bổ sung nền rừng và cảnh vật, xuất WebP, sửa nút kỹ năng bị flex kéo thành bầu dục, tách các vùng chạm và hỗ trợ mobile dọc/ngang. Nhiệm vụ mặc định thu gọn; mục tiêu chỉ hiện khi chọn quái. Đây là bước hoàn thiện hình ảnh/UX, không đánh dấu hoàn thành milestone online. Animation hiện là nhún/đảo hướng sprite; nền minh họa chưa thay cho tilemap/collider được thiết kế riêng.
 
-Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 384 × 384 px, tối đa 64 màu, 19 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Dữ liệu ảnh giảm khoảng 99,1% so với bộ ảnh 2,06 MB; bố cục và các thao tác mobile vẫn được giữ.
+Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
+
+Lát môn phái local ngày 03/10/2026 · **v0.4.0 Thập đại môn phái**:
+
+- [x] 10 ảnh nhân vật riêng, cùng atlas 28 KB, giảm kích thước vẽ xuống 46 × 50; bóng/HP/nhãn gọn.
+- [x] 30 chiêu có icon/hiệu ứng và hành vi riêng; độc, bẫy, sét lan, làm chậm, choáng, khiên, hồi máu và phá giáp thật.
+- [x] Giữ bản idle hiện có: 160 ải, ba ô nhân vật, trang bị/tiềm năng, quà ngày/vắng mặt, phụ bản và 19 cảnh giới.
+- [x] Giữ `factionId` và save archetype; save chưa có faction chuyển `kim/hoa/thuy` thành Thiên Vương/Cái Bang/Nga Mi. Giữ XP, bạc, trang bị và điểm đã có, không tạo lại nhân vật.
+- [x] Màn xem thử chiêu trước nhập môn, kiểm tra mobile dọc/ngang, unit/browser regression và build đường dẫn Pages.
+- [ ] Playtest cân bằng và profiler trên điện thoại thật; sprite đi bộ nhiều hướng/nam nữ riêng, skill tree lớn và chiến đấu online authority thuộc bước tiếp theo.
 
 Lát gameplay local ngày 02/10/2026:
 
@@ -83,7 +92,7 @@ Cảm giác hướng tới: hành trình từ tân thủ đến cao thủ, có m
 | Mục tiêu | Chứng minh cảm giác chơi | Chơi solo có lưu dữ liệu | Chơi cùng bạn | Hành trình kiếm hiệp đầy đủ ban đầu |
 | Nhân vật | 1 nhân vật tạm | Tài khoản, tối đa 3 nhân vật | Giữ nguyên | Thêm tùy biến ngoại hình cơ bản |
 | Cấp tối đa | 10 | 30 | 30 | 60 |
-| Môn phái | 1 | 3 | 3 | 5 |
+| Môn phái | 10 trong prototype local hiện tại | 10 | 10 | 10 |
 | Bản đồ | 1 sân thử | 1 thị trấn + 3 bãi quái | Giữ nguyên | 2 thị trấn + 6 bãi quái |
 | Kỹ năng | Đánh thường + 2 chiêu | 6 kỹ năng/môn phái | Giữ nguyên | 8 kỹ năng/môn phái |
 | Trang bị | Vũ khí, áo; đồ thử | 8 ô, 4 phẩm chất | Giữ nguyên | 5 phẩm chất, bộ trang bị giới hạn |
@@ -230,35 +239,43 @@ Phòng ngự nền = 6 + 2 × (L - 1)
 
 ## 6. Môn phái, võ công và tuyệt chiêu
 
-### 6.1. Năm môn phái dự kiến
+### 6.1. Mười môn phái theo yêu cầu ngày 03/10/2026
 
-| Phái | Hành | Vũ khí/đặc điểm | Vai trò | Mở ở |
+Thay tên phái tự đặt bằng thập đại môn phái quen thuộc. Bản local v0.4.0 đã có cả 10 phái; yêu cầu này thay cho phạm vi 3/5 phái ban đầu. Mỗi phái phải tự lên cấp và vượt nội dung solo. Tổ đội tương lai không bắt buộc một healer/một tank. Ngũ hành chia thành hai phái mỗi hệ: Thiếu Lâm/Thiên Vương (Kim), Đường Môn/Ngũ Độc (Mộc), Nga Mi/Thúy Yên (Thủy), Cái Bang/Thiên Nhẫn (Hỏa), Võ Đang/Côn Lôn (Thổ).
+
+Atlas 5 × 4 giữ một ô riêng cho mỗi phái, có áo/tóc/mũ/vũ khí riêng; nhân vật vẽ 46 × 50, collider 12. Không dùng đổi màu một nhân vật để đại diện cả hệ. Ảnh tổng 28.026 byte, một frame/phái; animation nhún, đảo hướng, nghiêng khi ra chiêu và lướt có thời gian. Màn nhập môn chọn trong 10 ô nhỏ, xem ba icon/mô tả/hiệu ứng rồi Gia nhập. Giữ tên, giới tính, ba ô save, luyện ải, trang bị, tiềm năng và cảnh giới của bản idle đã triển khai.
+
+### 6.2. Ba mươi võ công đã triển khai trong prototype
+
+| Phái | Chiêu 1 | Chiêu 2 | Tuyệt chiêu | Đặc điểm |
 | --- | --- | --- | --- | --- |
-| Kim Phong | Kim | Kiếm, áp sát, lướt ngắn | Cận chiến, bền, đánh đơn mục tiêu | MVP 1 |
-| Xích Diệm | Hỏa | Pháp trượng, hỏa trận | Đánh xa, sát thương vùng, cần giữ khoảng cách | MVP 1 |
-| Huyền Thủy | Thủy | Phiến, thủy pháp | Hồi phục, làm chậm, vẫn tự đánh quái được | MVP 1 |
-| Thanh Mộc | Mộc | Cung, độc và bẫy | Đánh xa, sát thương theo thời gian | V1 |
-| Thổ Sơn | Thổ | Thương/khiên, chắn đòn | Đỡ đòn, giữ quái, bảo vệ tổ đội | V1 |
+| Thiếu Lâm | Vi Đà Côn | Kim Chung Tráo | Đại Lực Kim Cang | Côn quét nón, khiên, chấn vùng |
+| Thiên Vương | Truy Tinh Thương | Trục Nguyệt Bộ | Bá Vương Phá Trận | Thương xuyên tuyến, lướt, phá giáp |
+| Đường Môn | Truy Tâm Tiễn | Lôi Hỏa Cơ Quan | Bạo Vũ Lê Hoa | Ba ám khí, bẫy 4 giây, mưa tiễn |
+| Ngũ Độc | Độc Chưởng | Ngũ Độc Trận | Vạn Cổ Phệ Tâm | Độc theo thời gian, trận, độc vùng |
+| Nga Mi | Phật Quang Phổ Chiếu | Liên Hoa Hộ Thể | Từ Hàng Phổ Độ | Hồi máu, khiên, hoa sen |
+| Thúy Yên | Phi Tuyết Liên Thiên | Băng Tâm Ngọc Cốt | Băng Phong Vạn Lý | Quạt tuyết, làm chậm, đóng băng |
+| Cái Bang | Giáng Long Chưởng | Túy Điệp Cuồng Vũ | Phi Long Tại Thiên | Hỏa long, hồi sức, hỏa trận |
+| Thiên Nhẫn | Liệt Hỏa Song Nhận | Huyễn Ảnh Bộ | Ma Diệm Thất Sát | Song đao, áp sát, hồi sức khi trúng |
+| Võ Đang | Lưỡng Nghi Kiếm | Thái Cực Hộ Thể | Vạn Kiếm Quy Tông | Kiếm xuyên tuyến, thái cực, mưa kiếm |
+| Côn Lôn | Ngũ Lôi Chưởng | Lôi Động Cửu Thiên | Thiên Lôi Trấn Địa | Sét lan tối đa 3 quái, choáng, phá giáp |
 
-- MVP phải cho cả 3 phái vượt các nhiệm vụ solo; Huyền Thủy không phụ thuộc tổ đội để lên cấp.
-- Tổ đội 4 người không bắt buộc đúng một healer/một tank, nhưng phối hợp vai trò có lợi.
-- Khi đủ 5 phái, có thể thử tương khắc `Kim → Mộc → Thổ → Thủy → Hỏa → Kim` với chênh lệch nhỏ, ví dụ +5% sát thương. Chỉ bật sau khi đánh giá mất cân bằng; không làm rào cản nội dung PvE.
+Dữ liệu dùng chung `src/sects.ts`; `src/idle.ts` lấy tên/võ công/role từ cùng nguồn. Mỗi chiêu có kiểu chọn mục tiêu (đơn, vùng, nón, tuyến, lan), tâm tự thân/mục tiêu, tầm, bán kính, hệ số công, MP, cooldown, cấp mở, số đòn và các trường hồi phục/khiên/lướt/phá giáp/chậm/choáng/độc/trận.
 
-### 6.2. Bộ kỹ năng mẫu
+- Cấp mở 1/3/5, MP 8/14/20, cooldown 4/7/15 giây; tuyệt chiêu còn cần 100 nộ. Đánh thường có tầm riêng theo phái. MP hồi 0,7/giây, có bình MP và tự dùng thuốc của chế độ idle.
+- Độc gây tick mỗi giây theo thời lượng 3/6 giây; trận bẫy/độc/lửa tồn tại 3–4 giây và tick thật. Độc/trận không ghi vào save như tiến trình lâu dài; reset khi đổi sân/map theo vòng đời trận.
+- Khiên thường tồn tại 5 giây, hồi máu không vượt HP tối đa. Thiên Nhẫn chỉ hồi sức từ tuyệt chiêu khi có mục tiêu trúng. Choáng/đóng băng boss tối đa 0,35 giây, không triệt tiêu vùng báo đòn đã phát.
+- Ám khí nhiều đòn và sét lan tối đa ba quái; mỗi bước sét giảm còn 80% sát thương. Chiêu hướng nón/tuyến không chọn quái sau lưng hoặc ngoài vùng. Lướt kiểm tra từng đoạn qua collider, chạy qua nhiều frame; không teleport xuyên đá.
+- Kiểm tra cấp, MP, nộ, mục tiêu/tầm và đường lướt trước tiêu hao. Cast không hợp lệ không mất MP/hồi chiêu. Damage/status gắn với đòn/đạn tới mục tiêu; giữ động tác, va chạm, đồ rơi và âm thanh hiện có.
+- Hình skill dùng nét Canvas và SVG nội tuyến, tối đa 24 hiệu ứng thoáng + 6 trận kéo dài. Không tải ảnh chiêu, không flash toàn sân; render tối đa 30 FPS, minimap khoảng 5Hz.
 
-Mỗi phái có 6 kỹ năng trong MVP: đánh thường, 3 chiêu chủ động, 1 nội tại, 1 tuyệt chiêu. V1 thêm 1 chiêu chủ động và 1 nội tại; tổng 8 kỹ năng, không phải 8 nút cần bấm.
+Kiểm chứng: unit cho ngũ hành/10 bộ chiêu/30 icon/tầm và hình học/collider budget, browser thử đủ 30 chiêu, độc theo thời gian/bẫy/sét lan, lướt bị chặn, tài nguyên khi cast sai, save cũ và sáu viewport. Giữ các bộ regression luyện ải/cửa hàng/phụ bản/trang bị/cảnh giới/online session. Các fixture mạnh xác minh luồng; cân bằng ở cấp nhập môn, boss từng phái và hiệu năng trên thiết bị thật còn cần playtest.
 
-| Phái | Đánh thường | Ba chiêu chủ động MVP | Nội tại | Tuyệt chiêu |
-| --- | --- | --- | --- | --- |
-| Kim Phong | Kiếm Kích | Phá Giáp Trảm; Phi Kiếm Bộ; Hộ Thân Kiếm | Kiếm Tâm | Vạn Kiếm Quy Tông |
-| Xích Diệm | Hỏa Đạn | Liệt Hỏa Cầu; Hỏa Trận; Diễm Thân | Dư Hỏa | Thiên Hỏa Giáng Lâm |
-| Huyền Thủy | Thủy Tiễn | Hàn Băng Chưởng; Hồi Xuân; Thủy Thuẫn | Tĩnh Tâm | Băng Hà Thiên Vũ |
-| Thanh Mộc | Liên Tiễn | Độc Tiễn; Mộc Bẫy; Phong Bộ | Tích Độc | Vạn Tiễn Phong Lâm |
-| Thổ Sơn | Thương Kích | Chấn Địa; Khiêu Chiến; Sơn Thuẫn | Bất Động | Địa Long Hộ Trận |
-
-Mỗi chiêu cần mô tả: phạm vi, kiểu mục tiêu, sát thương/hồi phục, MP, thời gian thi triển, cooldown, hiệu ứng trạng thái, hoạt ảnh, khả năng bị ngắt và tương tác boss.
+Mỗi phái hiện có đánh thường + 2 chủ động + 1 tuyệt chiêu. MVP online có thể bổ sung chiêu chủ động thứ ba/nội tại, nhưng chỉ làm sau khi dữ liệu/hành vi 10 kit đã được chuyển sang server authority; không ghi nhận 6/8 kỹ năng hoặc skill tree đầy đủ chỉ vì đã có 30 chiêu local.
 
 ### 6.3. Lịch mở chiêu và nâng chiêu
+
+Prototype hiện dùng cấp 1/3/5, bậc tối đa 20 và rút điểm như bản idle. Lịch dưới đây là mục tiêu online cần cân bằng và đưa vào cấu hình riêng, chưa áp dụng cho bản chơi hiện tại.
 
 - Cấp 1: đánh thường tân thủ.
 - Cấp 5: gia nhập phái, thay đánh thường và mở chiêu chủ động thứ nhất.
@@ -274,6 +291,8 @@ Mỗi chiêu cần mô tả: phạm vi, kiểu mục tiêu, sát thương/hồi 
 - Cho reset điểm tại NPC: lần đầu miễn phí, các lần sau tốn bạc theo cấp. Không mất chiêu đã mở.
 
 ### 6.4. Tuyệt chiêu
+
+Prototype v0.4.0 dùng 20 MP + 100 nộ, cooldown 15 giây; thông số dưới đây là mục tiêu online.
 
 - Cần đủ 100 nộ; nộ tăng qua hành động chiến đấu hợp lệ, có cooldown riêng 60–90 giây tùy phái.
 - Mặc định: gây sát thương cho kẻ địch phù hợp cấp +4 nộ/giây tối đa; nhận sát thương +2/giây; hồi HP thực cho đồng đội đang chiến đấu +4/giây. Tổng tăng tối đa 6 nộ/giây.

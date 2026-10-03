@@ -1,5 +1,5 @@
 // Local prototype rules. These are not authoritative online transactions.
-export const BAG_CAPACITY = 12;
+export const BAG_CAPACITY = 60;
 export const MAX_POTIONS = 99;
 export const POTION_COOLDOWN = 8;
 export type PotionKind = "hp" | "mp";
