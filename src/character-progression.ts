@@ -49,7 +49,7 @@ export function applyExperience(player: ExperienceOwner, base: number, multiplie
   if (player.level === MAX_LEVEL) player.xp = 0;
   return { amount, levels };
 }
-export const REBIRTH_BONUS: Readonly<GearStats> = { attack: 80, defense: 50, hp: 600, mp: 120, crit: 0, speed: 4 };
+export const REBIRTH_BONUS: Readonly<GearStats> = { ...emptyStats(), attack: 80, defense: 50, hp: 600, mp: 120, crit: 0, speed: 4 };
 export function rebirthBonuses(count: number): GearStats {
   return Object.fromEntries(Object.entries(REBIRTH_BONUS).map(([key, value]) => [key, value * integer(count, 0, 1e6)])) as unknown as GearStats;
 }

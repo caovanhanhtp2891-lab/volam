@@ -1,13 +1,15 @@
 import type { EquipmentData } from "./equipment";
 import { rarityTier } from "./equipment.ts";
 import type { Element } from "./idle";
-import { GEAR_SETS, setForElement } from "./gear-catalog.ts";
+import { GEAR_SETS, setForElement, type SetId } from "./gear-catalog.ts";
+import { drawSetCrest } from "./set-art.ts";
 import { drawGlow } from "./battle-vfx.ts";
 export interface EquipmentVisual {
   color: string;
   rarity?: EquipmentData["rarity"];
   enhance?: number;
   element?: Element;
+  setId?: SetId;
 }
 export function equipmentVisualState(
   item: Partial<EquipmentData>,
@@ -18,6 +20,7 @@ export function equipmentVisualState(
   return {
     tier,
     enhance,
+    halo: enhance >= 7,
     band: enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
     motes: simple
       ? 0
@@ -25,9 +28,7 @@ export function equipmentVisualState(
         ? 6
         : enhance >= 7
           ? 4
-          : tier >= 3
-            ? 2
-            : 0,
+          : 0,
     beam: [0, 36, 70, 98, 125][tier],
   };
 }
@@ -77,8 +78,8 @@ export function drawEquipmentRadiance(
   simple = false,
 ): void {
   const state = equipmentVisualState(item, simple);
-  if (!state.tier && !state.band) return;
-  const color = item.element
+  if (!state.halo) return;
+  const color = item.setId ? GEAR_SETS[item.setId].color : item.element
     ? GEAR_SETS[setForElement(item.element)].color
     : item.color;
   ctx.save();
@@ -105,6 +106,11 @@ export function drawEquipmentRadiance(
       ctx.stroke();
     }
   }
+  if (item.setId && state.band >= 2 && !simple) {
+    ctx.save(); ctx.rotate(-now / 1800);
+    drawSetCrest(ctx, GEAR_SETS[item.setId].crest, radius * .42, color);
+    ctx.restore();
+  }
   for (let i = 0; i < state.motes; i++) {
     const angle =
       now / (state.band === 3 ? 750 : 1400) + (i * Math.PI * 2) / state.motes;
@@ -125,21 +131,25 @@ export function drawEquipmentDropAura(
   simple = false,
 ): void {
   const state = equipmentVisualState(item, simple),
-    color = item.color;
+    color = item.setId ? GEAR_SETS[item.setId].color : item.color;
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  if (!simple)
+  if (state.halo && !simple)
     drawGlow(ctx, 0, 0, 23 + state.tier * 4, color, 0.2 + state.tier * 0.05);
   ctx.globalAlpha *= 0.45;
   ctx.lineWidth = state.tier >= 3 ? 1.5 : 1;
-  ctx.beginPath();
-  ctx.ellipse(0, 6, 16 + state.tier * 2, 5 + state.tier, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  if (landed && state.tier >= 2) {
+  if (state.halo) {
     ctx.beginPath();
-    ctx.ellipse(0, 6, 12 + state.tier * 2, 3 + state.tier, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 6, 16 + state.tier * 2, 5 + state.tier, 0, 0, Math.PI * 2);
     ctx.stroke();
+  }
+  if (landed && state.tier >= 2) {
+    if (state.halo) {
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 12 + state.tier * 2, 3 + state.tier, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     if (!simple) {
       ctx.globalAlpha = 0.12 + Math.sin(now / 320) * 0.025;
       ctx.beginPath();
@@ -151,7 +161,7 @@ export function drawEquipmentDropAura(
       ctx.fill();
       ctx.globalAlpha = 0.35;
       ctx.fillRect(-1, -state.beam, 2, state.beam);
-      for (let i = 0; i < Math.min(6, state.tier + 1); i++) {
+      for (let i = 0; i < state.motes; i++) {
         const t = (now / 1700 + i / (state.tier + 1)) % 1;
         ctx.save();
         ctx.globalAlpha = (1 - t) * 0.8;
@@ -160,7 +170,7 @@ export function drawEquipmentDropAura(
         ctx.restore();
       }
     }
-    if (state.tier === 4) {
+    if (state.enhance >= 10) {
       ctx.globalAlpha = 0.85;
       ctx.strokeStyle = "#ffe7a6";
       ctx.beginPath();

@@ -1,5 +1,6 @@
 import type { Element } from "./idle";
-import type { EquipmentData, GearStats } from "./equipment";
+import type { EquipmentData } from "./equipment";
+import { emptyStats, PERCENT_STATS, type GearStats } from "./gear-stats.ts";
 
 export const GEAR_VARIANTS = {
   sword: { slot: "weapon", name: "Trường Kiếm" },
@@ -16,12 +17,21 @@ export const GEAR_VARIANTS = {
   flute: { slot: "weapon", name: "Bích Ngọc Tiêu" },
   whip: { slot: "weapon", name: "Cửu Tiết Tiên" },
   hammer: { slot: "weapon", name: "Lôi Đình Chùy" },
+  dragonstaff: { slot: "weapon", name: "Bàn Long Côn" },
+  firesaber: { slot: "weapon", name: "Liệt Diễm Đao" },
+  poisondarts: { slot: "weapon", name: "Bạo Vũ Phi Châm" },
+  frostsword: { slot: "weapon", name: "Hàn Ngọc Kiếm" },
+  thundersword: { slot: "weapon", name: "Tử Điện Kiếm" },
+  lotusfan: { slot: "weapon", name: "Liên Hoa Phiến" },
   plate: { slot: "armor", name: "Chiến Giáp" },
   robe: { slot: "armor", name: "Đạo Bào" },
   mail: { slot: "armor", name: "Khinh Giáp" },
   lamellar: { slot: "armor", name: "Long Lân Giáp" },
   cloak: { slot: "armor", name: "Dạ Hành Y" },
   brocade: { slot: "armor", name: "Cẩm Tú Bào" },
+  dragonrobe: { slot: "armor", name: "Hàng Long Bào" },
+  phoenixmail: { slot: "armor", name: "Phượng Vũ Giáp" },
+  shadowrobe: { slot: "armor", name: "U Ảnh Y" },
   helm: { slot: "helmet", name: "Chiến Khôi" },
   crown: { slot: "helmet", name: "Ngọc Quan" },
   hood: { slot: "helmet", name: "Trùm Đầu" },
@@ -29,33 +39,48 @@ export const GEAR_VARIANTS = {
   veiledhat: { slot: "helmet", name: "Mịch Ly Đấu Lạp" },
   lotuscoronet: { slot: "helmet", name: "Liên Hoa Quan" },
   mask: { slot: "helmet", name: "Tu La Diện" },
+  thundercrest: { slot: "helmet", name: "Tử Lôi Quan" },
+  phoenixcrown: { slot: "helmet", name: "Phượng Linh Quan" },
   greaves: { slot: "boots", name: "Chiến Ngoa" },
   slippers: { slot: "boots", name: "Vân Hài" },
   cloudboots: { slot: "boots", name: "Phi Vân Ngoa" },
   sandboots: { slot: "boots", name: "Sa Mạc Ngoa" },
+  lotusboots: { slot: "boots", name: "Liên Bộ Hài" },
+  shadowboots: { slot: "boots", name: "Ảnh Phong Ngoa" },
   metalbelt: { slot: "belt", name: "Chiến Đai" },
   jadebelt: { slot: "belt", name: "Ngọc Đai" },
   silkbelt: { slot: "belt", name: "Lưu Vân Đai" },
   dragonbelt: { slot: "belt", name: "Bàn Long Đai" },
+  starbelt: { slot: "belt", name: "Thất Tinh Đai" },
+  emberbelt: { slot: "belt", name: "Hỏa Ngọc Đai" },
   chain: { slot: "necklace", name: "Bảo Liên" },
   amulet: { slot: "necklace", name: "Hộ Tâm Liên" },
   moonchain: { slot: "necklace", name: "Nguyệt Nha Liên" },
   fangchain: { slot: "necklace", name: "Lang Nha Liên" },
+  lotuschain: { slot: "necklace", name: "Liên Tâm Liên" },
+  venomchain: { slot: "necklace", name: "Bích Độc Liên" },
   rubyring: { slot: "ring", name: "Bảo Giới" },
   jadering: { slot: "ring", name: "Ngọc Giới" },
   dragonring: { slot: "ring", name: "Bàn Long Giới" },
   signetring: { slot: "ring", name: "Thiên Ấn Giới" },
   twinring: { slot: "ring", name: "Âm Dương Giới" },
+  frostring: { slot: "ring", name: "Băng Tinh Giới" },
+  phoenixring: { slot: "ring", name: "Phượng Huyết Giới" },
   guards: { slot: "bracelet", name: "Hộ Uyển" },
   beads: { slot: "bracelet", name: "Linh Châu" },
   silvercuff: { slot: "bracelet", name: "Ngân Nguyệt Trạc" },
   chainbracelet: { slot: "bracelet", name: "Thất Tinh Xuyến" },
+  thunderbracer: { slot: "bracelet", name: "Lôi Văn Uyển" },
+  lotusbeads: { slot: "bracelet", name: "Liên Hoa Châu" },
   seal: { slot: "pendant", name: "Ngọc Ấn" },
   talisman: { slot: "pendant", name: "Linh Phù" },
   gourd: { slot: "pendant", name: "Càn Khôn Hồ Lô" },
   mirror: { slot: "pendant", name: "Bát Quái Kính" },
   scroll: { slot: "pendant", name: "Thiên Thư" },
   bell: { slot: "pendant", name: "Trấn Hồn Linh" },
+  dragonseal: { slot: "pendant", name: "Long Hồn Ấn" },
+  taijicharm: { slot: "pendant", name: "Thái Cực Bội" },
+  venomvial: { slot: "pendant", name: "Ngũ Độc Bình" },
   bay: { slot: "horse", name: "Tuấn Mã" },
   white: { slot: "horse", name: "Bạch Long Mã" },
   warhorse: { slot: "horse", name: "Thiết Giáp Mã" },
@@ -83,9 +108,17 @@ export const SET_IDS = [
   "han-nguyet",
   "xich-diem",
   "huyen-nham",
+  "kim-cang", "ba-vuong", "bao-vu", "ngu-doc", "lien-hoa",
+  "bang-phach", "hang-long", "ma-diem", "thai-cuc", "tu-loi",
 ] as const;
 export type SetId = (typeof SET_IDS)[number];
-export const GEAR_SETS = {
+export type SetCrest = "blade" | "bamboo" | "moon" | "flame" | "mountain" | "bell" | "spear" | "dart" | "serpent" | "lotus" | "crystal" | "dragon" | "taiji" | "thunder";
+interface GearSet {
+  name: string; element: Element; color: string; glyph: string;
+  hidden: string; description: string; specialty: keyof GearStats;
+  full: Partial<GearStats>; crest: SetCrest; weapon: GearVariant; sect?: string;
+}
+export const GEAR_SETS: Record<SetId, GearSet> = {
   "kim-phong": {
     name: "Kim Phong",
     element: "kim",
@@ -95,6 +128,7 @@ export const GEAR_SETS = {
     description: "Công kích và chí mạng",
     specialty: "crit",
     full: { attack: 30, crit: 5 },
+    crest: "blade", weapon: "sword",
   },
   "thanh-truc": {
     name: "Thanh Trúc",
@@ -105,6 +139,7 @@ export const GEAR_SETS = {
     description: "Sinh lực và tốc độ",
     specialty: "speed",
     full: { hp: 250, speed: 12 },
+    crest: "bamboo", weapon: "crossbow",
   },
   "han-nguyet": {
     name: "Hàn Nguyệt",
@@ -115,6 +150,7 @@ export const GEAR_SETS = {
     description: "Nội lực và sinh lực",
     specialty: "mp",
     full: { hp: 160, mp: 120 },
+    crest: "moon", weapon: "fan",
   },
   "xich-diem": {
     name: "Xích Diệm",
@@ -125,6 +161,7 @@ export const GEAR_SETS = {
     description: "Công kích và tốc độ",
     specialty: "attack",
     full: { attack: 40, speed: 8 },
+    crest: "flame", weapon: "blade",
   },
   "huyen-nham": {
     name: "Huyền Nham",
@@ -135,8 +172,19 @@ export const GEAR_SETS = {
     description: "Phòng ngự và sinh lực",
     specialty: "defense",
     full: { defense: 30, hp: 250 },
+    crest: "mountain", weapon: "staff",
   },
-} as const;
+  "kim-cang": { name: "Kim Cang", element: "kim", color: "#ffd777", glyph: "禪", sect: "Thiếu Lâm", crest: "bell", weapon: "dragonstaff", hidden: "Kim Cang Bất Hoại", description: "Giảm sát thương và hồi sinh lực", specialty: "damageReduction", full: { defense: 24, hp: 180, damageReduction: 6, hpRegen: 6 } },
+  "ba-vuong": { name: "Bá Vương", element: "kim", color: "#79e7df", glyph: "戟", sect: "Thiên Vương", crest: "spear", weapon: "halberd", hidden: "Phá Trận Bá Vương", description: "Xuyên giáp và công kích", specialty: "armorPen", full: { attack: 30, hp: 120, armorPen: 8, attackSpeed: 6 } },
+  "bao-vu": { name: "Bạo Vũ", element: "moc", color: "#62e6ba", glyph: "鏢", sect: "Đường Môn", crest: "dart", weapon: "poisondarts", hidden: "Bạo Vũ Truy Hồn", description: "Tốc độ đánh và chí mạng", specialty: "attackSpeed", full: { attack: 20, crit: 4, attackSpeed: 10, armorPen: 6 } },
+  "ngu-doc": { name: "Ngũ Độc", element: "moc", color: "#bb90ff", glyph: "毒", sect: "Ngũ Độc", crest: "serpent", weapon: "daggers", hidden: "Vạn Độc Quy Tâm", description: "Hút sinh lực và hồi nội lực", specialty: "lifeSteal", full: { attack: 20, mp: 80, lifeSteal: 5, mpRegen: 4 } },
+  "lien-hoa": { name: "Liên Hoa", element: "thuy", color: "#ffc2dc", glyph: "蓮", sect: "Nga Mi", crest: "lotus", weapon: "lotusfan", hidden: "Liên Tâm Hộ Thể", description: "Hồi sinh lực và giảm sát thương", specialty: "hpRegen", full: { hp: 220, mp: 100, hpRegen: 8, damageReduction: 5 } },
+  "bang-phach": { name: "Băng Phách", element: "thuy", color: "#98ebff", glyph: "冰", sect: "Thúy Yên", crest: "crystal", weapon: "frostsword", hidden: "Băng Tâm Tuyết Ảnh", description: "Né tránh và sát thương chí mạng", specialty: "dodge", full: { mp: 100, speed: 8, dodge: 6, critDamage: 18 } },
+  "hang-long": { name: "Hàng Long", element: "hoa", color: "#ffc066", glyph: "龍", sect: "Cái Bang", crest: "dragon", weapon: "dragonstaff", hidden: "Hàng Long Chân Khí", description: "Sát thương chí mạng và hút sinh lực", specialty: "critDamage", full: { attack: 35, hp: 140, critDamage: 20, lifeSteal: 4 } },
+  "ma-diem": { name: "Ma Diệm", element: "hoa", color: "#ff7863", glyph: "焰", sect: "Thiên Nhẫn", crest: "flame", weapon: "firesaber", hidden: "Ma Diệm Phần Thiên", description: "Xuyên giáp và sát thương chí mạng", specialty: "armorPen", full: { attack: 35, armorPen: 8, critDamage: 15, attackSpeed: 6 } },
+  "thai-cuc": { name: "Thái Cực", element: "tho", color: "#a4ddff", glyph: "☯", sect: "Võ Đang", crest: "taiji", weapon: "sword", hidden: "Âm Dương Hợp Nhất", description: "Hồi nội lực và giảm sát thương", specialty: "mpRegen", full: { attack: 20, mp: 120, mpRegen: 6, damageReduction: 6 } },
+  "tu-loi": { name: "Tử Lôi", element: "tho", color: "#d2b4ff", glyph: "雷", sect: "Côn Lôn", crest: "thunder", weapon: "thundersword", hidden: "Cửu Thiên Lôi Đình", description: "Chí mạng và tốc độ đánh", specialty: "crit", full: { attack: 28, crit: 4, critDamage: 16, attackSpeed: 8 } },
+};
 export interface GearIdentity {
   variant?: GearVariant;
   element?: Element;
@@ -151,14 +199,7 @@ export interface SetStatus {
   full: boolean;
   bonuses: GearStats;
 }
-const blank = (): GearStats => ({
-  attack: 0,
-  defense: 0,
-  hp: 0,
-  mp: 0,
-  crit: 0,
-  speed: 0,
-});
+const blank = emptyStats;
 export function variantsForSlot(slot: string): GearVariant[] {
   return (Object.keys(GEAR_VARIANTS) as GearVariant[]).filter(
     (key) => GEAR_VARIANTS[key].slot === (slot === "ring2" ? "ring" : slot),
@@ -189,7 +230,7 @@ export function rollGearIdentity(
       : pick(["kim", "moc", "thuy", "hoa", "tho"] as const);
   const setId =
     rarity === "Hoàng Kim" || random() < (rarity === "Thường" ? 0.2 : 0.65)
-      ? setForElement(element)
+      ? pick(SET_IDS.filter(id => GEAR_SETS[id].element === element))
       : undefined;
   return {
     variant: pick(variantsForSlot(slot)),
@@ -247,12 +288,14 @@ export function setStatuses(
     if (count >= 6) {
       if (set.specialty === "crit") stats.crit += 3 + Math.floor(grade / 4);
       else if (set.specialty === "speed") stats.speed += 8 + grade * 2;
+      else if (PERCENT_STATS.includes(set.specialty)) stats[set.specialty] += (set.specialty === "critDamage" ? 10 : 3) + Math.floor(grade / 4);
+      else if (set.specialty === "hpRegen" || set.specialty === "mpRegen") stats[set.specialty] += (set.specialty === "hpRegen" ? 4 : 2) * grade;
       else stats[set.specialty] += (set.specialty === "mp" ? 80 : 14) * grade;
     }
     if (count === 11)
       for (const [key, value] of Object.entries(set.full))
         stats[key as keyof GearStats] +=
-          value * (key === "crit" || key === "speed" ? 1 : grade);
+          value! * (PERCENT_STATS.includes(key as keyof GearStats) || key === "speed" ? 1 : grade);
     const aligned = element === set.element;
     if (aligned)
       for (const key of Object.keys(stats) as (keyof GearStats)[])

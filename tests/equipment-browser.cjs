@@ -82,7 +82,7 @@ async function boss(page) { await page.locator('[data-idle-tab="log"]').click();
     await page.waitForFunction(key => JSON.parse(localStorage.getItem(key)).player.goldenClears.includes("2026-10-03-12"), key, { timeout: 12000 });
     const killed = await read(page);
     const drop = killed.groundLoot.find(l => l.item?.rarity === "Hoàng Kim"); assert.ok(drop);
-    assert.equal(Object.keys(drop.item.bonuses).length, 6); assert.equal(drop.item.color, "#ffd35a");
+    assert.equal(Object.keys(drop.item.bonuses).length, 10); assert.equal(drop.item.color, "#ffd35a");
     assert.equal(killed.player.bossDefeated, starting.player.bossDefeated);
     assert.equal(killed.player.idle.totalKills, starting.player.idle.totalKills);
     assert.equal(killed.player.idle.stage, starting.player.idle.stage);

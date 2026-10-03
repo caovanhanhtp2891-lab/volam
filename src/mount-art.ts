@@ -6,6 +6,7 @@ export interface MountAppearance {
   color: string;
   tier: number;
   enhancement: number;
+  simpleEffects?: boolean;
 }
 export function drawHorse(
   ctx: CanvasRenderingContext2D,
@@ -146,7 +147,7 @@ export function drawHorse(
     ctx.closePath();
     ctx.fill();
   }
-  if (horse.tier >= 3 || horse.enhancement >= 5) {
+  if (horse.enhancement >= 7 && !horse.simpleEffects) {
     drawGlow(ctx, 0, -7, 25, horse.color, 0.2);
     for (let i = 0; i < 3; i++) {
       const t = (now / 1000 + i / 3) % 1;

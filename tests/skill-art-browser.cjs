@@ -57,12 +57,16 @@ function capture() {
           await page.evaluate(() => { window.artMetrics = { glows: 0, strokes: 0, gradients: 0, frames: 0 }; });
           await page.waitForTimeout(100);
           const metrics = await page.evaluate(() => window.artMetrics);
-          assert.ok(metrics.frames > 0 && metrics.glows / metrics.frames <= 2, 'dash preview shows the hero and its effect without a ranged projectile');
+          assert.ok(metrics.frames > 0 && metrics.glows / metrics.frames <= 3, 'dash preview shows the hero, practice target and one light effect without a ranged projectile');
         }
         frames.add(first);
-        cards.push({ sect: sect.name, skill: sect.kit[key].name, image: first, icon: await icon.evaluate(el => el.outerHTML) });
         await page.waitForTimeout(220);
         assert.notEqual(first, await page.locator('#skill-art-canvas').evaluate(c => c.toDataURL()), `${sect.name} ${key} animates`);
+        await page.waitForFunction(() => window.frameTime % 1600 > 1000 && window.frameTime % 1600 < 1090);
+        assert.equal(await page.locator('#skill-art-canvas').getAttribute('data-phase'), 'impact');
+        const impact = await page.locator('#skill-art-canvas').evaluate(c => c.toDataURL());
+        assert.notEqual(first, impact, `${sect.name} ${key}: release and contact differ`);
+        cards.push({ sect: sect.name, skill: sect.kit[key].name, image: first, impact, icon: await icon.evaluate(el => el.outerHTML) });
       }
       const after = await snapshot(page);
       assert.equal(after.mp, before.mp, 'preview spends no mana');
@@ -107,7 +111,7 @@ function capture() {
     await page.screenshot({ path: '/tmp/volam-skill-preview-mobile.png' });
     assert.deepEqual(errors, [], 'no browser or asset errors');
     const gallery = await browser.newPage({ viewport: { width: 1080, height: 900 } });
-    const html = `<meta charset="utf-8"><style>body{margin:20px;background:#0a1819;color:#e9dab7;font:14px system-ui}h1{font-size:24px}main{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}article{background:#142c26;border:1px solid #4a6251;border-radius:7px;padding:8px}img{width:100%}header{display:flex;align-items:center;gap:8px}svg{width:44px;height:44px;flex-shrink:0}small{display:block;color:#adc6b6}</style><h1>Giang Hồ Dị Truyện · Thập đại môn phái · v0.9.0</h1><main>${cards.map(card => `<article><header>${card.icon}<div><b>${card.sect}</b><small>${card.skill}</small></div></header><img src="${card.image}"></article>`).join('')}</main>`;
+    const html = `<meta charset="utf-8"><style>body{margin:20px;background:#0a1819;color:#e9dab7;font:14px system-ui}h1{font-size:24px}main{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}article{background:#142c26;border:1px solid #4a6251;border-radius:7px;padding:8px}img{width:100%}header{display:flex;align-items:center;gap:8px}svg{width:44px;height:44px;flex-shrink:0}small{display:block;color:#adc6b6}</style><h1>Giang Hồ Dị Truyện · Thập đại môn phái · Ra chiêu / Trúng địch</h1><main>${cards.map(card => `<article><header>${card.icon}<div><b>${card.sect}</b><small>${card.skill}</small></div></header><div style="display:flex"><img style="width:50%" src="${card.image}"><img style="width:50%" src="${card.impact}"></div></article>`).join('')}</main>`;
     await fs.writeFile('/tmp/volam-skill-gallery.html', html);
     await gallery.setContent(html);
     await gallery.screenshot({ path: '/tmp/volam-skill-gallery.png', fullPage: true });

@@ -12,6 +12,7 @@ import {
   rollGearIdentity,
 } from "../src/gear-catalog.ts";
 import {
+  emptyStats,
   loadoutStats,
   totalGearStats,
   equipBestGear,
@@ -56,9 +57,9 @@ test("set thresholds activate only with equipped distinct slots and full hidden 
     false,
   );
 });
-test("five full sets have different actual bonuses, matching element strengthens only set stats", () => {
+test("fifteen full sets have different actual bonuses, matching element strengthens only set stats", () => {
   const full = SET_IDS.map((id) => setBonuses(set(11, id)));
-  assert.equal(new Set(full.map(JSON.stringify)).size, 5);
+  assert.equal(new Set(full.map(JSON.stringify)).size, 15);
   for (const id of SET_IDS) {
     const items = set(11, id),
       base = setBonuses(items),
@@ -85,6 +86,7 @@ test("weakest set grade limits bonuses; mixed sets stack their own stages and re
     piece("boots", "xich-diem"),
   ];
   assert.deepEqual(setBonuses(mixed), {
+    ...emptyStats(),
     attack: 12,
     defense: 8,
     hp: 0,
@@ -127,8 +129,8 @@ test("old gear receives no invented elements or set bonuses and identity validat
     true,
   );
 });
-test("all 60 equipment variants have compatible distinct artwork, grades and enchantment markers", () => {
-  assert.equal(Object.keys(GEAR_VARIANTS).length, 60);
+test("all 84 equipment variants have compatible distinct artwork, grades and enchantment markers", () => {
+  assert.equal(Object.keys(GEAR_VARIANTS).length, 84);
   for (const [variant, info] of Object.entries(GEAR_VARIANTS)) {
     const gear = { ...piece(info.slot), variant, level: 160, enhance: 10 };
     assert.ok(VARIANT_SHAPES[variant]);
@@ -144,7 +146,7 @@ test("all 60 equipment variants have compatible distinct artwork, grades and enc
   }
   assert.equal(
     new Set(variantsForSlot("weapon").map((v) => VARIANT_SHAPES[v])).size,
-    14,
+    20,
   );
   assert.equal(
     validGearIdentity({ ...piece("ring2"), variant: "jadering" }),

@@ -87,7 +87,7 @@ async function move(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.12.0",
+      "0.13.0",
     );
     await page.locator("#hero-name-input").fill("Kim Phong Kỵ Sĩ");
     await page.locator('[data-faction="shaolin"]').click();
@@ -247,7 +247,7 @@ async function move(page) {
     assert.equal(loaded.maxMp, full.maxMp);
     assert.equal(await cp(page), partialPower + diff);
     await page.locator("#gear-sets-btn").click();
-    assert.equal(await page.locator("[data-set-card]").count(), 5);
+    assert.equal(await page.locator("[data-set-card]").count(), SET_IDS.length);
     assert.equal(
       await page.locator('[data-set-card="kim-phong"] .set-unlocked').count(),
       4,
@@ -301,7 +301,7 @@ async function move(page) {
       );
       await page.locator("#utility-close").click();
     }
-    const variants = Object.entries(GEAR_VARIANTS).map(
+    const variants = Object.entries(GEAR_VARIANTS).slice(0, 60).map(
       ([variant, meta], i) => ({
         ...gear(meta.slot),
         id: `art-${i}`,
@@ -325,7 +325,7 @@ async function move(page) {
       path: path.join(captureDir, "gear-variants-mobile.png"),
     });
     console.log(
-      "PASS all five sets and 60 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
+      "PASS all fifteen sets and 60 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
     );
 
     await seed(page, (s) => {

@@ -9,6 +9,7 @@ import {
   elementalMultiplier,
   completeWave,
   goToStage,
+  canEnterStage,
   spendAttribute,
   dailyDate,
   claimDaily,
@@ -88,6 +89,37 @@ test("stage selection respects unlocks and the final stage never overflows", () 
   assert.equal(completeWave(final).advanced, false);
   assert.equal(final.stage, MAX_STAGE);
   assert.equal(final.maxStage, MAX_STAGE);
+});
+
+test("level milestones open a new region without clearing the previous boss", () => {
+  for (const start of [11, 21, 31, 151]) {
+    const progress = normalizeIdle({ maxStage: 1, wave: 3, inTown: true });
+    const before = structuredClone(progress);
+    assert.equal(goToStage(progress, start, start - 1), false);
+    assert.deepEqual(progress, before);
+    assert.equal(canEnterStage(progress, start, start), true);
+    assert.equal(goToStage(progress, start, start), true);
+    assert.equal(progress.stage, start);
+    assert.equal(progress.maxStage, start);
+    assert.equal(progress.wave, 1);
+    assert.equal(progress.inTown, false);
+    assert.equal(stageInfo(progress.stage).level, start);
+    const restored = normalizeIdle(JSON.parse(JSON.stringify(progress)));
+    assert.equal(goToStage(restored, start, 1), true, "opened maps survive save/load and rebirth");
+  }
+});
+
+test("level unlocks only region entrances and rejects invalid stages and levels", () => {
+  const progress = normalizeIdle();
+  for (const stage of [0, 1.5, 12, 152, MAX_STAGE + 1, Infinity, NaN]) {
+    assert.equal(goToStage(progress, stage, 160), false);
+  }
+  for (const level of [10, -1, NaN, Infinity]) assert.equal(goToStage(progress, 11, level), false);
+  assert.equal(progress.maxStage, 1);
+  assert.equal(goToStage(progress, 11, 11), true);
+  assert.equal(goToStage(progress, 12, 11), false);
+  completeWave(Object.assign(progress, { wave: 4 }));
+  assert.equal(goToStage(progress, 12, 11), true, "wave completion still opens the next stage");
 });
 
 test("all five elemental relationships have an advantage and the reciprocal penalty", () => {

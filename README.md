@@ -2,6 +2,75 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Hiệu ứng ra chiêu, trúng địch và hình vật phẩm
+
+30 chiêu có chuỗi **tụ lực → ra chiêu/đạn bay → trúng địch**. Dấu trúng đòn của 10 phái khác nhau: kim cang chấn Thiếu Lâm, thương xuyên Thiên Vương, phi châm/vệt độc Đường Môn, độc xà Ngũ Độc, sen Nga Mi, băng tinh Thúy Yên, long trảo Cái Bang, hỏa diệm Thiên Nhẫn, kiếm khí Võ Đang và lôi điện Côn Lôn. Đòn thường cũng dùng hình của phái. Dấu trúng xuất hiện tại mỗi quái thực sự nhận sát thương, gồm mục tiêu phụ; đạn hủy khi mục tiêu đã chết. Chiêu hộ thể/hồi phục không hiện dấu trúng giả lên địch. **Võ công → Xem hiệu ứng** dùng cùng renderer với mục tiêu tập luyện, không tiêu hao MP/nộ.
+
+**84 mẫu trang bị vẽ mới** và bình HP/MP có chi tiết kim loại, vải, ngọc và đá quý. Túi, cửa hàng, so sánh, trang bị rơi và vũ khí trong sân/chân dung dùng cùng bộ hình. Bạc, đá tinh luyện, lệnh bài và rương thưởng có biểu tượng riêng. Năm phẩm chất giữ màu viền bạc/lục/lam/tím/vàng; **+0–+6 chưa có vòng sáng**, **+7 mở vòng linh khí**, **+10 thêm phù văn/vòng phụ**. Phẩm chất Hoàng Kim không tự mở vòng khi chưa cường hóa cao. Vòng bộ trang bị cần món đang mặc từ +7; hiệu ứng cảnh giới/danh hiệu vẫn theo tiến trình tương ứng.
+
+Ba atlas trang bị/vật phẩm WebP tổng ~1,82 MB, tách khỏi atlas nhân vật. Icon Canvas cache tối đa 160; hiệu ứng không tạo gradient mỗi frame. Chế độ Gọn giảm tia/hạt; giao diện hỗ trợ reduced motion. Kiểm tra bằng `pnpm build`, unit test và `tests/skill-art-browser.cjs`, `tests/sects-browser.cjs`, `tests/equipment-art-browser.cjs`, `tests/browser-smoke.cjs`.
+
+## Tranh đoạt lãnh thổ, ấn quân hàm và hình nhân vật
+
+**Giang hồ → Tranh đoạt lãnh thổ** mở chiến dịch công thành solo gồm 9 thành: Biên Thành → Tương Dương → Đại Lý → Phượng Tường → Thành Đô → Dương Châu → Lâm An → Biện Kinh → Hoàng Thành. Cần cấp 10/20/30/45/60/80/100/125/150 và chiếm thành trước. Mỗi trận có 3 đợt, 4 phút; đợt cuối có Thống lĩnh. Chiến công và thưởng chiếm thành chỉ nhận một lần. Rút quân, ngã xuống hoặc hết giờ không nhận chiến công của thành chưa chiếm. Đây là chiến dịch local của từng nhân vật; chưa có tranh thành PvP/bang hội hoặc nhiệm kỳ chức vị.
+
+**Nhân vật → ô Ấn quân hàm** ở góc phải dưới là ô thứ 12, bên cạnh 11 ô trang bị thường. Nhận sắc phong rồi chọn **Mang ấn**; mỗi nhân vật chỉ mang một ấn. Ấn cộng trực tiếp vào chỉ số, lực chiến và các thuộc tính chiến đấu nâng cao. Đổi/tháo ấn thay đúng phần cộng, không cộng dồn các ấn đã nhận; ấn không chiếm ô túi hoặc ảnh hưởng bộ 11 món. Tiến trình lãnh thổ và ấn lưu riêng theo nhân vật, giữ sau trùng sinh. File lưu cũ bắt đầu với ô ấn trống.
+
+| Chức vị | Thành đã chiếm | Chiến công |
+| --- | ---: | ---: |
+| Hương Trưởng | 1 | 80 |
+| Huyện Lệnh | 2 | 200 |
+| Thái Thú | 3 | 380 |
+| Tổng Đốc | 5 | 1.000 |
+| Đại Tướng Quân | 6 | 1.500 |
+| Thừa Tướng | 8 | 3.000 |
+| Hoàng Đế | 9 | 4.300 |
+
+**20 mẫu nhân vật cổ trang** cho nam/nữ của 10 môn phái, lấy cảm hứng từ phong cách Võ Lâm Truyền Kỳ. Màn chọn phái, nhân vật trong trận và màn Nhân vật dùng chung hình; avatar cắt khuôn mặt từ đúng mẫu phái/giới tính đó. Đổi giới tính trong Cài đặt cập nhật mọi nơi. Sprite cao 56 × 76, giữ collider bán kính 12 và bước chân theo quãng đường thật. Atlas nhân vật WebP ~664 KB; atlas NPC/quái cũ vẫn ~28 KB. Trang bị thêm hoa văn nhỏ và linh khí để giữ rõ trang phục môn phái.
+
+Kiểm thử tiến trình công thành, 7 ấn, thay/tháo/lưu tải/trùng sinh, hết giờ/thất bại, hình chung cho 20 mẫu và giao diện di động:
+
+```bash
+node --experimental-strip-types tests/military-characters-browser.cjs
+```
+
+## Võ học và trang bị môn phái
+
+- 30 icon có huy hiệu môn phái; tụ lực, đạn và tuyệt chiêu dùng cùng biểu tượng. Bổ sung tua thương Thiên Vương, đai côn/kim chung Thiếu Lâm, độc nha Ngũ Độc, cánh sen Nga Mi, băng tinh Thúy Yên và kiếm trận Võ Đang; giữ hỏa long Cái Bang, ma diệm Thiên Nhẫn, ám khí độc Đường Môn và lôi điện Côn Lôn.
+- **84 mẫu trang bị**, thêm 24 mẫu như Bàn Long Côn, Liệt Diễm Đao, Bạo Vũ Phi Châm, Hàn Ngọc Kiếm, Tử Điện Kiếm, Liên Hoa Phiến, Hàng Long Bào, Phượng Vũ Giáp, Thái Cực Bội và Ngũ Độc Bình. Mỗi mẫu có hình, vật liệu, hoa văn và đá riêng.
+- **15 bộ**, gồm 5 bộ ngũ hành cũ và 10 bộ môn phái. Bộ mới rơi từ quái và có đủ 11 vị trí trong Tiệm. Cùng hệ vẫn nhận +20%; tên môn phái gợi ý lối chơi, không khóa quyền mặc. Huy hiệu, linh khí, hoa văn trên áo/vũ khí và vòng dưới chân lấy đúng bộ đang mặc.
+- **14 loại chỉ số**, đồ mới có **2/3/5/7/10 dòng phụ** từ Thường đến Hoàng Kim. Cường hóa, bảng so sánh, Mặc đồ mạnh nhất và lực chiến tính cả các dòng mới. Đồ cũ giữ nguyên các dòng đã có.
+
+| Bộ mới | Môn phái | Lối chơi |
+| --- | --- | --- |
+| Kim Cang | Thiếu Lâm | Giảm sát thương, hồi sinh lực |
+| Bá Vương | Thiên Vương | Xuyên giáp, công kích |
+| Bạo Vũ | Đường Môn | Tốc độ đánh, chí mạng |
+| Ngũ Độc | Ngũ Độc | Hút sinh lực, hồi nội lực |
+| Liên Hoa | Nga Mi | Hồi sinh lực, giảm sát thương |
+| Băng Phách | Thúy Yên | Né tránh, sát thương chí mạng |
+| Hàng Long | Cái Bang | Sát thương chí mạng, hút sinh lực |
+| Ma Diệm | Thiên Nhẫn | Xuyên giáp, sát thương chí mạng |
+| Thái Cực | Võ Đang | Hồi nội lực, giảm sát thương |
+| Tử Lôi | Côn Lôn | Chí mạng, tốc độ đánh |
+
+**Nhân vật → Chỉ số chiến đấu nâng cao** xem tám dòng mới sau giới hạn: sát thương chí mạng tối đa +150% trên nền 150%; tốc độ đánh thường 80%; hút sinh lực 20% HP thực lấy từ quái (không tính sát thương vượt HP còn lại); xuyên giáp 60%; giảm sát thương 50% sau phòng thủ/trước hộ thể; né tránh 35%; hồi HP 1.000/giây và hồi MP cộng thêm 300/giây. Hồi phục trang bị hoạt động khi mô phỏng chiến đấu chạy. Các giới hạn không sửa dòng gốc trên món đồ.
+
+**Bảo khố → Bộ trang bị** xem trước màu linh khí và huy hiệu; Chọn mua giữ đúng bộ đã xem. Chạy `tests/advanced-equipment-browser.cjs` với Playwright để kiểm tra tám dòng trong chiến đấu thật, hiển thị/cường hóa 14 dòng, lưu tải, 15 huy hiệu và mua đúng bộ.
+
+## Võ học, bước chân và bản đồ theo cấp
+
+- Nâng 30 icon võ công với khung sáng và màu riêng từng phái. Hỏa long Cái Bang có vảy, sừng, râu và vuốt; Thiên Nhẫn có hỏa diệm trên song nhận/ảnh bộ; ám khí Đường Môn có vệt độc và gây độc thật trong 3–4 giây. Các tuyệt chiêu có phù trận, vẫn hỗ trợ chế độ Đầy đủ/Gọn.
+- Tầm đánh xuất hiện ở màn chọn phái, bảng Võ công, nút kỹ năng và **Xem chiêu**. Nét đứt minh họa hình quạt/xuyên tuyến/vòng tầm đánh; khi thi triển tay cũng hiện phạm vi thoáng qua. Mục tiêu ngoài tầm báo **XA QUÁ**; không trừ MP hoặc bắt đầu hồi chiêu khi thi triển không hợp lệ.
+- Nhân vật trên sân tăng lên **56 × 76**, hai chân bước luân phiên theo quãng đường di chuyển và dừng khi đứng yên. Khi cưỡi ngựa hoặc lướt, chân nhân vật không chạy tại chỗ. Atlas nhân vật riêng ~664 KB; collider vẫn bán kính 12.
+- Trong **Giang hồ → Bản đồ luyện công**, đủ cấp **11 / 21 / 31 / … / 151** có thể chọn ngay đầu vùng tương ứng, không cần hạ boss vùng trước. Map mới sinh quái đúng cấp ải; vùng đã vào được lưu cùng nhân vật. Vượt đủ bốn đợt vẫn mở ải kế tiếp như trước.
+
+Kiểm tra riêng luồng mở map theo cấp, quái mạnh hơn, tầm đánh và hai chân di chuyển bằng cùng cấu hình Playwright/Chromium/URL ở phần kiểm thử:
+
+```bash
+node --experimental-strip-types tests/world-upgrade-browser.cjs
+```
+
 ## Phàm nhân nhập đạo · v0.9.0
 
 - Sân đấu chiếm toàn bộ phần màn hình phía trên menu đáy. Ảnh đại diện, cấp, tên/lực chiến và HP/MP/XP ở góc trái; bạc, quà ngày, cài đặt ở góc phải. Minimap và nhiệm vụ có thể thu gọn ở bên phải; thông báo nhặt đồ ở bên trái. Joystick/Tự động bên trái, cụm nút tròn kỹ năng/thuốc/về thành bên phải, nhật ký một dòng sát menu.
@@ -46,9 +115,9 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Sân đấu phủ phần màn hình phía trên menu, các bảng mở khi chạm năm tab **Giang hồ / Nhân vật / Võ công / Hành trang / Khác** nằm dưới. Giao diện xanh rêu, viền vàng, dùng chung trên điện thoại và desktop.
 - **Nhân vật** và **Túi đồ** mở thành màn riêng với khung vàng cổ theo ảnh tham chiếu. Nhân vật đứng giữa trên đài tu luyện có vòng cảnh giới chuyển động, trang bị xếp 6 ô bên trái và 5 ô bên phải. Chân dung có áo/vũ khí theo phái, giới tính và đồ đang mặc; HP/MP và bảy chỉ số hiện phía dưới. Chạm trang bị để xem chi tiết; cường hóa bằng nút có giá bạc/đá rồi xem trước và xác nhận, mở chi tiết không tự trừ tiền.
 - Túi đồ dùng lưới 60 ô có viền phẩm chất, hình trang bị, cấp độ và mức cường hóa. Màn túi có số ô đang dùng, bạc/đá, Mặc đồ mạnh nhất, Vứt đồ theo lọc, Lưu/Tải và Tiệm; danh sách để mặc/bán/cường hóa nằm dưới lưới, trang bị đang mặc nằm trong mục có thể mở rộng. Nút **×** đưa về sân đấu.
-- Có 16 vùng, 160 ải; mỗi ải có 4 đợt, trùm ở đợt cuối của mỗi ải thứ 10. **Vượt ải** mở ải kế tiếp; **Luyện công** lặp lại ải hiện tại. Chỉ đi tới vùng/ải đã mở.
+- Có 16 vùng, 160 ải; mỗi ải có 4 đợt, trùm ở đợt cuối của mỗi ải thứ 10. **Vượt ải** mở ải kế tiếp; **Luyện công** lặp lại ải hiện tại. Vùng mới mở khi đủ cấp đầu vùng hoặc vượt ải; các ải bên trong tiếp tục mở theo tiến trình.
 - Tự tìm quái, dùng võ công, dùng thuốc và nhặt đồ. WASD hoặc joystick chuyển sang điều khiển tay; bấm **Tự động** để tiếp tục. Khắc chế ngũ hành tăng 25% hoặc giảm 20% sát thương.
-- Nhân vật nhỏ 46 × 50, áo/tóc/vũ khí riêng cho từng phái; nhún/đảo hướng theo di chuyển, nghiêng người khi đánh/thi triển và lướt có thời gian. Camera bám mềm; chuyển đợt giữ vị trí nhân vật. Quái có động tác lao đánh, phản ứng trúng đòn và ngã xuống.
+- Nhân vật 56 × 76, áo/tóc/vũ khí riêng cho từng phái và giới tính; nhún/đảo hướng theo di chuyển, nghiêng người khi đánh/thi triển và lướt có thời gian. Camera bám mềm; chuyển đợt giữ vị trí nhân vật. Quái có động tác lao đánh, phản ứng trúng đòn và ngã xuống.
 - Cảnh giới tu tiên tự tính từ lực chiến hiện tại: đủ 23 bậc từ Phàm Nhân đến Vô Cực. Tên cảnh giới và tầng/giai đoạn nằm trên đầu nhân vật; vòng sáng dưới chân tăng màu, lớp vòng, phù văn, hoa sen, tia và hạt sáng theo bậc. Tab **Nhân vật** hiển thị cảnh giới, lực chiến còn thiếu và bảng các ngưỡng.
 - Đánh thường cận chiến có vệt chém, đòn tầm xa có đạn bay và gây sát thương khi chạm mục tiêu. Hiệu ứng theo năm hệ: kim nhận, lá/ám khí, băng, lửa và lôi. Chiêu ngoài tầm không tiêu hao MP hoặc hồi chiêu.
 - Trang bị bật ra rồi rơi xuống đất, có hình kiếm, áo, mũ, giày, nhẫn và thú cưỡi theo vị trí; màu và ánh sáng theo phẩm chất dùng chung trên đất, Hành trang, Nhân vật và màn so sánh. Đồ Hiếm/Cực phẩm có cột sáng và quầng sáng dưới chân khi mặc; vũ khí phát sáng theo màu trang bị. Đồ nằm trên sân ít nhất 1,6 giây trước khi tự nhặt. Chạm đồ để đi tới nhặt hoặc dùng **E**. Đồ tự nhặt bay về nhân vật, thông báo có thể mở so sánh với trang bị đang dùng. Đồ chưa nhặt được lưu cùng nhân vật; túi đầy vẫn nhặt được bạc, trang bị tự nhặt được giữ trong Đồ chờ nhận.
@@ -57,15 +126,15 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.12.0 · Bảo khố & Linh quang** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.13.0 · Thập phái & Tranh đoạt** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
 ## Trang bị và boss Hoàng Kim · v0.5.0
 
 - 11 hình trang bị vector dùng chung trên đất, trong túi và trên nhân vật. Không thêm ảnh bitmap: atlas vẫn 28 KB. Bậc trang bị 1–16 theo mỗi 10 cấp; cấp trang bị biểu thị sức mạnh, chưa có yêu cầu cấp để mặc.
-- 5 phẩm chất: **Thường (xám), Tốt (lục), Hiếm (lam), Cực phẩm (tím), Hoàng Kim (vàng)**. Hoàng Kim có khung viền vàng/ký hiệu riêng và cột sáng vàng khi rơi. Trang bị mới có 1/2/3/4/6 dòng phụ theo phẩm chất, cùng chỉ số chính; các dòng trùng loại cộng chung khi hiển thị.
-- Dòng phụ gồm công, phòng, sinh lực, nội lực, chí mạng và tốc độ di chuyển. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng theo 4% mỗi bậc, tối đa +10; chỉ số chính có mức tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên. Vì vậy đồ cấp thấp vẫn tăng sức mạnh khi +1. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
+- 5 phẩm chất: **Thường (xám), Tốt (lục), Hiếm (lam), Cực phẩm (tím), Hoàng Kim (vàng)**. Hoàng Kim có khung viền vàng/ký hiệu riêng và cột sáng vàng khi rơi. Trang bị mới có 2/3/5/7/10 dòng phụ theo phẩm chất, cùng chỉ số chính; các dòng trùng loại cộng chung khi hiển thị.
+- Dòng phụ gồm 14 loại: công, phòng, sinh lực, nội lực, chí mạng, tốc độ di chuyển và tám dòng chiến đấu nâng cao mô tả phía trên. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng theo 4% mỗi bậc, tối đa +10; chỉ số chính có mức tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên. Vì vậy đồ cấp thấp vẫn tăng sức mạnh khi +1. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
 - **Hành trang → Mặc đồ mạnh nhất** chọn món tăng tổng điểm lực chiến cao nhất cho từng vị trí, kể cả chỉ số phụ/cường hóa. Món cũ về túi; không mất đồ khi túi đầy.
 - **Vứt đồ theo lọc** chọn phẩm chất tối đa, cấp trang bị tối đa, chỉ đồ yếu hơn/bằng món đang mặc. Xem danh sách rồi xác nhận hoặc hủy. Luôn giữ đồ bộ, đồ Hoàng Kim, đồ +1 trở lên, đồ đang mặc và Đồ chờ nhận. Đổi bộ lọc phải xem lại trước khi xác nhận; không vứt cả đồ mới nhặt sau khi xem trước.
 - Boss xuất hiện theo giờ Việt Nam **12:00–12:20 Kim Giáp Lang Vương, 19:00–19:20 Hoàng Kim Thủ Vệ, 21:00–21:20 Xích Diệm Ma Vương**. Tab Giang hồ hiển thị đếm ngược và lịch. Từ cấp 5 có thể vào đấu trường trong khung giờ; có đòn báo vùng đỏ và cuồng nộ dưới 50% HP.
@@ -110,15 +179,15 @@ Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng 
 ## Hình trang bị và linh quang · v0.12.0
 
 - Mỗi món có các lớp vật liệu, men màu, nét chạm khắc, viền sáng và đá ngọc ở đúng vị trí. Sáu vật liệu gồm thép, vàng, ngọc, lụa, da và gỗ. Viền bạc/lục/lam/tím/vàng thể hiện phẩm chất; Hoàng Kim có khung kim long và ấn văn.
-- **+3:** dòng sáng chạy theo hình món; **+7:** linh khí xoay; **+10:** thêm tinh tú. Ngũ hành đổi màu đá và linh khí. Tay nhân vật cầm đúng một trong 14 hình vũ khí, đảo hướng và vung khi đánh; giáp có vai/miếng hộ tâm hoặc nét thêu, mũ có trâm/giác quan, giày có viền, pháp bảo phát sáng khi đủ phẩm chất/cường hóa. Món Hiếm trở lên rơi có cột sáng và hạt riêng, Hoàng Kim có trận nhỏ dưới đất.
-- **Nhân vật → Mẫu đồ** hoặc **Túi đồ → Mẫu trang bị** mở Bảo khố. Chọn vị trí, phẩm chất, +0/+3/+7/+10 và ngũ hành để xem mẫu. **Chọn mua** mở Tiệm với đúng kiểu và bộ; món mua thực tế vẫn Tốt, +0, giá theo cấp. Mẫu minh họa không cấp trang bị hoặc thay đổi bạc/chỉ số.
+- **+3:** viền khắc sáng tĩnh; **+7:** vòng linh khí xoay; **+10:** thêm phù văn và vòng phụ. Ngũ hành và bộ trang bị đổi màu linh khí và huy hiệu. Tay nhân vật cầm đúng một trong 20 hình vũ khí, đảo hướng và vung khi đánh; giáp có vai/miếng hộ tâm hoặc nét thêu, mũ có trâm/giác quan, giày có viền, pháp bảo phát sáng từ +7. Món Hiếm trở lên rơi có cột màu để dễ tìm; vòng sáng và hạt chỉ xuất hiện từ +7, +10 thêm phù văn.
+- **Nhân vật → Mẫu đồ** hoặc **Túi đồ → Mẫu trang bị** mở Bảo khố. Chọn vị trí, phẩm chất, +0/+3/+7/+10 và ngũ hành/bộ để xem mẫu. **Chọn mua** mở Tiệm với đúng kiểu và bộ; món mua thực tế vẫn Tốt, +0, giá theo cấp. Mẫu minh họa không cấp trang bị hoặc thay đổi bạc/chỉ số.
 - Hình trong sân được cache tối đa 160 icon 128×128; không tạo gradient vật liệu mỗi khung hình. Linh khí mỗi món tối đa 6 hạt, đồ rơi tối đa 5 hạt. Cài đặt **Gọn** và tùy chọn giảm chuyển động của trình duyệt dừng animation trong bảng đồ; Gọn còn giảm hạt và cột sáng trong sân.
 
-Kiểm tra hình ảnh: `node --experimental-strip-types tests/equipment-art-browser.cjs` với các biến Playwright bên dưới. Kiểm thử mua đủ 14 kiểu vũ khí, nhẫn thứ hai, ngựa mới, mặc/lưu/tải; xem đủ 60 mẫu, chế độ Gọn/giảm chuyển động, cache khi vẽ và sáu kích thước màn hình. Unit test: `node --experimental-strip-types --test --test-isolation=none tests/*.test.mjs`.
+Kiểm tra hình ảnh: `node --experimental-strip-types tests/equipment-art-browser.cjs` với các biến Playwright bên dưới. Kiểm thử mua đủ 20 kiểu vũ khí, nhẫn thứ hai, ngựa mới, mặc/lưu/tải; xem đủ 84 mẫu, chế độ Gọn/giảm chuyển động, cache khi vẽ và sáu kích thước màn hình. Unit test: `node --experimental-strip-types --test --test-isolation=none tests/*.test.mjs`.
 
 ## Bộ ngũ hành và cưỡi ngựa · v0.11.0
 
-- Trang bị có **60 chủng loại** từ v0.12.0: 14 vũ khí, 6 giáp, 7 mũ, 4 giày, 4 đai, 4 dây chuyền, 5 nhẫn, 4 hộ uyển, 6 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
+- Trang bị có **84 chủng loại**: 20 vũ khí, 9 giáp, 9 mũ, 6 giày, 6 đai, 6 dây chuyền, 7 nhẫn, 6 hộ uyển, 9 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
 - Năm bộ **Kim Phong / Thanh Trúc / Hàn Nguyệt / Xích Diệm / Huyền Nham** ứng với Kim/Mộc/Thủy/Hỏa/Thổ. Đồ Hoàng Kim mới luôn thuộc một bộ; đồ khác có cơ hội thuộc bộ. Đồ rơi ưu tiên hệ môn phái 60% khi chọn hệ. Save cũ giữ nguyên chỉ số, không tự thêm dòng phụ, hệ hoặc bộ.
 - **2 món:** +6 công, +4 phòng; **4 món:** thêm +90 HP, +24 MP; **6 món:** thêm chỉ số đặc trưng của hệ. **Đủ 11 vị trí**, gồm hai nhẫn và ngựa, mở thuộc tính ẩn bên dưới và trận sáng riêng. Công/phòng/HP/MP của bộ nhân với bậc món thấp nhất; cùng hệ môn phái tăng các thuộc tính bộ 20%, làm tròn lên. Bộ chỉ đếm các ô đang mặc; ngựa vẫn tính vào bộ khi đi bộ. Phối nhiều bộ nhận những mốc riêng đã đủ, không nhận thuộc tính ẩn của bộ thiếu món.
 
@@ -139,7 +208,7 @@ Kiểm tra bổ sung: `node --experimental-strip-types tests/gear-mount-browser.
 
 ## Cảnh giới theo lực chiến
 
-Tổng điểm sức mạnh **S = Công × 3 + Phòng × 2 + HP tối đa × 0,15 + MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Lực chiến = **⌊S³ / 1.000⌋**, giới hạn ở số nguyên an toàn của JavaScript. Bao gồm trang bị/cường hóa, tiềm năng, trùng sinh và danh hiệu đang đeo; không làm thay đổi sát thương/HP hoặc ghi thang điểm mới vào chỉ số gốc. Mọi dòng đều góp phần; trang bị mạnh hơn theo tổng điểm vẫn tăng lực chiến. Thay đồ/cường hóa cập nhật ngay cả bảng Nhân vật, thanh trên và vòng cảnh giới. HP đang mất không làm tụt cảnh giới; save cũ được tính lại mà không tạo lại nhân vật.
+Tổng điểm sức mạnh **S = Công × 3 + Phòng × 2 + HP tối đa × 0,15 + MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2 + điểm tám dòng nâng cao**. Điểm nâng cao dùng giá trị sau giới hạn: sát thương chí mạng × 2, tốc độ đánh × 5, hút sinh lực × 10, xuyên giáp × 5, giảm sát thương × 8, né tránh × 8, hồi HP × 2 và hồi MP × 3. Lực chiến = **⌊S³ / 1.000⌋**, giới hạn ở số nguyên an toàn của JavaScript. Bao gồm trang bị/cường hóa, tiềm năng, trùng sinh và danh hiệu đang đeo; không làm thay đổi sát thương/HP hoặc ghi thang điểm mới vào chỉ số gốc. Mọi dòng đều góp phần; trang bị mạnh hơn theo tổng điểm vẫn tăng lực chiến. Thay đồ/cường hóa cập nhật ngay cả bảng Nhân vật, thanh trên và vòng cảnh giới. HP đang mất không làm tụt cảnh giới; save cũ được tính lại mà không tạo lại nhân vật.
 
 Chí mạng chiến đấu = 12% cơ bản + trang bị + danh hiệu, giới hạn 40%; điểm sức mạnh vẫn tính toàn bộ dòng để xếp đồ. Phần MP/tốc/chí mạng cộng thêm không tính lại giá trị cơ bản của môn phái. Con số cạnh tên được rút gọn, số đầy đủ có trong tooltip và tab Nhân vật. Trong túi, **Điểm trang bị** là điểm xếp hạng của riêng món; **chênh lệch lực chiến** là dự đoán thật sau khi thay món đang mặc, gồm cả HP do phòng thủ của bộ đồ tạo ra. Cường hóa món chưa mặc không cộng cho nhân vật.
 
@@ -318,7 +387,7 @@ Bộ này kiểm tra XP thật từ quái/lửa trại/vắng mặt ở cả 5 h
 
 Giao diện chiếm một viewport, hỗ trợ màn hình dọc và điện thoại xoay ngang: sân đấu ở trên, menu ở dưới, minimap theo vị trí thật, joystick, Auto và nút kỹ năng tròn. Các tab thông tin cuộn nội bộ, không kéo cả trang. Nút thu gọn/mở rộng cho phép tập trung vào sân đấu. Sát thương thường xuất hiện bằng số nổi và nhật ký, không bật toast liên tục che menu.
 
-Đồ họa dùng một atlas **28.026 byte**, 480 × 384, 20 ô: 10 phái và 10 hình quái/NPC/loot. Nhân vật vẽ ở 46 × 50, nhỏ hơn khoảng 40% so với sprite 76 × 83 trước đây. Icon kỹ năng là SVG nội tuyến; 30 chiêu dùng hình Canvas nhiều lớp theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
+Đồ họa dùng atlas nhân vật **663.510 byte**, 1223 × 1286, 20 mẫu nam/nữ; atlas NPC/quái/đồ nhặt cũ vẫn **28.026 byte**, 480 × 384. Nhân vật vẽ ở 56 × 76; hình sân, màn Nhân vật và avatar lấy cùng mẫu môn phái/giới tính. Ba atlas trang bị/vật phẩm WebP tổng ~1,82 MB; icon kỹ năng là SVG nội tuyến; 30 chiêu dùng hình Canvas nhiều lớp theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
 
 ## Võ công của thập đại môn phái · v0.4.0
 
@@ -339,7 +408,7 @@ Màn nhập môn có 10 ô nhỏ, chọn phái để xem cả ba icon, mô tả 
 
 Dữ liệu chung ở `src/sects.ts`, hình hiệu ứng ở `src/sect-effects.ts`, icon/palette ở `src/skill-art.ts`. Boss chịu choáng/đóng băng tối đa 0,35 giây. Lướt kiểm tra cả đường qua collider; không đủ MP/nộ, ngoài tầm, bị khóa cấp hoặc đường lướt bị chặn sẽ không mất MP/hồi chiêu. Độc, bẫy và hỏa trận thực sự gây sát thương theo thời gian. Nội lực hồi 0,7 MP/giây khi chơi. Những con số này phục vụ prototype, cần playtest cân bằng cho cả 10 phái ở cấp nhập môn và boss.
 
-Save giữ các `factionId` hiện có và mã archetype `kim/hoa/thuy` để tương thích ba ô nhân vật/file xuất. Save rất cũ chưa có `factionId` sẽ dùng Thiên Vương/Cái Bang/Nga Mi tương ứng, giữ cấp/XP, bạc, trang bị và điểm võ học; bán kính nhân vật chuyển về 12. Sprite có một khung/phái, nhún/đảo hướng/động tác đơn giản, chưa có bộ đi bộ bốn hướng hoặc hai bộ sprite nam/nữ riêng.
+Save giữ các `factionId` hiện có và mã archetype `kim/hoa/thuy` để tương thích ba ô nhân vật/file xuất. Save rất cũ chưa có `factionId` sẽ dùng Thiên Vương/Cái Bang/Nga Mi tương ứng, giữ cấp/XP, bạc, trang bị và điểm võ học; bán kính nhân vật chuyển về 12. Mỗi phái có hình nam/nữ riêng, một khung cho mỗi mẫu, nhún/đảo hướng, hai chân bước luân phiên và động tác đánh/thi triển; chưa có bộ đi bộ bốn hướng.
 
 Kiểm tra thêm 10 phái, đủ 30 chiêu, DOT/bẫy/sét lan, chi phí khi cast không hợp lệ và viewport:
 

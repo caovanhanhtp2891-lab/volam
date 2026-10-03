@@ -1,0 +1,8 @@
+import { militaryRankOf, type MilitaryRankId } from "./military.ts";
+import { SET_CREST_PATHS } from "./set-art.ts";
+let serial = 0;
+export function militarySealMarkup(rankId: MilitaryRankId | null, extraClass = ""): string {
+  const rank = militaryRankOf(rankId), color = rank?.color ?? "#8b948b", id = `rank-seal-${++serial}`;
+  const imperial = rankId === "hoang-de", high = imperial || rankId === "thua-tuong";
+  return `<svg class="military-seal-art ${rank ? "" : "empty-seal"} ${extraClass}" data-seal-art="${rankId ?? "empty"}" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="${id}" x2=".6" y2="1"><stop stop-color="${high ? "#fff2c2" : "#d6eee1"}"/><stop offset=".42" stop-color="${color}"/><stop offset="1" stop-color="${high ? "#795322" : "#345d58"}"/></linearGradient></defs><path d="M15 41 9 59l12-5 7 7 5-19M36 42l1 19 7-7 12 5-7-19" fill="${imperial ? "#a8372b" : "#634e46"}" stroke="${color}"/><path d="M9 31 32 23l23 8v17l-23 9-23-9z" fill="url(#${id})" stroke="#1d2826" stroke-width="2"/><path d="M9 31l23 9 23-9M32 40v17" fill="none" stroke="${color}" stroke-width="1.5"/><path d="M14 43l14 6m8 0 14-6" stroke="#ffedb9" opacity=".6"/>${rank ? `<path d="${imperial ? "M21 25q-6-15 7-13l4-10 7 10q13 1 9 10l-11 4-3-6-5 5z" : "M19 25v-9l13-9 13 9v9l-13 5z"}" fill="url(#${id})" stroke="${color}" stroke-width="1.5"/><g transform="translate(32 19) scale(.55)"><path d="${SET_CREST_PATHS[rank.crest]}" fill="none" stroke="#fff5cf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g><text x="32" y="47" text-anchor="middle" font-size="10" fill="#142821">${rank.glyph}</text>` : '<path d="M25 12h14v16H25zM22 36h20" fill="none" stroke="#8b948b" stroke-width="2" stroke-dasharray="3 2"/>'}</svg>`;
+}

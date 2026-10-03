@@ -1,5 +1,8 @@
 import type { Element } from "./idle";
 import { setBonuses, type GearIdentity, type SetId } from "./gear-catalog.ts";
+import { STAT_LABELS, emptyStats, secondaryScore, type GearStat, type GearStats } from "./gear-stats.ts";
+export { STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife } from "./gear-stats.ts";
+export type { GearStat, GearStats } from "./gear-stats.ts";
 export const RARITIES = [
   "Thường",
   "Tốt",
@@ -15,16 +18,6 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   "Cực phẩm": "#cf91ff",
   "Hoàng Kim": "#ffd35a",
 };
-export const STAT_LABELS = {
-  attack: "Tấn công",
-  defense: "Phòng thủ",
-  hp: "Sinh lực",
-  mp: "Nội lực",
-  crit: "Chí mạng",
-  speed: "Tốc độ",
-} as const;
-export type GearStat = keyof typeof STAT_LABELS;
-export type GearStats = Record<GearStat, number>;
 export interface EquipmentData extends GearIdentity {
   id: string;
   slot: string;
@@ -34,14 +27,6 @@ export interface EquipmentData extends GearIdentity {
   enhance: number;
   bonuses?: Partial<GearStats>;
 }
-export const emptyStats = (): GearStats => ({
-  attack: 0,
-  defense: 0,
-  hp: 0,
-  mp: 0,
-  crit: 0,
-  speed: 0,
-});
 export function rarityTier(rarity?: string): number {
   return Math.max(0, RARITIES.indexOf(rarity as Rarity));
 }
@@ -123,9 +108,7 @@ export function loadoutScore(
     s.attack * 3 +
     s.defense * 2 +
     (s.hp + Math.floor(s.defense * 1.45)) * 0.15 +
-    s.mp * 0.1 +
-    s.crit * 8 +
-    s.speed * 2
+    secondaryScore(s)
   );
 }
 // Defense also grants 1.45 HP in the existing character rules. Use the same
@@ -137,9 +120,7 @@ export function gearScore(item?: EquipmentData): number {
     s.attack * 3 +
     s.defense * 2 +
     (s.hp + s.defense * 1.45) * 0.15 +
-    s.mp * 0.1 +
-    s.crit * 8 +
-    s.speed * 2
+    secondaryScore(s)
   );
 }
 export function equipBestGear<T extends EquipmentData>(
@@ -210,7 +191,7 @@ export function rollGearBonuses(
   random = Math.random,
 ): Partial<GearStats> {
   const tier = rarityTier(rarity);
-  const count = [1, 2, 3, 4, 6][tier];
+  const count = [2, 3, 5, 7, 10][tier];
   const keys = Object.keys(STAT_LABELS) as GearStat[];
   const preferred: GearStat =
     slot === "weapon"
@@ -239,6 +220,14 @@ export function rollGearBonuses(
       mp: 7 + level,
       crit: 1 + level / 80,
       speed: 1 + level / 25,
+      critDamage: 2 + level / 45,
+      attackSpeed: 1 + level / 90,
+      lifeSteal: 1 + level / 160,
+      armorPen: 1 + level / 100,
+      damageReduction: 1 + level / 120,
+      dodge: 1 + level / 160,
+      hpRegen: 1 + level / 20,
+      mpRegen: 1 + level / 60,
     }[key];
     bonuses[key] = Math.max(1, Math.floor(base * strength));
   }

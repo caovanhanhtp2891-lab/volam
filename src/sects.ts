@@ -1,7 +1,7 @@
 export type SectId = "thieu-lam" | "thien-vuong" | "duong-mon" | "ngu-doc" | "nga-mi" | "thuy-yen" | "cai-bang" | "thien-nhan" | "vo-dang" | "con-lon";
 export type SkillKey = "skill1" | "skill2" | "ultimate";
 export type EffectMotif = "staff" | "bell" | "spear" | "arrows" | "trap" | "poison" | "lotus" | "fan" | "frost" | "dragon" | "spiral" | "blades" | "shadow" | "taiji" | "swords" | "lightning";
-export const HERO_SIZE = { width: 46, height: 50, radius: 12 } as const;
+export const HERO_SIZE = { width: 56, height: 76, radius: 12 } as const;
 export const SKILL_KEYS: SkillKey[] = ["skill1", "skill2", "ultimate"];
 
 // Keep the saved faction IDs from the idle campaign stable.
@@ -76,11 +76,11 @@ export const SECTS: Record<SectId, Sect> = {
     },
   },
   "duong-mon": {
-    id: "duong-mon", name: "Đường Môn", element: "Mộc", title: "Ám khí · Cơ quan", description: "Nỏ bắn xa, cơ quan ghìm chân và loạt ám khí tỏa quạt.", color: "#73c994", accent: "#cdeada", baseHp: 110, baseMp: 110, baseAttack: 24, baseDefense: 5, speed: 160, basicRange: 210,
+    id: "duong-mon", name: "Đường Môn", element: "Mộc", title: "Ám khí · Độc tiễn", description: "Ám khí tẩm độc bắn xa, cơ quan ghìm chân và độc tiễn tỏa quạt.", color: "#73c994", accent: "#cdeada", baseHp: 110, baseMp: 110, baseAttack: 24, baseDefense: 5, speed: 160, basicRange: 210,
     kit: {
-      skill1: skill("Truy Tâm Tiễn", "Ba mũi ám tiễn liên tiếp vào một mục tiêu tầm xa.", "arrows", { range: 390, damage: .7, hits: 3 }),
+      skill1: skill("Truy Tâm Tiễn", "Ba mũi ám tiễn tẩm độc liên tiếp, gây độc trong 3 giây.", "arrows", { range: 390, damage: .7, hits: 3, poison: 3 }),
       skill2: second("Lôi Hỏa Cơ Quan", "Đặt bẫy tại mục tiêu, gây sát thương mỗi giây và làm chậm trong 4 giây.", "trap", { shape: "area", range: 340, radius: 90, damage: .4, zone: 4, slow: .6 }),
-      ultimate: ultimate("Bạo Vũ Lê Hoa", "Ám khí hình quạt rộng, ba loạt xuyên nhiều quái.", "arrows", { shape: "cone", radius: 280, range: 330, damage: 1.15, hits: 3 }),
+      ultimate: ultimate("Bạo Vũ Lê Hoa", "Ba loạt ám khí tẩm độc tỏa quạt, gây độc trong 4 giây.", "arrows", { shape: "cone", radius: 280, range: 330, damage: 1.15, hits: 3, poison: 4 }),
     },
   },
   "ngu-doc": {
@@ -145,6 +145,16 @@ export function resolveSectId(value: unknown): SectId | null {
   if (typeof value !== "string") return null;
   const aliases: Record<string, SectId> = { kim: "thien-vuong", hoa: "cai-bang", thuy: "nga-mi" };
   return Object.hasOwn(SECTS, value) ? value as SectId : Object.hasOwn(aliases, value) ? aliases[value] : null;
+}
+
+export function skillReachLabel(skill: SkillDefinition): string {
+  if (!skill.requiresTarget && skill.damage === 0) return "Hộ thể · bản thân";
+  if (skill.shape === "area" && skill.anchor === "self") return `Tầm đánh ${skill.radius} · quanh mình`;
+  if (skill.shape === "area") return `Tầm đánh ${skill.range} · bán kính ${skill.radius}`;
+  if (skill.shape === "cone") return `Tầm đánh ${skill.range} · hình quạt`;
+  if (skill.shape === "line") return `Tầm đánh ${skill.range} · xuyên tuyến`;
+  if (skill.shape === "chain") return `Tầm đánh ${skill.range} · lan ${skill.radius}`;
+  return `Tầm đánh ${skill.range}${skill.dash ? " · lướt áp sát" : ""}`;
 }
 
 interface Point { x: number; y: number; }

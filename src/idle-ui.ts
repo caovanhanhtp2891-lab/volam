@@ -1,3 +1,4 @@
+import { resourceMarkup } from "./item-art";
 import { spriteMarkup } from "./art";
 import { APP_VERSION, RELEASE_NAME } from "./release";
 
@@ -6,7 +7,7 @@ export function idleShell(): string {
   <div class="app-shell" data-page="log">
     <header class="topbar">
       <button class="hero-status" id="hero-status" aria-label="Mở chỉ số nhân vật"><div class="hero-portrait"><div class="avatar-orb" id="avatar-orb">劍</div><b id="idle-level">1</b></div><div class="topmid"><div class="hero-row"><strong id="character-name">Giang Hồ Dị Truyện</strong><span id="header-combat-power" aria-label="Lực chiến">⚔ 0</span></div><span id="idle-stage-label" class="hidden">Võ lâm · Idle</span><div class="meter hp-meter"><span id="hp-bar"></span><small id="hp-label">Sinh lực</small></div><div class="meter mp-meter"><span id="mp-bar"></span><small id="mp-label">Nội lực</small></div><div class="meter xp-meter"><span id="xp-bar"></span><small id="xp-label">Hành tẩu giang hồ</small></div></div></button>
-      <div class="header-actions"><div class="gold-header"><i>◆</i><b id="gold-label">0</b></div><button class="icon-button gift-button" id="gift-btn" aria-label="Phần thưởng hằng ngày">🎁<i></i></button><button class="icon-button" id="settings-shortcut" aria-label="Cài đặt">⚙</button></div>
+      <div class="header-actions"><div class="gold-header">${resourceMarkup("silver")}<b id="gold-label">0</b></div><button class="icon-button gift-button" id="gift-btn" aria-label="Phần thưởng hằng ngày">${resourceMarkup("chest")}<i></i></button><button class="icon-button" id="settings-shortcut" aria-label="Cài đặt">⚙</button></div>
     </header>
     <section class="canvas-frame">
       <canvas id="game-canvas" width="600" height="600" aria-label="Sân đấu Giang Hồ Dị Truyện"></canvas>
@@ -23,14 +24,14 @@ export function idleShell(): string {
     <main class="game-layout">
       <section class="world-panel tab-page" data-page="log"><div class="mobile-sheet-handle"><b>Giang hồ · Hoạt động</b><button id="world-panel-close" aria-label="Trở về sân đấu">×</button></div><div class="arena-left-buttons"><button class="arena-chip" id="training-btn">⚔ Luyện công</button><button class="arena-chip" id="rotation-btn" aria-pressed="true">⟳ Xoay chiêu: Bật</button></div>
         <div id="legacy-training" class="legacy-training hidden"><b>Sân luyện mới đã sẵn sàng</b><p>Vào luyện công để nhân vật tự tìm quái, ra chiêu và nhặt trang bị. Giữ nguyên cấp độ, hành trang và nhiệm vụ của bạn.</p><button id="legacy-training-btn" class="outline-button">Vào luyện công</button></div>
-        <div class="todo-card"><b>Việc cần làm</b><button id="todo-reward" class="mini-button">Có quà chờ nhận</button><button class="mini-button" data-idle-open="dungeon">Phụ bản</button></div>
+        <div class="todo-card"><b>Việc cần làm</b><button id="todo-reward" class="mini-button">Có quà chờ nhận</button><button class="mini-button" data-idle-open="dungeon">Phụ bản</button><button class="mini-button" data-open-territories>⚑ Tranh đoạt lãnh thổ</button></div>
         <div class="stage-card"><div><strong id="stage-name">Hoa Sơn · Ải 1/10</strong><small id="stage-description">Chọn môn phái để bắt đầu</small></div><div class="stage-actions"><button id="stage-prev" aria-label="Ải trước">◀</button><button id="stage-push" aria-pressed="true">Vượt ải</button><button id="stage-next" aria-label="Ải tiếp theo">▶</button></div></div>
         <div class="card golden-card"><div><b>✦ Boss Hoàng Kim</b><small id="golden-status">12:00 · 19:00 · 21:00 (VN)</small></div><button id="golden-boss-btn" class="mini-button">Lịch boss</button></div>
         <div class="hunt-status"><span id="elite-hunt-status">Hạ quái thường để tìm tinh anh.</span><button id="campfire-btn" class="mini-button" disabled>Đến lửa trại</button></div>
         <section class="quest-panel"><button id="quest-toggle" class="quest-toggle" aria-label="Mở nhiệm vụ" aria-expanded="false">⌄</button><b id="quest-title">Dấu chân trong Rừng Trúc</b><p id="quest-text"></p><div class="quest-progress"><span id="quest-kill-progress"></span><span id="quest-boss-progress"></span></div><small id="quest-reward"></small></section>
         <div class="log-panel"><div id="log-list" class="log-list"></div></div>
         <div class="target-panel"><div id="target-content"></div></div>
-        <h3>Bản đồ luyện công <small>16 vùng · 160 ải</small></h3><div id="region-list" class="region-list"></div>
+        <h3>Bản đồ luyện công <small>16 vùng · 160 ải</small></h3><p class="map-unlock-hint">Đủ cấp 11, 21, 31… để vào vùng mới. Cũng có thể mở vùng bằng cách vượt ải.</p><div id="region-list" class="region-list"></div>
         <div class="controls-panel"><p>WASD / joystick: di chuyển · 1–3: võ công · 4: đánh thường · Q/R: thuốc · E: nhặt · H: lên/xuống ngựa · B: hành trang · K: võ công</p></div>
       </section>
       <section class="character-panel tab-page" data-page="char">
@@ -38,18 +39,19 @@ export function idleShell(): string {
         <div class="classic-header"><span class="frame-flourish" aria-hidden="true">❦</span><h2>Nhân Vật</h2><span class="frame-flourish" aria-hidden="true">❦</span><button class="classic-close" id="character-close" aria-label="Đóng Nhân vật">×</button></div>
         <div class="classic-body">
         <div class="paper-doll"><div class="paper-doll-center"><strong id="preview-player-name"></strong><span id="preview-player-realm"></span><canvas id="character-preview" width="360" height="400" aria-label="Hình nhân vật và vòng cảnh giới"></canvas></div><div id="equipment-grid" class="equipment-grid"></div></div>
-        <p class="equipment-help">Chạm ô trang bị để xem chi tiết</p>
+        <p class="equipment-help">Chạm ô trang bị để xem chi tiết · Ô ấn mở sắc phong quân hàm</p>
         <div class="card mount-card"><span>♞</span><div><b id="mount-name">Chưa có ngựa</b><small id="mount-info"></small></div><button class="mini-button" data-mount-toggle aria-pressed="false">Đến Tiệm</button></div>
         <div class="profile-resources"><div class="profile-meter profile-hp"><span id="profile-hp-bar"></span><small id="profile-hp-label"></small></div><div class="profile-meter profile-mp"><span id="profile-mp-bar"></span><small id="profile-mp-label"></small></div></div>
         <div class="character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small></div><span id="character-element" class="element-badge">金</span></div>
         <div class="profile-power">Lực chiến <strong id="combat-power">0</strong></div>
         <div id="stat-grid" class="stat-grid"></div>
+        <button id="combat-stats-btn" class="mini-button combat-stats-button">Chỉ số chiến đấu nâng cao</button>
         <h3 class="gear-sets-heading">Bộ trang bị <button class="mini-button" data-open-gear-gallery>Mẫu đồ</button><button class="mini-button" id="gear-sets-btn">Ngũ hành</button></h3><div id="set-resonance"></div>
         <div id="cultivation-card" class="card cultivation-card"><div class="cultivation-heading"><div><small id="realm-plane">Phàm giới · Bậc 1/23</small><strong id="realm-name">Phàm Nhân</strong><span id="realm-phase">Chưa nhập đạo</span></div><button id="realm-guide-btn" class="mini-button">23 cảnh giới</button></div><div id="realm-meter" class="realm-meter" role="progressbar" aria-label="Tiến tới cảnh giới tiếp theo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="realm-progress"></span></div><p id="realm-next"></p><small class="dim">Tăng lực chiến bằng cấp độ, tiềm năng và trang bị đang mặc.</small></div>
         <div class="card progression-card"><div><b id="worn-title-label">Chưa đeo danh hiệu</b><small id="title-count">Danh hiệu 0/12</small></div><button id="titles-btn" class="mini-button">Danh hiệu</button></div>
         <div class="card progression-card"><div><b id="rebirth-label">Trùng sinh 0 lần</b><small id="rebirth-status">Đạt cấp 160 để trùng sinh.</small></div><button id="rebirth-btn" class="mini-button">Trùng sinh</button></div>
         <h3>Tiềm năng <small id="attribute-points">0 điểm</small></h3><div id="attribute-list" class="card"></div>
-        <div class="currency-row"><span>✦ <b id="stone-label">0</b> đá tinh luyện</span><span>◇ <b id="token-label">0</b> lệnh bài</span></div>
+        <div class="currency-row"><span>${resourceMarkup("stone")} <b id="stone-label">0</b> đá tinh luyện</span><span>${resourceMarkup("token")} <b id="token-label">0</b> lệnh bài</span></div>
         <div class="hidden"><b id="mobile-gold"></b><b id="mobile-stones"></b><span class="character-shortcut"></span></div>
         <div class="btnrow"><button class="outline-button" data-idle-open="smith">⚒ Thợ rèn</button><button class="outline-button" data-idle-open="dungeon">◇ Phụ bản</button></div>
         </div></div>

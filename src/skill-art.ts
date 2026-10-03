@@ -1,15 +1,22 @@
 import { SECTS, SKILL_KEYS, type SectId, type SkillDefinition, type SkillKey } from "./sects.ts";
+import type { SetCrest } from "./gear-catalog";
+import { SET_CREST_PATHS } from "./set-art.ts";
+export const SECT_SIGILS: Record<SectId, SetCrest> = {
+  "thieu-lam": "bell", "thien-vuong": "spear", "duong-mon": "dart",
+  "ngu-doc": "serpent", "nga-mi": "lotus", "thuy-yen": "crystal",
+  "cai-bang": "dragon", "thien-nhan": "flame", "vo-dang": "taiji", "con-lon": "thunder",
+};
 
 export interface SkillPalette { color: string; light: string; accent: string; dark: string }
 export const SKILL_PALETTES: Record<SectId, SkillPalette> = {
   "thieu-lam": { color: "#ffc85a", light: "#fff6d2", accent: "#ec8a35", dark: "#37200c" },
   "thien-vuong": { color: "#ffda79", light: "#fffbea", accent: "#72e3df", dark: "#18302f" },
-  "duong-mon": { color: "#55ecae", light: "#e7fff2", accent: "#ffa55b", dark: "#102e26" },
+  "duong-mon": { color: "#55ecae", light: "#e7fff2", accent: "#ac8cff", dark: "#102e26" },
   "ngu-doc": { color: "#baf46b", light: "#f2ffcc", accent: "#c781ff", dark: "#281838" },
   "nga-mi": { color: "#ffaace", light: "#fff7fb", accent: "#a0f0d9", dark: "#361e36" },
   "thuy-yen": { color: "#76dfff", light: "#efffff", accent: "#98aeff", dark: "#162c47" },
   "cai-bang": { color: "#ffab4e", light: "#fff3b7", accent: "#ff643f", dark: "#3c1c14" },
-  "thien-nhan": { color: "#ff6688", light: "#ffe9da", accent: "#b489ff", dark: "#301529" },
+  "thien-nhan": { color: "#ff654b", light: "#fff1bc", accent: "#ffb23e", dark: "#381623" },
   "vo-dang": { color: "#92ceff", light: "#f3fcff", accent: "#a4efed", dark: "#152d48" },
   "con-lon": { color: "#bda4ff", light: "#fff8d6", accent: "#ffe177", dark: "#272044" },
 };
@@ -24,7 +31,8 @@ const dagger = '<path d="M0-21-3-12-2 9h4l1-21zM-5 9h10l-3 3v7h-4v-7z"/>';
 const leaf = '<path d="M0-20C-14-13-12-2 0 7c12-9 14-20 0-27Z"/>';
 const blade = '<path d="M0-23C14-10 12 4-3 14L0-7-8 17-12 19l3-9z"/><path d="M-13 17l9 4M-12 20l-4 7" fill="none"/>';
 const bolt = '<path d="m3-25-14 27h10l-4 23L14-5H4l6-20z"/>';
-const dragon = '<path d="M-25 17C-12 23 6 10-3 3S-19-7-7-12s17 7 24-3l9 4-8 11-8-1C0 3 20 21-2 25" fill="none" stroke-width="6"/><path d="m11-15 3-10 5 9m-7 10 10-2m-8 0 8 8" fill="none"/><circle cx="20" cy="-12" r="1.8" fill="#fff7db" stroke="none"/>';
+const dragon = '<path d="M-25 17C-12 23 6 10-3 3S-19-7-7-12s17 7 24-3l9 4-8 11-8-1C0 3 20 21-2 25" fill="none" stroke-width="7"/><path d="m10-16 3-11 5 10 6-7-2 11m-10 7 11-2m-8 0 8 8M-12-6l5 4-5 4M-2 12l5 3-4 4M4 1l9 6 4-3m-4 3 2 5" fill="none"/><path d="M23-9q13-9 5-15M22-5q13 6 8 14" fill="none" stroke-width="1"/><circle cx="19" cy="-12" r="3" fill="#3c1c14"/><circle cx="20" cy="-13" r="1.6" fill="#fff7db" stroke="none"/>';
+const fire = '<path d="M32 8c1 12-15 15-13 28 1 17 28 19 28 0 0-7-5-12-7-15 1 10-4 10-4 10 3-12-4-15-4-23Z"/><path d="M32 30c-1 6-8 9-7 14 2 8 14 8 14-1 0-4-4-6-3-11-1 3-3 4-4 5z" fill="#fff1bc" stroke="none"/>';
 
 function iconArt(sect: SectId, key: SkillKey, accent: string): string {
   const ult = key === "ultimate", second = key === "skill2";
@@ -40,7 +48,7 @@ function iconArt(sect: SectId, key: SkillKey, accent: string): string {
     case "duong-mon":
       if (second) return ring + `<g stroke="${accent}"><path d="M20 16h24v31H20z"/><path d="m16 27 32 10m-32 0 32-10" fill="none"/></g><circle cx="32" cy="32" r="10"/><circle cx="32" cy="32" r="4" fill="${accent}"/>`;
       if (ult) return '<path d="M9 46a29 29 0 0 1 46 0" fill="none" stroke-width="2"/>' + Array.from({length: 7},(_,i)=>rotate(dagger, -66+i*22,32,40)).join('');
-      return [-12,0,12].map((x,i)=>rotate(dagger,42,32+x,32+(i-1)*5)).join('');
+      return `<path d="M8 39q3 13 17 13M13 24q-9 13 0 21M39 47q6 5 11-1" fill="none" stroke="${accent}" stroke-width="2.5"/><path d="M13 45q-7 9 0 10 7-1 0-10" fill="${accent}" stroke="none"/>` + [-12,0,12].map((x,i)=>rotate(dagger,42,32+x,32+(i-1)*5)).join('');
     case "ngu-doc":
       if (second) return ring + `<path d="m32 8 7 18 20 2-15 12 4 20-16-11-16 11 4-20L5 28l20-2z" fill="none" stroke="${accent}" stroke-width="2"/><path d="M32 23c-4 8-9 10-9 17a9 9 0 0 0 18 0c0-7-5-9-9-17z"/>`;
       if (ult) return `<path d="M26 45C6 55 9 27 19 26c9-1 1-15 9-18s15 5 8 11" fill="none" stroke="${accent}" stroke-width="5"/><ellipse cx="34" cy="36" rx="8" ry="12"/><path d="M28 30 17 19l-6 5 6 5m24 1 10-11 6 5-6 5M26 36l-12 4m13 4-9 8m23-16 11 4m-12 4 8 8" fill="none" stroke-width="2"/>`;
@@ -57,13 +65,13 @@ function iconArt(sect: SectId, key: SkillKey, accent: string): string {
       if (second) return '<path d="M27 10h10l-3 8c15 9 5 15 4 17 21 21-34 30-19 3 3-5 12-7 5-13-4-4-3-9 3-15z"/><path d="M21 34q12-6 21 0M24 46q9 5 15-1" fill="none"/><path d="M9 26q-7 19 9 29M48 9q17 21 6 36" fill="none" opacity=".8"/>';
       return (ult ? ring + '<g transform="translate(32 32) scale(.76)">' + rotate(dragon,180,0,0) + '</g>' : '') + rotate(dragon,ult?-20:0);
     case "thien-nhan":
-      if (second) return `<path d="M8 17h18M4 29h19M8 42h17" fill="none" stroke="${accent}" stroke-width="3"/><path d="M31 14 49 9l9 25-21 17-10-23z"/><path d="m34 25 17-3-8 10z" fill="${accent}"/><path d="m39 41 11-8" fill="none"/>`;
-      if (ult) return ring + Array.from({length:6},(_,i)=>rotate(blade,i*60)).join('') + '<circle cx="32" cy="32" r="7" fill="#301529"/>';
-      return rotate(blade,40,25,29) + rotate(blade,-40,41,31);
+      if (second) return `<g opacity=".65" transform="translate(-8 4) scale(.85)">${fire}</g><path d="M8 17h18M4 29h19M8 42h17" fill="none" stroke="${accent}" stroke-width="3"/><path d="M31 14 49 9l9 25-21 17-10-23z"/><path d="m34 25 17-3-8 10z" fill="${accent}"/><path d="m39 41 11-8" fill="none"/>`;
+      if (ult) return ring + Array.from({length:6},(_,i)=>rotate(blade,i*60)).join('') + `<g transform="translate(16 16) scale(.5)">${fire}</g>`;
+      return `<g opacity=".65" fill="${accent}">${fire}</g>` + rotate(blade,40,25,29) + rotate(blade,-40,41,31);
     case "vo-dang":
       if (second) return '<circle cx="32" cy="32" r="23" fill="#122239"/><path d="M32 9a23 23 0 0 1 0 46c-15 0-15-23 0-23s15-23 0-23Z" fill="#f3fcff"/><circle cx="32" cy="20" r="4" fill="#122239"/><circle cx="32" cy="44" r="4" fill="#f3fcff" stroke="none"/>';
       if (ult) return ring + [-60,-40,-20,0,20,40,60].map(a=>rotate(sword,a,32,37)).join('');
-      return '<path d="M10 49C-2 28 24 4 49 10 27 11 11 33 10 49" opacity=".6"/>' + rotate(sword,38);
+      return `<path d="M10 49C-2 28 24 4 49 10 27 11 11 33 10 49" opacity=".6"/><g fill="none" stroke="${accent}" opacity=".7"><circle cx="32" cy="32" r="20"/><path d="M12 28h5m30 8h5M28 12v5m8 30v5"/></g>` + rotate(sword,38);
     case "con-lon":
       if (second) return `<path d="M18 8h28v47H18z" fill="${accent}"/><path d="M22 13h20M23 50h18" stroke="#56376d" fill="none"/>` + '<g transform="translate(32 31) scale(.6)">' + bolt + '</g>';
       return (ult ? '<path d="M9 24c-8-12 10-22 17-12C34 0 51 8 48 18c15-1 15 13 6 13H12" fill="none" stroke-width="3"/>' + rotate(bolt,0,22,37) + rotate(bolt,18,44,39) : rotate(bolt,22));
@@ -73,5 +81,5 @@ function iconArt(sect: SectId, key: SkillKey, accent: string): string {
 export function skillIconMarkup(skill: SkillDefinition, key: SkillKey, fallback: string): string {
   const identity = visualIdentity(skill), sect = identity?.sect ?? "vo-dang", palette = SKILL_PALETTES[sect];
   const id = `skill-art-${++serial}`, color = identity ? palette.color : fallback;
-  return `<svg viewBox="0 0 64 64" aria-hidden="true" data-motif="${skill.motif}" data-icon-skill="${key}" data-visual="${sect}-${key}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}-halo"><stop stop-color="${color}" stop-opacity=".45"/><stop offset="1" stop-color="${palette.dark}"/></radialGradient><linearGradient id="${id}-ink" x2=".6" y2="1"><stop stop-color="${palette.light}"/><stop offset=".4" stop-color="${color}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#${id}-halo)" stroke="${key === "ultimate" ? "#ffe8a6" : color}" stroke-width="1.5"/><circle cx="32" cy="32" r="27" fill="none" stroke="${color}" stroke-opacity=".35"/><g fill="url(#${id}-ink)" stroke="${palette.light}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">${iconArt(sect,key,palette.accent)}</g><path d="m10 9 3 4-4-1m42 36 3 4-4-1" fill="${palette.light}" opacity=".8"/></svg>`;
+  return `<svg viewBox="0 0 64 64" aria-hidden="true" data-motif="${skill.motif}" data-icon-skill="${key}" data-visual="${sect}-${key}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}-halo" cx=".42" cy=".36" r=".7"><stop stop-color="${color}" stop-opacity=".6"/><stop offset=".5" stop-color="${palette.dark}"/><stop offset="1" stop-color="#060e14"/></radialGradient><linearGradient id="${id}-ink" x2=".6" y2="1"><stop stop-color="${palette.light}"/><stop offset=".38" stop-color="${color}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#${id}-halo)" stroke="${key === "ultimate" ? "#ffe8a6" : color}" stroke-width="1.8"/><circle cx="32" cy="32" r="27" fill="none" stroke="${color}" stroke-opacity=".35"/><path d="M10 19A26 26 0 0 1 46 9M54 45A26 26 0 0 1 18 55" fill="none" stroke="${palette.light}" stroke-opacity=".65" stroke-width="1.2"/><path d="m32 2 3 5-3 3-3-3zm0 52 3 3-3 5-3-5z" fill="${key === "ultimate" ? "#ffe8a6" : palette.accent}"/><g fill="url(#${id}-ink)" stroke="${palette.light}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">${iconArt(sect,key,palette.accent)}</g><path d="m10 9 3 4-4-1m42 36 3 4-4-1" fill="${palette.light}" opacity=".8"/><g data-school-sigil="${sect}" transform="translate(11 11)"><circle r="7" fill="${palette.dark}" stroke="${palette.accent}" stroke-width=".8"/><path d="${SET_CREST_PATHS[SECT_SIGILS[sect]]}" transform="scale(.38)" fill="none" stroke="${palette.light}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
 }

@@ -2,242 +2,13 @@ import { drawAnimatedHero, type HeroAppearance } from "./combat-art";
 import { freshMotion } from "./combat";
 import { drawHorse, type MountAppearance } from "./mount-art";
 import { drawGearAura } from "./gear-effects";
-import { drawEquipmentIcon, weaponCenter } from "./equipment-art";
-import { drawEquipmentRadiance } from "./equipment-vfx";
-import { drawWearableDetails } from "./worn-equipment-art";
-import { drawGlow } from "./battle-vfx";
 import { drawCultivationAura } from "./cultivation-art";
 import type { Cultivation } from "./cultivation";
-import { ELEMENTS, factionOf, type FactionId } from "./idle";
+import type { FactionId } from "./idle";
+import { SECT_BY_FACTION } from "./sects";
+import { characterArtKey } from "./character-art";
 
 let pedestal: HTMLCanvasElement | undefined;
-function drawPortraitBody(
-  ctx: CanvasRenderingContext2D,
-  factionId: FactionId,
-  sex: "male" | "female",
-  appearance: HeroAppearance,
-  now: number,
-): void {
-  const color =
-    appearance.armorColor || ELEMENTS[factionOf(factionId).element].color;
-  const ink = "#17232d",
-    skin = "#f0c8a0",
-    gold = "#e7cb83";
-  const sway = Math.sin(now / 650) * 1.4;
-  ctx.save();
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  // A full-body portrait uses longer robe and limbs than the small arena sprite.
-  ctx.fillStyle = color;
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-19, -126);
-  ctx.quadraticCurveTo(-34, -85, -27 + sway, -45);
-  ctx.lineTo(0, -64);
-  ctx.lineTo(28 + sway, -45);
-  ctx.quadraticCurveTo(33, -85, 19, -126);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  for (const side of [-1, 1]) {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 17;
-    ctx.beginPath();
-    ctx.moveTo(side * 11, -73);
-    ctx.lineTo(side * 13, -39);
-    ctx.lineTo(side * 12, -5);
-    ctx.stroke();
-    ctx.strokeStyle = "#345465";
-    ctx.lineWidth = 12;
-    ctx.stroke();
-    ctx.fillStyle = "#172b34";
-    ctx.strokeStyle = gold;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.ellipse(side * 14, -1, 11, 4, -side * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-  ctx.translate(0, -Math.sin(now / 550) * 0.7);
-  for (const side of [-1, 1]) {
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 15;
-    ctx.beginPath();
-    ctx.moveTo(side * 19, -128);
-    ctx.lineTo(side * 28, -104);
-    ctx.lineTo(side * 24, -80);
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 11;
-    ctx.stroke();
-    ctx.strokeStyle = skin;
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.moveTo(side * 26, -96);
-    ctx.lineTo(side * 24, -79);
-    ctx.stroke();
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.ellipse(side * 24, -77, 4, 6, side * 0.25, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = "#d8d3b6";
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-16, -131);
-  ctx.lineTo(16, -131);
-  ctx.lineTo(16, -70);
-  ctx.lineTo(-16, -70);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(-20, -134);
-  ctx.lineTo(-6, -135);
-  ctx.lineTo(-3, -103);
-  ctx.lineTo(-8, -74);
-  ctx.lineTo(-26, -55);
-  ctx.lineTo(-24, -109);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(20, -134);
-  ctx.lineTo(6, -135);
-  ctx.lineTo(2, -103);
-  ctx.lineTo(9, -74);
-  ctx.lineTo(26, -55);
-  ctx.lineTo(24, -109);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = gold;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(-8, -133);
-  ctx.lineTo(-2, -104);
-  ctx.lineTo(-18, -66);
-  ctx.moveTo(8, -133);
-  ctx.lineTo(2, -104);
-  ctx.lineTo(18, -66);
-  ctx.stroke();
-  ctx.fillStyle = "#423b30";
-  ctx.fillRect(-19, -88, 38, 8);
-  ctx.fillStyle = gold;
-  ctx.fillRect(-5, -89, 10, 10);
-  if (sex === "female") {
-    ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.moveTo(-8, -153);
-    ctx.quadraticCurveTo(-30 + sway, -131, -16 + sway, -111);
-    ctx.lineTo(2, -136);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.fillStyle = skin;
-  ctx.fillRect(-5, -141, 10, 12);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.ellipse(0, -151, 11, 14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = ink;
-  ctx.beginPath();
-  ctx.ellipse(0, -161, 12, 7, 0, Math.PI, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(-1, -173, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = gold;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-10, -160);
-  ctx.lineTo(10, -160);
-  ctx.moveTo(-8, -158);
-  ctx.quadraticCurveTo(-20, -150, -22 + sway, -146);
-  ctx.stroke();
-  ctx.fillStyle = ink;
-  ctx.fillRect(-6, -151, 2, 2);
-  ctx.fillRect(4, -151, 2, 2);
-  ctx.fillStyle = "#a46e57";
-  ctx.fillRect(-3, -143, 6, 1);
-  drawWearableDetails(ctx, appearance, now, true);
-  ctx.save();
-  ctx.translate(25, -77);
-  ctx.rotate(0.38);
-  const staff = appearance.weaponVariant
-      ? appearance.weaponVariant === "staff"
-      : ["tianren", "kunlun", "gaibang"].includes(factionId),
-    spear = appearance.weaponVariant
-      ? appearance.weaponVariant === "spear"
-      : factionId === "tianwang";
-  if (appearance.weaponVariant) {
-    const size = ["spear", "halberd", "staff"].includes(
-      appearance.weaponVariant,
-    )
-      ? 110
-      : ["fan", "chakram"].includes(appearance.weaponVariant)
-        ? 70
-        : 90;
-    ctx.rotate(-0.35);
-    ctx.translate(...weaponCenter(appearance.weaponVariant, size));
-    const weapon = appearance.weapon ?? {
-      color: appearance.weaponColor,
-      enhance: appearance.enhancement,
-    };
-    drawEquipmentRadiance(
-      ctx,
-      weapon,
-      now,
-      size * 0.34,
-      appearance.simpleEffects,
-    );
-    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, size, {
-      ...weapon,
-      variant: appearance.weaponVariant,
-    });
-    ctx.restore();
-    ctx.restore();
-    return;
-  }
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.moveTo(0, 35);
-  ctx.lineTo(0, -(staff || spear ? 86 : 60));
-  ctx.stroke();
-  ctx.strokeStyle = staff ? gold : appearance.weaponColor;
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  if (staff) {
-    drawGlow(ctx, 0, -84, 9, appearance.weaponColor, 0.8);
-    ctx.fillStyle = "#ffedaf";
-    ctx.beginPath();
-    ctx.arc(0, -84, 4, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = appearance.weaponColor;
-    ctx.beginPath();
-    ctx.moveTo(0, spear ? -101 : -72);
-    ctx.lineTo(-5, spear ? -81 : -55);
-    ctx.lineTo(5, spear ? -81 : -55);
-    ctx.fill();
-    ctx.strokeStyle = gold;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-8, -3);
-    ctx.lineTo(8, -3);
-    ctx.stroke();
-  }
-  if (appearance.tier >= 2 || appearance.enhancement > 0)
-    drawGlow(ctx, 0, -38, 14, appearance.weaponColor, 0.35);
-  ctx.restore();
-  ctx.restore();
-}
 function portraitPedestal(): HTMLCanvasElement {
   if (pedestal) return pedestal;
   pedestal = document.createElement("canvas");
@@ -295,6 +66,7 @@ export function drawCharacterPreview(
   },
   now: number,
 ): void {
+  canvas.dataset.characterArt = characterArtKey(SECT_BY_FACTION[character.factionId], character.sex);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -326,14 +98,14 @@ export function drawCharacterPreview(
     ctx.restore();
     return;
   }
-  ctx.translate(0, 44);
-  ctx.scale(1.5, 1.5);
-  drawPortraitBody(
+  ctx.scale(4, 4);
+  drawAnimatedHero(
     ctx,
     character.factionId,
     character.sex,
-    character.appearance,
+    freshMotion(),
     now,
+    character.appearance,
   );
   ctx.restore();
 }

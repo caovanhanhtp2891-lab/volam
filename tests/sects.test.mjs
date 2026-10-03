@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { statSync } from "node:fs";
-import { SECTS, SKILL_KEYS, HERO_SIZE, resolveSectId, selectSkillTargets } from "../src/sects.ts";
+import { SECTS, SKILL_KEYS, HERO_SIZE, resolveSectId, selectSkillTargets, skillReachLabel } from "../src/sects.ts";
 import { skillIconMarkup } from "../src/sect-effects.ts";
 
 const actor = { x: 0, y: 0 };
@@ -21,8 +21,26 @@ test("ten familiar sects have thirty named skills, usable costs and distinct ico
   }
   assert.equal(names.size, 30);
   assert.equal(icons.size, 30);
-  assert.ok(HERO_SIZE.width <= 46 && HERO_SIZE.height <= 50);
+  assert.deepEqual(HERO_SIZE, { width: 56, height: 76, radius: 12 });
   assert.ok(statSync(new URL("../src/assets/simple-atlas.webp", import.meta.url)).size < 32768);
+});
+
+test("skill reach descriptions distinguish casting distance, area radius and self protection", () => {
+  assert.equal(skillReachLabel(SECTS["cai-bang"].kit.skill1), "Tầm đánh 360 · bán kính 100");
+  assert.equal(skillReachLabel(SECTS["thien-nhan"].kit.ultimate), "Tầm đánh 195 · quanh mình");
+  assert.equal(skillReachLabel(SECTS["thieu-lam"].kit.skill2), "Hộ thể · bản thân");
+  assert.equal(skillReachLabel(SECTS["duong-mon"].kit.ultimate), "Tầm đánh 330 · hình quạt");
+});
+
+test("Tang Men poison darts retain range boundaries and distinct hit counts", () => {
+  for (const key of ["skill1", "ultimate"]) {
+    const skill = SECTS["duong-mon"].kit[key];
+    assert.equal(skill.hits, 3);
+    assert.ok(skill.poison >= 3);
+    const edge = enemy("edge", skill.range + 10, 0), outside = enemy("outside", skill.range + 10.01, 0);
+    assert.equal(selectSkillTargets(skill, actor, [edge], edge).valid, true);
+    assert.equal(selectSkillTargets(skill, actor, [outside], outside).valid, false);
+  }
 });
 
 test("old sect aliases migrate to schools with matching base stats; invalid IDs are rejected", () => {

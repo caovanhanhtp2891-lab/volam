@@ -1,16 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { RARITIES, RARITY_COLORS, gearStats, totalGearStats, gearScore, equipBestGear, rollGearBonuses, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement } from "../src/equipment.ts";
+import { RARITIES, RARITY_COLORS, emptyStats, gearStats, totalGearStats, gearScore, equipBestGear, rollGearBonuses, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement } from "../src/equipment.ts";
 import { equipmentMarkup } from "../src/equipment-art.ts";
 const item = (id, slot = "weapon", changes = {}) => ({ id, slot, power: 20, level: 10, enhance: 0, rarity: "Tốt", ...changes });
 test("old saves retain primary attack/defense and enhancement without inventing random bonuses", () => {
-  assert.deepEqual(gearStats(item("old", "weapon", { enhance: 5 })), { attack: 25, defense: 0, hp: 0, mp: 0, crit: 0, speed: 0 });
+  assert.deepEqual(gearStats(item("old", "weapon", { enhance: 5 })), { ...emptyStats(), attack: 25 });
   assert.equal(gearStats(item("old-armor", "armor")).defense, 20);
 });
 test("all six bonus lines stack across slots and enhancement scales each line exactly once", () => {
   const a = item("all", "ring", { enhance: 10, bonuses: { attack: 10, defense: 5, hp: 100, mp: 50, crit: 5, speed: 10 } });
   const before = JSON.stringify(a);
-  assert.deepEqual(gearStats(a), { attack: 14, defense: 37, hp: 140, mp: 70, crit: 7, speed: 14 });
+  assert.deepEqual(gearStats(a), { ...emptyStats(), attack: 14, defense: 37, hp: 140, mp: 70, crit: 7, speed: 14 });
   assert.equal(totalGearStats([a, a]).hp, 280);
   assert.equal(JSON.stringify(a), before);
 });
@@ -44,10 +44,10 @@ test("poor, zero-stone and capped upgrades never consume resources, roll randomn
   }
   assert.deepEqual([0, 3, 6, 8].map(enhance => enhancementInfo(item("rate", "weapon", { enhance })).chance), [1, .78, .58, .42]);
 });
-test("new rarity rolls increase line count; Golden has all six; all rolls remain positive", () => {
+test("new rarity rolls increase line count; Golden has ten unique lines; all rolls remain positive", () => {
   for (const [tier, rarity] of RARITIES.entries()) for (const level of [1, 80, 160]) {
     const bonuses = rollGearBonuses(level, rarity, "boots", () => .5);
-    assert.equal(Object.keys(bonuses).length, [1, 2, 3, 4, 6][tier]);
+    assert.equal(Object.keys(bonuses).length, [2, 3, 5, 7, 10][tier]);
     assert.ok(Object.values(bonuses).every(n => Number.isInteger(n) && n > 0));
     assert.ok(bonuses.speed > 0);
   }

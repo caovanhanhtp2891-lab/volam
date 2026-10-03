@@ -11,7 +11,7 @@ function captureCanvas() {
   proto.stroke = function(...args) { if (this.canvas.id === "game-canvas") { window.sectColors ??= new Set(); window.sectColors.add(this.strokeStyle); } return stroke.apply(this, args); };
   proto.clearRect = function(...args) { if (this.canvas.id === 'game-canvas') this.captureNextCamera = true; return clear.apply(this, args); };
   proto.translate = function(x, y) { if (this.captureNextCamera) { window.currentCamera = { x: -x, y: -y }; this.captureNextCamera = false; } return translate.call(this, x, y); };
-  proto.drawImage = function(image, ...args) { if (image instanceof HTMLImageElement && image.naturalWidth === 480 && args[6] === 46 && args[7] === 50) window.smallHeroDrawn = true; return draw.call(this, image, ...args); };
+  proto.drawImage = function(image, ...args) { if (image instanceof HTMLImageElement && image.naturalWidth === 1223 && args[6] === 56 && args[7] === 76) window.heroDrawn = true; return draw.call(this, image, ...args); };
 }
 
 async function saved(page) {
@@ -67,10 +67,10 @@ async function castAndSave(page, key, aimId = 'bandit-1') {
         assert.ok((await page.locator('.sect-preview-description').textContent()).includes(sect.kit[key].name));
       }
       if (sect.id === 'thieu-lam') await page.screenshot({ path: '/tmp/volam-ten-sects-selection.png' });
-      await page.evaluate(() => { window.smallHeroDrawn = false; });
+      await page.evaluate(() => { window.heroDrawn = false; });
       await page.locator('#join-sect').click();
       await page.locator('#sect-overlay').waitFor({ state: 'hidden' });
-      await page.waitForFunction(() => window.smallHeroDrawn);
+      await page.waitForFunction(() => window.heroDrawn);
       assert.equal(await page.locator('#avatar-orb').getAttribute('data-sect'), sect.id);
       const beforePosition = (await seed(page, { x: 300, y: 360 })).player;
       await page.keyboard.down('d'); await page.waitForTimeout(250); await page.keyboard.up('d');

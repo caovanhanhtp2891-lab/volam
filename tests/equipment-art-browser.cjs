@@ -39,6 +39,7 @@ async function gallery(page) {
   const { GEAR_VARIANTS, variantsForSlot, SET_IDS, GEAR_SETS } = await import(
     "../src/gear-catalog.ts"
   );
+  const weaponCount = variantsForSlot("weapon").length;
   const browser = await chromium.launch({
     executablePath: process.env.VOLAM_CHROMIUM_PATH || "/usr/bin/chromium",
     headless: true,
@@ -92,7 +93,7 @@ async function gallery(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.12.0",
+      "0.13.0",
     );
     await page.locator("#hero-name-input").fill("Bảo Khố Kiếm Sĩ");
     await page.locator('[data-faction="wudang"]').click();
@@ -105,14 +106,14 @@ async function gallery(page) {
     });
     const before = (await save(page)).player;
     await gallery(page);
-    assert.equal(await page.locator(".gear-sample").count(), 14);
+    assert.equal(await page.locator(".gear-sample").count(), weaponCount);
     assert.equal(
       await page.locator(".gear-sample [data-material]").count(),
-      14,
+      weaponCount,
     );
     for (const rarity of ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"]) {
       await page.locator("#gear-gallery-rarity").selectOption(rarity);
-      assert.equal(await page.locator(".gear-sample .gear-body").count(), 14);
+      assert.equal(await page.locator(".gear-sample .gear-body").count(), weaponCount);
     }
     for (const enhance of [0, 3, 7, 10]) {
       await page.locator("#gear-gallery-enhance").selectOption(String(enhance));
@@ -120,16 +121,19 @@ async function gallery(page) {
         await page
           .locator('.gear-sample [data-enhancement="' + enhance + '"]')
           .count(),
-        14,
+        weaponCount,
       );
       assert.equal(
         await page.locator(".gear-sample .gear-enchant").count(),
-        enhance >= 3 ? 14 : 0,
+        enhance >= 3 ? weaponCount : 0,
       );
       assert.equal(
         await page.locator(".gear-sample .gear-orbit").count(),
-        enhance >= 7 ? 14 : 0,
+        enhance >= 7 ? weaponCount : 0,
       );
+      assert.equal(await page.locator(".gear-sample .gear-halo").count(), enhance >= 7 ? weaponCount : 0);
+      assert.equal(await page.locator(".gear-sample [data-painted-item]").count(), weaponCount);
+      if (enhance < 7) assert.equal(await page.locator(".gear-sample .gear-quality-crest").first().evaluate(el => getComputedStyle(el).animationName), "none", "gold quality has no animated awakening below +7");
     }
     await page.locator("#gear-gallery-element").selectOption("hoa");
     assert.ok(
@@ -196,10 +200,10 @@ async function gallery(page) {
       assert.equal(item.level, 10);
     }
     const bought = (await read(page)).player;
-    assert.equal(bought.gold, initialGold - 14 * 200);
-    assert.equal(new Set(bought.inventory.map((item) => item.id)).size, 14);
+    assert.equal(bought.gold, initialGold - weaponCount * 200);
+    assert.equal(new Set(bought.inventory.map((item) => item.id)).size, weaponCount);
     await page.locator("#set-shop-slot").selectOption("ring2");
-    assert.equal(await page.locator("#set-shop-variant option").count(), 5);
+    assert.equal(await page.locator("#set-shop-variant option").count(), variantsForSlot("ring2").length);
     await page.locator("#set-shop-variant").selectOption("twinring");
     await page.locator("#buy-set-piece").click();
     assert.equal((await read(page)).player.inventory.at(-1).slot, "ring2");
@@ -215,7 +219,7 @@ async function gallery(page) {
       "true"
     )
       await page.locator("#mobile-auto").click();
-    assert.equal((await read(page)).player.inventory.length, 16);
+    assert.equal((await read(page)).player.inventory.length, weaponCount + 2);
     await bag(page);
     const hammer = (await read(page)).player.inventory.find(
       (item) => item.variant === "hammer",
@@ -225,7 +229,7 @@ async function gallery(page) {
       .click();
     assert.ok(
       (await page.locator(".gear-effect-label").textContent()).includes(
-        "Ánh lục",
+        "Viền lục",
       ),
     );
     await page.locator("[data-inspect-equip]").click();
@@ -325,7 +329,7 @@ async function gallery(page) {
       assert.equal(await page.locator(".gear-sample").count(), n);
       total += n;
     }
-    assert.equal(total, 60);
+    assert.equal(total, Object.keys(GEAR_VARIANTS).length);
     for (const [width, height] of [
       [320, 568],
       [360, 640],
@@ -358,7 +362,7 @@ async function gallery(page) {
     await page.locator("#utility-close").click();
     const templates = (await read(page)).player.equipment.weapon;
     await seed(page, (s) => {
-      s.player.inventory = Object.entries(GEAR_VARIANTS).map(
+      s.player.inventory = Object.entries(GEAR_VARIANTS).slice(0, 60).map(
         ([variant, meta], i) => ({
           ...templates,
           id: "all-" + variant,
@@ -389,7 +393,7 @@ async function gallery(page) {
     );
     assert.deepEqual(errors, []);
     console.log(
-      "PASS all sixty illustrations, simple/reduced motion and gallery/merchant layouts fit six screen sizes without runtime errors",
+      "PASS all eighty-four gallery illustrations, simple/reduced motion and gallery/merchant layouts fit six screen sizes without runtime errors",
     );
   } finally {
     await browser.close();
