@@ -15,6 +15,7 @@ export function idleShell(): string {
       <div class="mobile-map-card"><div class="mobile-map-title"><b id="mobile-map-name">HOA SƠN</b></div><canvas id="mobile-minimap" width="190" height="120" aria-label="Bản đồ nhỏ"></canvas><div class="mobile-map-channel">Đợt 1/4</div><button class="icon-button" id="compact-btn" aria-label="Ẩn hoặc hiện HUD sân đấu" aria-pressed="false">⛶</button></div>
       <section class="arena-quest"><button id="arena-quest-toggle" aria-expanded="true" aria-label="Thu gọn nhiệm vụ"><span>♧ Nhiệm vụ</span><b>⌃</b></button><div id="arena-quest-body"><span id="arena-objective">Hạ quái Hoa Sơn</span><div class="arena-objective-progress"><div class="meter"><span id="arena-objective-bar"></span></div><small id="arena-objective-count">0/3</small></div></div></section>
       <button class="arena-chip" id="mobile-auto" aria-pressed="false"><span>⚔</span><small>Tự động</small></button>
+      <button class="arena-chip" id="mount-toggle" data-mount-toggle aria-pressed="false" aria-label="Lên ngựa (H)"><span>♞</span><small>Ngựa</small></button>
       <div class="mobile-hud" id="mobile-hud"><div class="joystick" id="joystick" aria-label="Cần điều khiển di chuyển"><div class="joystick-ring"><div class="joystick-knob" id="joystick-knob"></div></div></div><button id="mobile-pickup" class="mobile-pickup" aria-label="Nhặt đồ">${spriteMarkup("loot")}</button></div>
       <div class="combat-bar"><div class="combat-status"><span id="combat-status-text">Chưa có mục tiêu</span></div><div class="skill-bar" id="skill-bar"></div><div class="potion-shortcuts"><button class="potion-button potion-hp" data-use-potion="hp" aria-label="Dùng bình HP"><span>HP</span><small>0</small></button><button class="potion-button potion-mp" data-use-potion="mp" aria-label="Dùng bình MP"><span>MP</span><small>0</small></button><button class="town-button" id="town-btn">Về<br>thành</button></div></div>
       <div id="mobile-chat" class="arena-chat"><button id="arena-log-toggle" aria-label="Mở nhật ký giang hồ"><span>▤</span><span id="arena-log-text">[Hệ thống] Chọn môn phái để bắt đầu.</span><b>⌃</b></button></div>
@@ -30,7 +31,7 @@ export function idleShell(): string {
         <div class="log-panel"><div id="log-list" class="log-list"></div></div>
         <div class="target-panel"><div id="target-content"></div></div>
         <h3>Bản đồ luyện công <small>16 vùng · 160 ải</small></h3><div id="region-list" class="region-list"></div>
-        <div class="controls-panel"><p>WASD / joystick: di chuyển · 1–3: võ công · 4: đánh thường · Q/R: thuốc · E: nhặt · B: hành trang · K: võ công</p></div>
+        <div class="controls-panel"><p>WASD / joystick: di chuyển · 1–3: võ công · 4: đánh thường · Q/R: thuốc · E: nhặt · H: lên/xuống ngựa · B: hành trang · K: võ công</p></div>
       </section>
       <section class="character-panel tab-page" data-page="char">
         <div class="classic-window character-window">
@@ -38,10 +39,12 @@ export function idleShell(): string {
         <div class="classic-body">
         <div class="paper-doll"><div class="paper-doll-center"><strong id="preview-player-name"></strong><span id="preview-player-realm"></span><canvas id="character-preview" width="360" height="400" aria-label="Hình nhân vật và vòng cảnh giới"></canvas></div><div id="equipment-grid" class="equipment-grid"></div></div>
         <p class="equipment-help">Chạm ô trang bị để xem chi tiết</p>
+        <div class="card mount-card"><span>♞</span><div><b id="mount-name">Chưa có ngựa</b><small id="mount-info"></small></div><button class="mini-button" data-mount-toggle aria-pressed="false">Đến Tiệm</button></div>
         <div class="profile-resources"><div class="profile-meter profile-hp"><span id="profile-hp-bar"></span><small id="profile-hp-label"></small></div><div class="profile-meter profile-mp"><span id="profile-mp-bar"></span><small id="profile-mp-label"></small></div></div>
         <div class="character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small></div><span id="character-element" class="element-badge">金</span></div>
         <div class="profile-power">Lực chiến <strong id="combat-power">0</strong></div>
         <div id="stat-grid" class="stat-grid"></div>
+        <h3 class="gear-sets-heading">Bộ trang bị <button class="mini-button" id="gear-sets-btn">Ngũ hành</button></h3><div id="set-resonance"></div>
         <div id="cultivation-card" class="card cultivation-card"><div class="cultivation-heading"><div><small id="realm-plane">Phàm giới · Bậc 1/23</small><strong id="realm-name">Phàm Nhân</strong><span id="realm-phase">Chưa nhập đạo</span></div><button id="realm-guide-btn" class="mini-button">23 cảnh giới</button></div><div id="realm-meter" class="realm-meter" role="progressbar" aria-label="Tiến tới cảnh giới tiếp theo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="realm-progress"></span></div><p id="realm-next"></p><small class="dim">Tăng lực chiến bằng cấp độ, tiềm năng và trang bị đang mặc.</small></div>
         <div class="card progression-card"><div><b id="worn-title-label">Chưa đeo danh hiệu</b><small id="title-count">Danh hiệu 0/12</small></div><button id="titles-btn" class="mini-button">Danh hiệu</button></div>
         <div class="card progression-card"><div><b id="rebirth-label">Trùng sinh 0 lần</b><small id="rebirth-status">Đạt cấp 160 để trùng sinh.</small></div><button id="rebirth-btn" class="mini-button">Trùng sinh</button></div>

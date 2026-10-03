@@ -16,14 +16,14 @@ async function seed(page, change) {
     const context = await browser.newContext({ viewport:{width:390,height:844},isMobile:true,hasTouch:true });
     const page=await context.newPage(); page.on('pageerror',e=>errors.push(e.message));
     page.on('response',r=>{if(r.status()>=400 && r.url().startsWith(url))errors.push(`${r.status()} ${r.url()}`)});
-    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.10.0');
+    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.11.0');
     await page.locator('#hero-name-input').fill('Ngũ Độc Thanh Vân'); await page.locator('[data-faction="wudu"]').click(); await page.locator('#join-sect').click();
     await seed(page,s=>{s.player.idle.inTown=true; s.player.idle.autoEquip=false; s.player.attack=22; s.player.defense=5;});
     for (const [width,height] of [[320,568],[360,640],[390,844],[600,960],[844,390],[1440,900]]) {
       await page.setViewportSize({width,height}); await page.waitForTimeout(120);
       const result=await page.evaluate(()=>{
         const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
-        const controls=[...document.querySelectorAll('#hero-status,#gift-btn,#settings-shortcut,#compact-btn,#arena-quest-toggle,#mobile-auto,.joystick,.mobile-pickup,.skill-button,.potion-button,.town-button,#arena-log-toggle,.bottom-nav button')].filter(e=>e.checkVisibility()).map(e=>({id:e.id||e.getAttribute('aria-label')||e.textContent,box:e.getBoundingClientRect().toJSON()}));
+        const controls=[...document.querySelectorAll('#hero-status,#gift-btn,#settings-shortcut,#compact-btn,#arena-quest-toggle,#mobile-auto,#mount-toggle,.joystick,.mobile-pickup,.skill-button,.potion-button,.town-button,#arena-log-toggle,.bottom-nav button')].filter(e=>e.checkVisibility()).map(e=>({id:e.id||e.getAttribute('aria-label')||e.textContent,box:e.getBoundingClientRect().toJSON()}));
         const overlaps=[];for(let i=0;i<controls.length;i++)for(let j=i+1;j<controls.length;j++){const a=controls[i].box,b=controls[j].box;if(Math.min(a.right,b.right)-Math.max(a.x,b.x)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)>1)overlaps.push([controls[i].id,controls[j].id])}
         const card=document.querySelector('.mobile-map-card'), app=box('.app-shell');
         return {width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,app,arena:box('.canvas-frame'),hero:box('#hero-status'),actions:box('.header-actions'),map:box('.mobile-map-card'),quest:box('.arena-quest'),joystick:box('.joystick'),skills:box('.combat-bar'),chat:box('.arena-chat'),nav:box('.bottom-nav'),overlaps,offscreen:controls.filter(({box:r})=>r.x<app.x-.5||r.right>app.right+.5||r.y<-.5||r.bottom>innerHeight+.5),mapOverflow:card.scrollWidth-card.clientWidth};

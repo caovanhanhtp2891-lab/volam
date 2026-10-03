@@ -41,7 +41,11 @@ import {
 } from "./combat-art";
 import { drawCharacterPreview } from "./character-preview";
 import { equipmentMarkup, equipmentTier } from "./equipment-art";
-import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, totalGearStats, gearScore, rollGearBonuses, equipBestGear, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
+import { GEAR_VARIANTS, GEAR_SETS, SET_IDS, EQUIPMENT_SLOTS, SET_THRESHOLDS, variantOf, setStatuses, rollGearIdentity, validGearIdentity, type GearIdentity, type SetId } from "./gear-catalog";
+import { BASIC_HORSE_PRICE, mountSpeedBonus, ridingSpeed, normalizeMounted } from "./mount";
+import { drawHorse, type MountAppearance } from "./mount-art";
+import { drawGearAura } from "./gear-effects";
+import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
 import {
   drawBattleEffect,
@@ -91,7 +95,7 @@ type ItemSlot =
 type PanelTab = "bag" | "smith" | "skills" | "dungeon" | "shop";
 type SkillKey = "skill1" | "skill2" | "ultimate";
 
-interface Item {
+interface Item extends GearIdentity {
   id: string;
   name: string;
   slot: ItemSlot;
@@ -105,6 +109,7 @@ interface Item {
 }
 
 interface Player {
+  mounted: boolean;
   name: string;
   sex: "male" | "female";
   factionId: FactionId;
@@ -354,6 +359,9 @@ let idleNextWave = 0;
 let lastAutoSave = 0;
 let lastAutoAction = 0;
 let characterRenderKey = "";
+let setRenderKey = "";
+let setShopId: SetId = "kim-phong";
+let setShopSlot: ItemSlot = "weapon";
 let regionRenderKey = "";
 let audioContext: AudioContext | null = null;
 
@@ -623,10 +631,7 @@ function createItem(
     (Object.keys(GEAR_SLOTS) as ItemSlot[])[
       randomInt(0, Object.keys(GEAR_SLOTS).length - 1)
     ];
-  const names =
-    slot === "weapon"
-      ? ["Kiếm", "Đao", "Phiến", "Trượng"]
-      : [GEAR_SLOTS[slot].name];
+  const identity = rollGearIdentity(slot, rarity, game ? factionOf(game.player.factionId).element : undefined);
   const prefix: Record<Rarity, string> = {
     Thường: "Mộc",
     Tốt: "Thanh",
@@ -637,7 +642,8 @@ function createItem(
   const icon = GEAR_SLOTS[slot].icon;
   return {
     id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: `${prefix[rarity]} ${names[randomInt(0, names.length - 1)]}`,
+    name: `${identity.setId ? GEAR_SETS[identity.setId].name : prefix[rarity]} ${GEAR_VARIANTS[identity.variant!].name}`,
+    ...identity,
     slot,
     rarity,
     level,
@@ -821,6 +827,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     attack: sect.baseAttack,
     defense: sect.baseDefense,
     speed: sect.speed,
+    mounted: false,
     rage: 0,
     shield: 0,
     shieldUntil: 0,
@@ -907,8 +914,254 @@ function showToast(message: string): void {
   toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2300);
 }
 
+function itemArt(item: Item, extraClass = ""): string {
+  return equipmentMarkup(item.slot, item.color, item.rarity, extraClass, item);
+}
+function gearIdentityMarkup(item: Item): string {
+  const element = item.element ? ELEMENTS[item.element] : undefined;
+  return `<div class="gear-identity"><span>${item.variant ? GEAR_VARIANTS[item.variant].name : GEAR_SLOTS[item.slot].name}</span>${element ? `<span class="gear-element-label" style="color:${element.color}">Hệ ${element.name}</span>` : ""}${item.setId ? `<span class="gear-set-label" style="color:${GEAR_SETS[item.setId].color}">Bộ ${GEAR_SETS[item.setId].name}</span>` : ""}</div>`;
+}
+function statsText(stats: Partial<GearStats>): string {
+  return Object.entries(stats)
+    .filter(([, value]) => value)
+    .map(
+      ([key, value]) =>
+        `+${formatNumber(value!)}${key === "crit" ? "%" : ""} ${STAT_LABELS[key as GearStat].toLocaleLowerCase("vi")}`,
+    )
+    .join(" · ");
+}
+function setStageRules(
+  id: SetId,
+  grade: number,
+  element: Element,
+  worn: number,
+): string {
+  let previous: GearStats = {
+    attack: 0,
+    defense: 0,
+    hp: 0,
+    mp: 0,
+    crit: 0,
+    speed: 0,
+  };
+  return SET_THRESHOLDS.map((count) => {
+    const pieces: Item[] = EQUIPMENT_SLOTS.slice(0, count).map((slot) => ({
+      id: `preview-${slot}`,
+      slot,
+      rarity: "Tốt",
+      level: grade * 10,
+      power: 0,
+      enhance: 0,
+      name: "",
+      color: "#73d19b",
+      icon: "",
+      setId: id,
+      element: GEAR_SETS[id].element,
+    }));
+    const stats = setStatuses(pieces, element)[0].bonuses;
+    const delta = Object.fromEntries(
+      Object.entries(stats).map(([key, value]) => [
+        key,
+        value - previous[key as GearStat],
+      ]),
+    );
+    previous = stats;
+    return `<li class="${worn >= count ? "set-unlocked" : "set-locked"}" data-set-threshold="${count}"><b>${worn >= count ? "✦" : "◇"} ${count}/11 món${count === 11 ? ` · ${GEAR_SETS[id].hidden}` : ""}</b><span>${statsText(delta)}</span>${count === 11 ? `<small>${worn === 11 ? "Thuộc tính ẩn đã kích hoạt" : "Thuộc tính ẩn: cần mặc đủ bộ"}</small>` : ""}</li>`;
+  }).join("");
+}
+function openGearSets(selected?: SetId): void {
+  if (!game) return;
+  const player = game.player,
+    element = factionOf(player.factionId).element,
+    statuses = setStatuses(Object.values(player.equipment), element);
+  openUtility(
+    "Trang bị bộ · Ngũ hành",
+    `<p class="dim">Mỗi bộ có 11 vị trí, gồm hai nhẫn và ngựa. Mốc 2/4/6 món cộng chỉ số; đủ 11 mở thuộc tính ẩn và trận sáng riêng. Cùng hệ môn phái: thuộc tính bộ +20%. Bậc bộ bằng bậc món thấp nhất đang mặc; có thể phối nhiều bộ.</p>${SET_IDS.map(
+      (id) => {
+        const set = GEAR_SETS[id],
+          worn = statuses.find((status) => status.id === id);
+        const owned = [
+          ...Object.values(player.equipment),
+          ...player.inventory,
+        ].filter((item) => item.setId === id);
+        const slots = new Set(owned.map((item) => item.slot));
+        return `<section class="gear-set-card ${id === selected ? "selected-set" : ""}" data-set-card="${id}" style="--set-color:${set.color}"><header><span class="set-emblem">${set.glyph}</span><div><b>${set.name} · Hệ ${ELEMENTS[set.element].name}</b><small>Mặc ${worn?.pieces ?? 0}/11 · Sở hữu ${slots.size}/11 vị trí · Bậc ${worn?.grade ?? 1}${set.element === element ? " · Đồng hệ +20%" : ""}</small></div></header><ul class="set-rules">${setStageRules(id, worn?.grade ?? 1, element, worn?.pieces ?? 0)}</ul><div class="item-actions"><button class="mini-button" data-wear-set="${id}" ${player.inventory.some((item) => item.setId === id) ? "" : "disabled"}>Mặc các món trong túi</button><button class="mini-button" data-set-shop="${id}">Mua mảnh bộ</button></div></section>`;
+      },
+    ).join("")}`,
+  );
+}
+function refreshSetUi(): void {
+  if (!game) return;
+  const statuses = setStatuses(
+    Object.values(game.player.equipment),
+    factionOf(game.player.factionId).element,
+  );
+  const key = JSON.stringify(statuses);
+  if (key === setRenderKey) return;
+  setRenderKey = key;
+  document.getElementById("set-resonance")!.innerHTML = statuses.length
+    ? statuses
+        .map((status) => {
+          const set = GEAR_SETS[status.id];
+          return `<button class="set-summary ${status.full ? "full-set" : ""}" data-open-set="${status.id}" style="--set-color:${set.color}"><span class="set-emblem">${set.glyph}</span><span><b>${set.name} · ${status.pieces}/11${status.aligned ? " · Đồng hệ" : ""}</b><small>${statsText(status.bonuses) || "Cần 2 món để cộng thuộc tính"}</small>${status.full ? `<strong data-set-full="${status.id}">✦ ${set.hidden} đã kích hoạt</strong>` : ""}</span></button>`;
+        })
+        .join("")
+    : '<p class="dim">Chưa mặc trang bị bộ. Tìm đồ rơi có tên bộ hoặc mua mảnh bộ ở Tiệm.</p>';
+}
+function setShopVariant(id: SetId, slot: ItemSlot) {
+  if (slot === "weapon")
+    return (
+      {
+        "kim-phong": "sword",
+        "thanh-truc": "crossbow",
+        "han-nguyet": "fan",
+        "xich-diem": "blade",
+        "huyen-nham": "staff",
+      } as const
+    )[id];
+  if (slot === "horse")
+    return (
+      {
+        "kim-phong": "warhorse",
+        "thanh-truc": "bay",
+        "han-nguyet": "white",
+        "xich-diem": "ember",
+        "huyen-nham": "warhorse",
+      } as const
+    )[id];
+  return variantOf({ slot });
+}
+function openSetShop(id?: SetId): void {
+  if (!game) return;
+  if (id && SET_IDS.includes(id)) setShopId = id;
+  const set = GEAR_SETS[setShopId],
+    player = game.player,
+    price = 120 + player.level * 8;
+  const preview: Item = {
+    id: "shop-preview",
+    name: `${set.name} ${GEAR_VARIANTS[setShopVariant(setShopId, setShopSlot)].name}`,
+    slot: setShopSlot,
+    variant: setShopVariant(setShopId, setShopSlot),
+    setId: setShopId,
+    element: set.element,
+    rarity: "Tốt",
+    level: player.level,
+    power: 0,
+    enhance: 0,
+    color: itemColor("Tốt"),
+    icon: "◆",
+  };
+  const blocked =
+    game.mapMode !== "world" ||
+    player.inventory.length >= BAG_CAPACITY ||
+    player.gold < price;
+  openUtility(
+    "Thương nhân · Mảnh bộ",
+    `<label class="form-row">Bộ <select id="set-shop-id">${SET_IDS.map((id) => `<option value="${id}" ${id === setShopId ? "selected" : ""}>${GEAR_SETS[id].name} · ${ELEMENTS[GEAR_SETS[id].element].name}</option>`).join("")}</select></label><label class="form-row">Vị trí <select id="set-shop-slot">${EQUIPMENT_SLOTS.map((slot) => `<option value="${slot}" ${slot === setShopSlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><div class="item-detail">${itemArt(preview, "detail-gear-art")}<b>${preview.name}</b>${gearIdentityMarkup(preview)}<p>Tốt · Cấp ${player.level} · ${equipmentGrade(player.level)} · Hai dòng phụ ngẫu nhiên.</p></div><p class="dim">Mua vào túi, tự chọn mặc. Ghép được với đồ rơi cùng bộ. Đang có ${formatNumber(player.gold)} bạc · ${player.inventory.length}/${BAG_CAPACITY} ô.</p><button class="outline-button" id="buy-set-piece" ${blocked ? "disabled" : ""}>${game.mapMode !== "world" ? "Rời phụ bản để mua" : player.inventory.length >= BAG_CAPACITY ? "Túi đã đầy" : `Mua mảnh bộ · ${price} bạc`}</button>`,
+  );
+}
+function buySetPiece(): void {
+  if (!game || game.mapMode !== "world") return;
+  const price = 120 + game.player.level * 8;
+  if (game.player.gold < price || game.player.inventory.length >= BAG_CAPACITY)
+    return;
+  const item = createItem(game.player.level, "Tốt", setShopSlot),
+    set = GEAR_SETS[setShopId];
+  Object.assign(item, {
+    setId: setShopId,
+    element: set.element,
+    variant: setShopVariant(setShopId, setShopSlot),
+    name: `${set.name} ${GEAR_VARIANTS[setShopVariant(setShopId, setShopSlot)].name}`,
+  });
+  game.player.gold -= price;
+  game.player.inventory.push(item);
+  persistGame();
+  refreshUi(true);
+  showToast(`Đã mua ${item.name}. Mặc trong Túi đồ hoặc Bộ ngũ hành.`);
+  openSetShop();
+}
+function buyBasicHorse(): void {
+  if (
+    !game ||
+    game.mapMode !== "world" ||
+    game.player.gold < BASIC_HORSE_PRICE ||
+    game.player.inventory.length >= BAG_CAPACITY
+  )
+    return;
+  const horse = createItem(1, "Tốt", "horse");
+  delete horse.setId;
+  Object.assign(horse, { name: "Tuấn Mã Hành Cước", variant: "bay" });
+  game.player.gold -= BASIC_HORSE_PRICE;
+  game.player.inventory.push(horse);
+  persistGame();
+  refreshUi(true);
+  showToast("Đã mua Tuấn Mã. Mặc vào ô Ngựa, rồi bấm Lên ngựa hoặc H.");
+}
+function currentMountAppearance(): MountAppearance | undefined {
+  const horse = game?.player.equipment.horse;
+  return horse
+    ? {
+        variant: variantOf(horse),
+        color: horse.color,
+        tier: equipmentTier(horse.rarity),
+        enhancement: horse.enhance,
+      }
+    : undefined;
+}
+function toggleMount(): void {
+  if (!game) return;
+  if (!game.player.equipment.horse) {
+    openMobileSheet("shop");
+    return showToast("Mua hoặc tìm ngựa, rồi mặc vào ô Ngựa để cưỡi.");
+  }
+  if (game.combat.dash)
+    return showToast("Chờ kết thúc chiêu lướt để lên xuống ngựa.");
+  game.player.mounted = !game.player.mounted;
+  syncStats();
+  persistGame();
+  refreshUi(true);
+  showToast(
+    game.player.mounted
+      ? `Đã lên ${game.player.equipment.horse.name} · Tốc độ +${mountSpeedBonus(game.player.equipment.horse)}%.`
+      : "Đã xuống ngựa.",
+  );
+}
+function refreshMountUi(): void {
+  if (!game) return;
+  const horse = game.player.equipment.horse,
+    mounted = game.player.mounted;
+  const label = horse ? (mounted ? "Xuống ngựa" : "Lên ngựa") : "Đến Tiệm";
+  document
+    .querySelectorAll<HTMLElement>("[data-mount-toggle]")
+    .forEach((button) => {
+      button.setAttribute("aria-pressed", String(mounted));
+      button.setAttribute(
+        "aria-label",
+        horse ? `${label} (H)` : "Mua ngựa ở Tiệm",
+      );
+      if (button.id === "mount-toggle") {
+        button.querySelector("small")!.textContent = horse
+          ? mounted
+            ? "Xuống"
+            : "Lên ngựa"
+          : "Ngựa";
+      } else button.textContent = label;
+    });
+  document.getElementById("mount-name")!.textContent =
+    horse?.name ?? "Chưa có ngựa";
+  document.getElementById("mount-info")!.textContent = horse
+    ? `${mounted ? "Đang cưỡi" : "Đi bộ"} · Khi cưỡi +${mountSpeedBonus(horse)}% tốc độ · Phím H`
+    : "Mặc ngựa từ túi đồ hoặc mua tại Tiệm.";
+  document.getElementById("character-preview")!.dataset.mounted =
+    String(mounted);
+  document.getElementById("game-canvas")!.dataset.mounted = String(mounted);
+}
+
 function equipmentBonuses(): GearStats {
-  return totalGearStats(game ? Object.values(game.player.equipment) : []);
+  return loadoutStats(
+    game ? Object.values(game.player.equipment) : [],
+    game ? factionOf(game.player.factionId).element : undefined,
+  );
 }
 function equipmentAttack(): number { return equipmentBonuses().attack; }
 function equipmentDefense(): number { return equipmentBonuses().defense; }
@@ -938,13 +1191,14 @@ function currentStrengthScore(): number {
 }
 function currentCombatPower(): number { return powerFromScore(currentStrengthScore()); }
 function projectedGearPower(item: Item, current?: Item): number {
-  const before = current ? gearStats(current) : { attack: 0, defense: 0, hp: 0, mp: 0, crit: 0, speed: 0 };
-  const after = gearStats(item), gear = equipmentBonuses(), bonus = characterBonuses();
-  const defenseDelta = after.defense - before.defense;
-  const hpDelta = after.hp - before.hp + Math.floor((gear.defense + defenseDelta) * 1.45) - Math.floor(gear.defense * 1.45);
-  return combatPower(effectiveAttack() + after.attack - before.attack, effectiveDefense() + defenseDelta,
-    (game?.player.maxHp ?? 0) + hpDelta,
-    (gear.mp + bonus.mp + after.mp - before.mp) * .1 + (gear.crit + bonus.crit + after.crit - before.crit) * 8 + (gear.speed + bonus.speed + after.speed - before.speed) * 2);
+  if (!game) return 0;
+  const gear = equipmentBonuses(), bonus = characterBonuses();
+  const after = loadoutStats([...Object.values(game.player.equipment).filter(gear => gear.slot !== item.slot), item], factionOf(game.player.factionId).element);
+  const defenseDelta = after.defense - gear.defense;
+  const hpDelta = after.hp - gear.hp + Math.floor(after.defense * 1.45) - Math.floor(gear.defense * 1.45);
+  return combatPower(effectiveAttack() + after.attack - gear.attack, effectiveDefense() + defenseDelta,
+    game.player.maxHp + hpDelta,
+    (after.mp + bonus.mp) * .1 + (after.crit + bonus.crit) * 8 + (after.speed + bonus.speed) * 2);
 }
 
 function skillScale(skill: SkillKey, base: number): number {
@@ -1275,7 +1529,8 @@ function syncStats(fullHeal = false): void {
     player.idle.attributes.vitality * 12 + equipmentBonuses().hp + bonus.hp;
   player.maxMp =
     sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp + bonus.mp;
-  player.speed = sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed + bonus.speed;
+  player.mounted = normalizeMounted(player.mounted, player.equipment.horse);
+  player.speed = ridingSpeed(sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed + bonus.speed, player.equipment.horse, player.mounted);
   if (fullHeal) {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
@@ -1859,7 +2114,7 @@ function notifyLoot(item: Item): void {
   entry.className = "loot-notice";
   entry.style.setProperty("--loot-color", item.color);
   entry.dataset.lootItem = item.id;
-  entry.innerHTML = `${equipmentMarkup(item.slot, item.color, item.rarity)}<div><b>${escapeHtml(item.name)}</b><small>${item.rarity} · Cấp ${item.level}</small></div>`;
+  entry.innerHTML = `${itemArt(item)}<div><b>${escapeHtml(item.name)}</b><small>${item.rarity} · Cấp ${item.level}</small></div>`;
   entry.setAttribute("aria-label", `Đã nhặt ${item.name}, xem trang bị`);
   notices.prepend(entry);
   while (notices.children.length > 2) notices.lastElementChild?.remove();
@@ -1891,7 +2146,7 @@ function openEnhancement(item: Item, result = ""): void {
   const equipped = game.player.equipment[item.slot]?.id === item.id;
   const blocked = game.mapMode !== "world";
   const poor = game.player.gold < info.cost || game.player.refiningStones < info.stones;
-  openUtility("Cường hóa trang bị", `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${before[key]}${key === "crit" ? "%" : ""}</td><td>${after[key]}${key === "crit" ? "%" : ""}</td><td>${after[key] > before[key] ? `+${after[key] - before[key]}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số chính tăng mỗi bậc; các dòng phụ tăng theo tỷ lệ. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? '<p class="enhancement-result">Đã đạt cường hóa tối đa +10.</p>' : `<div class="enhancement-cost"><b>${info.cost} bạc + ${info.stones} đá</b><span>Tỷ lệ ${Math.round(info.chance * 100)}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? "+10 tối đa" : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
+  openUtility("Cường hóa trang bị", `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${before[key]}${key === "crit" ? "%" : ""}</td><td>${after[key]}${key === "crit" ? "%" : ""}</td><td>${after[key] > before[key] ? `+${after[key] - before[key]}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số chính tăng mỗi bậc; các dòng phụ tăng theo tỷ lệ. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? '<p class="enhancement-result">Đã đạt cường hóa tối đa +10.</p>' : `<div class="enhancement-cost"><b>${info.cost} bạc + ${info.stones} đá</b><span>Tỷ lệ ${Math.round(info.chance * 100)}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? "+10 tối đa" : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
 }
 function confirmEnhancement(id: string, rank: number): void {
   if (!game || game.mapMode !== "world") return;
@@ -2907,7 +3162,7 @@ function drawLoot(loot: GroundLoot, now: number): void {
     ctx.save();
     ctx.translate(0, -height - 5);
     ctx.rotate((1 - progress) * 2.2);
-    drawEquipmentIcon(ctx, loot.item.slot, color, 42);
+    drawEquipmentIcon(ctx, loot.item.slot, color, 42, loot.item);
     ctx.restore();
     if (progress === 1) {
       ctx.textAlign = "center";
@@ -2959,7 +3214,7 @@ function drawPickupFlight(
   ctx.globalAlpha = 1 - t * 0.7;
   ctx.scale(1 - t * 0.6, 1 - t * 0.6);
   if (pickup.loot.item)
-    drawEquipmentIcon(ctx, pickup.loot.item.slot, pickup.loot.item.color, 22);
+    drawEquipmentIcon(ctx, pickup.loot.item.slot, pickup.loot.item.color, 22, pickup.loot.item);
   else {
     ctx.fillStyle = "#edcd76";
     ctx.beginPath();
@@ -3184,7 +3439,12 @@ function currentHeroAppearance(): HeroAppearance {
         : best,
     undefined,
   );
+  const set = setStatuses(Object.values(equipment), game ? factionOf(game.player.factionId).element : undefined).sort((a, b) => b.pieces - a.pieces)[0];
   return {
+    element: set ? GEAR_SETS[set.id].element : equipment.weapon?.element,
+    pieces: set?.pieces ?? 0,
+    weaponVariant: equipment.weapon?.variant,
+    simpleEffects: game?.player.preferences.skillEffects === "simple",
     weaponColor: equipment.weapon?.color ?? "#ffe5a3",
     armorColor:
       equipmentTier(equipment.armor?.rarity) >= 2 ? equipment.armor!.color : "",
@@ -3203,7 +3463,7 @@ function drawHeroSprite(
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.28)";
   ctx.beginPath();
-  ctx.ellipse(0, 12, 12, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 12, !remote && game?.player.mounted ? 34 : 12, !remote && game?.player.mounted ? 9 : 4, 0, 0, Math.PI * 2);
   ctx.fill();
   if (remote) {
     const motion = freshMotion();
@@ -3212,6 +3472,11 @@ function drawHeroSprite(
     ctx.scale(0.9, 0.9);
     drawAnimatedHero(ctx, "wudang", "male", motion, now);
   } else if (game) {
+    if (game.player.mounted) {
+      const horse = currentMountAppearance();
+      if (horse) drawHorse(ctx, horse, game.combat.motion, now);
+      ctx.translate(0, -20); ctx.scale(.8, .8);
+    }
     drawAnimatedHero(
       ctx,
       game.player.factionId,
@@ -3242,13 +3507,15 @@ function drawPlayer(player: Player, now: number): void {
   ctx.save();
   ctx.translate(player.x, player.y);
   drawCultivationAura(ctx, cultivation, now);
+  drawGearAura(ctx, currentHeroAppearance(), now, player.preferences.skillEffects === "simple");
   const title = wornTitle(player.journey);
   if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
+  const ridingOffset = player.mounted ? 22 : 0;
   drawBar(
     player.x - 25,
-    player.y - 43,
+    player.y - 43 - ridingOffset,
     50,
     5,
     player.hp / player.maxHp,
@@ -3260,7 +3527,7 @@ function drawPlayer(player: Player, now: number): void {
   drawOutlinedText(
     `${player.name} · Cấp ${player.level}`,
     player.x,
-    player.y - 53,
+    player.y - 53 - ridingOffset,
   );
   ctx.font = "700 10px 'DM Sans', sans-serif";
   const labelWidth = ctx.measureText(cultivation.label).width + 16;
@@ -3269,7 +3536,7 @@ function drawPlayer(player: Player, now: number): void {
     game!.cameraX + labelWidth / 2 + 6,
     game!.cameraX + VIEW_WIDTH - labelWidth / 2 - 6,
   );
-  const labelY = Math.max(player.y - 72, game!.cameraY + 45);
+  const labelY = Math.max(player.y - 72 - ridingOffset, game!.cameraY + 45);
   ctx.fillStyle = "rgba(9,19,22,.85)";
   ctx.beginPath();
   ctx.roundRect(labelX - labelWidth / 2, labelY - 12, labelWidth, 17, 4);
@@ -3562,7 +3829,7 @@ function itemRow(item: Item, index: number, equipped = false): string {
     pendingSaleId === item.id
       ? `<button class="mini-button" data-cancel-sale>Hủy</button>`
       : "";
-  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${equipmentMarkup(item.slot, item.color, item.rarity)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span>${gearStatsMarkup(item)}</div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
+  return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${itemArt(item)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span>${gearIdentityMarkup(item)}${gearStatsMarkup(item)}</div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
 }
 
 function supplyMarkup(): string {
@@ -3594,6 +3861,7 @@ function renderInventory(): void {
     Math.ceil(player.potionCooldown),
     player.inventory,
     player.equipment,
+    player.mounted,
     player.pendingItems.length,
     player.dungeonClears,
     game.mapMode,
@@ -3624,6 +3892,8 @@ function renderInventory(): void {
       ${game.mapMode === "dungeon" ? `<p class="panel-notice">Tiệm đóng trong phụ bản. Bạn vẫn dùng được bình đã mang theo.</p>` : ""}
       ${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="shop-card"><strong>${POTIONS[kind].name} · ${POTIONS[kind].price} bạc</strong><p>Hồi 40% ${POTIONS[kind].label} tối đa · Đang có ${player.potions[kind]}/${MAX_POTIONS}</p><div class="item-actions">${[1, 5].map((quantity) => `<button class="mini-button" data-buy-potion="${kind}" data-quantity="${quantity}" ${!shopOpen || player.gold < POTIONS[kind].price * quantity || player.potions[kind] + quantity > MAX_POTIONS ? "disabled" : ""}>Mua ${quantity} · ${POTIONS[kind].price * quantity} bạc</button>`).join("")}</div></div>`).join("")}
       <p class="panel-notice">Hai loại bình dùng chung hồi chiêu 8 giây. Q: bình HP · R: bình MP. HP/MP đầy sẽ không mất bình.</p>
+      <div class="shop-card mount-shop">${equipmentMarkup("horse", itemColor("Tốt"), "Tốt")}<div><strong>Tuấn Mã Hành Cước · ${BASIC_HORSE_PRICE} bạc</strong><p>Mặc vào ô Ngựa rồi Lên/Xuống ngựa bằng H. Tốc độ cưỡi +36%.</p><button class="mini-button" id="buy-basic-horse" ${!shopOpen || player.gold < BASIC_HORSE_PRICE || player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Mua Tuấn Mã</button></div></div>
+      <div class="shop-card"><strong>Trang bị bộ ngũ hành</strong><p>Chọn một trong 5 bộ và đúng vị trí còn thiếu. Phẩm chất Tốt, cấp theo nhân vật.</p><button class="mini-button" data-set-shop ${!shopOpen ? "disabled" : ""}>Chọn mảnh bộ · Từ ${120 + player.level * 8} bạc</button></div>
       <button class="outline-button" data-open-bag>Bán trang bị thừa trong Túi đồ</button>
     `;
     return;
@@ -3706,10 +3976,10 @@ function renderInventory(): void {
     .join("");
   inventoryContent.innerHTML = `
     <div class="bag-summary"><span>◆ <b>${formatNumber(player.gold)}</b> bạc</span><span>✦ <b>${formatNumber(player.refiningStones)}</b> đá</span><strong>${player.inventory.length}/${BAG_CAPACITY} ô</strong></div>
-    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
+    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-open-sets>Bộ ngũ hành</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
-      return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${equipmentMarkup(item.slot, item.color, item.rarity)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
+      return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${itemArt(item)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
     }).join("")}</div>
     ${supplyMarkup()}
     ${player.pendingItems.length ? `<div class="pending-rewards"><strong>Đồ chờ nhận · ${player.pendingItems.length} món</strong><p>Thưởng đã giữ lại, kể cả khi tải lại trang.</p><button class="outline-button" data-collect-pending ${player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Nhận vào túi</button></div>` : ""}
@@ -3832,7 +4102,7 @@ function collectIdleLoot(force = false): void {
 }
 function autoEquipBest(): number {
   if (!game) return 0;
-  const changed = equipBestGear(game.player);
+  const changed = equipBestGear(game.player, factionOf(game.player.factionId).element);
   syncStats();
   return changed;
 }
@@ -3848,7 +4118,7 @@ let discardPreview: { filter: DiscardFilter; ids: Set<string> } | null = null;
 function openDiscardFilter(): void {
   if (!game) return;
   discardPreview = null;
-  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ Hoàng Kim, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
+  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ bộ, đồ Hoàng Kim, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
 }
 function previewDiscard(): void {
   if (!game) return;
@@ -4085,6 +4355,8 @@ function refreshIdleUi(): void {
   document.querySelector(".mobile-map-card")!.classList.toggle("hidden", !player.preferences.minimap);
   refreshArenaObjective();
   refreshHuntUi();
+  refreshMountUi();
+  refreshSetUi();
   text("preview-player-name", player.name);
   text("preview-player-realm", cultivation.label);
   document.getElementById("preview-player-realm")!.style.color =
@@ -4183,7 +4455,7 @@ function refreshIdleUi(): void {
           "pendant",
         ];
         const side = left.includes(slot) ? left : right;
-        return `<button class="equipment-slot ${item ? "equipped" : "empty-slot"}" data-equipped-preview="${slot}" style="--rarity-color:${item?.color ?? "#8a754b"};grid-column:${side === left ? 1 : 3};grid-row:${side.indexOf(slot) + 1}" ${item ? "" : "disabled"} title="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}` : ": trống"}" aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}, cường hóa +${item.enhance}` : ": trống"}">${equipmentMarkup(slot, item?.color ?? "#8a754b", item?.rarity, "equipment-icon")}<small>${GEAR_SLOTS[slot].name}</small>${item?.enhance ? `<b>+${item.enhance}</b>` : ""}</button>`;
+        return `<button class="equipment-slot ${item ? "equipped" : "empty-slot"}" data-equipped-preview="${slot}" style="--rarity-color:${item?.color ?? "#8a754b"};grid-column:${side === left ? 1 : 3};grid-row:${side.indexOf(slot) + 1}" ${item ? "" : "disabled"} title="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}` : ": trống"}" aria-label="${GEAR_SLOTS[slot].name}${item ? `: ${escapeHtml(item.name)}, cường hóa +${item.enhance}` : ": trống"}">${equipmentMarkup(slot, item?.color ?? "#8a754b", item?.rarity, "equipment-icon", item)}<small>${GEAR_SLOTS[slot].name}</small>${item?.enhance ? `<b>+${item.enhance}</b>` : ""}</button>`;
       })
       .join("");
     document.getElementById("attribute-list")!.innerHTML = (
@@ -4325,7 +4597,7 @@ function showItemDetail(item: Item): void {
   const attribute = "lực chiến";
   openUtility(
     item.name,
-    `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearStatsMarkup(item, current)}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${item.enhance >= 10 ? "Đã cường hóa tối đa +10" : `Cường hóa · ${45 + item.enhance * 35} bạc + 1 đá`}</button>` : ""}`,
+    `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearIdentityMarkup(item)}${gearStatsMarkup(item, current)}${item.setId ? `<button class="mini-button" data-open-set="${item.setId}">Bộ ${GEAR_SETS[item.setId].name} · ${setStatuses(Object.values(game.player.equipment)).find(set => set.id === item.setId)?.pieces ?? 0}/11 đang mặc</button>` : ""}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${item.enhance >= 10 ? "Đã cường hóa tối đa +10" : `Cường hóa · ${45 + item.enhance * 35} bạc + 1 đá`}</button>` : ""}`,
   );
 }
 function openDailyRewards(): void {
@@ -4417,6 +4689,7 @@ function validateSave(value: unknown): {
     throw new Error("save-invalid");
   if (player.x > WORLD_WIDTH || player.y > WORLD_HEIGHT)
     throw new Error("save-invalid");
+  if (player.mounted !== undefined && typeof player.mounted !== "boolean") throw new Error("save-invalid");
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
   player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
@@ -4469,6 +4742,7 @@ function validateSave(value: unknown): {
         Object.hasOwn(GEAR_SLOTS, item.slot) &&
         RARITIES.includes(item.rarity) &&
         validBonuses(item.bonuses) &&
+        validGearIdentity(item) &&
         Number.isFinite(item.power) &&
         item.power >= 0 &&
         item.power <= 1e7 &&
@@ -4538,6 +4812,7 @@ function validateSave(value: unknown): {
     )
       throw new Error("save-invalid");
   }
+  player.mounted = normalizeMounted(player.mounted, player.equipment.horse);
   if (
     !Object.entries(player.equipment).every(
       ([slot, item]) => Object.hasOwn(GEAR_SLOTS, slot) && item.slot === slot,
@@ -4621,6 +4896,17 @@ function bindIdleUi(): void {
     button.setAttribute("aria-label", open ? "Thu gọn nhiệm vụ" : "Mở nhiệm vụ");
     button.querySelector("b")!.textContent = open ? "⌃" : "⌄";
     document.getElementById("arena-quest-body")!.classList.toggle("hidden", !open);
+  });
+  document.getElementById("gear-sets-btn")!.addEventListener("click", () => openGearSets());
+  document.querySelector(".app-shell")!.addEventListener("click", event => {
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-mount-toggle]")) toggleMount();
+    const set = target.closest<HTMLElement>("[data-open-set]");
+    if (set) openGearSets(set.dataset.openSet as SetId);
+    if (target.closest("[data-open-sets]")) openGearSets();
+    const shop = target.closest<HTMLElement>("[data-set-shop]");
+    if (shop) openSetShop(shop.dataset.setShop as SetId | undefined);
+    if (target.closest("#buy-basic-horse")) buyBasicHorse();
   });
   document.getElementById("titles-btn")!.addEventListener("click", () => openTitles());
   document.getElementById("rebirth-btn")!.addEventListener("click", openRebirth);
@@ -4778,6 +5064,9 @@ function bindIdleUi(): void {
   document
     .getElementById("utility-content")!
     .addEventListener("change", (event) => {
+      const control = event.target as HTMLSelectElement;
+      if (control.id === "set-shop-id" && SET_IDS.includes(control.value as SetId)) { setShopId = control.value as SetId; openSetShop(); }
+      if (control.id === "set-shop-slot" && (EQUIPMENT_SLOTS as readonly string[]).includes(control.value)) { setShopSlot = control.value as ItemSlot; openSetShop(); }
       if ((event.target as HTMLElement).matches("#discard-rarity,#discard-level,#discard-weaker")) {
         discardPreview = null;
         const preview = document.getElementById("discard-preview");
@@ -4788,6 +5077,14 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      if (target.closest("#buy-set-piece")) buySetPiece();
+      const wearSet = target.closest<HTMLElement>("[data-wear-set]");
+      if (wearSet && game) {
+        const id = wearSet.dataset.wearSet as SetId;
+        const count = equipSetPieces(game.player, id);
+        syncStats(); persistGame(); refreshUi(true); openGearSets(id);
+        showToast(`Đã mặc ${count} món bộ ${GEAR_SETS[id].name}. Đồ cũ giữ trong túi.`);
+      }
       const skillPreview = target.closest<HTMLButtonElement>("[data-art-skill]");
       if (skillPreview) openSkillArt(skillPreview.dataset.artSkill as SkillKey);
       const preview = target.closest<HTMLButtonElement>("[data-preview-title]");
@@ -5198,6 +5495,7 @@ document.addEventListener("keydown", (event) => {
   if (key === "2") castSkill("skill2");
   if (key === "3") castSkill("ultimate");
   if (key === "4") playerBasicAttack();
+  if (key === "h") toggleMount();
   if (key === "e") pickupNearby();
   if (key === "q") drinkPotion("hp");
   if (key === "r") drinkPotion("mp");
@@ -5467,6 +5765,8 @@ function frame(now: number): void {
           sex: game.player.sex,
           appearance: currentHeroAppearance(),
           cultivation: cultivationForPower(currentCombatPower()),
+          horse: game.player.mounted ? currentMountAppearance() : undefined,
+          simpleEffects: game.player.preferences.skillEffects === "simple",
         },
         now,
       );

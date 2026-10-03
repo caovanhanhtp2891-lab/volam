@@ -2392,7 +2392,7 @@ h2 {
 .app-shell[data-page="log"] .game-layout { display: none; }
 .app-shell[data-page="log"].activities-open .game-layout { display: block; }
 .app-shell.arena-expanded .game-layout { display: none; }
-.app-shell:not([data-page="log"]) :is(.mobile-hud,.combat-bar,#mobile-auto,.arena-chat), .app-shell.activities-open :is(.mobile-hud,.combat-bar,#mobile-auto,.arena-chat) { display: none; }
+.app-shell:not([data-page="log"]) :is(.mobile-hud,.combat-bar,#mobile-auto,#mount-toggle,.arena-chat), .app-shell.activities-open :is(.mobile-hud,.combat-bar,#mobile-auto,#mount-toggle,.arena-chat) { display: none; }
 .bottom-nav { position: absolute; left: 0; right: 0; bottom: 0; height: var(--nav-height); padding-bottom: env(safe-area-inset-bottom, 0px); z-index: 6; }
 .bottom-nav button { font-size: 10px; gap: 3px; }
 .bottom-nav button > span { font-size: 21px; line-height: 22px; }
@@ -2436,3 +2436,49 @@ h2 {
   .arena-quest { right: auto; left: 8px; top: 72px; width: 150px; }
   .mobile-pickup { left: 82px; }
 }
+
+/* Equipment identity, elemental sets and riding controls. */
+.gear-art.grade-2 { background: radial-gradient(ellipse, #ffffff0c, transparent 68%); }
+.gear-art.grade-3 { background: radial-gradient(ellipse, #ffe29a16, transparent 70%); }
+.gear-art.grade-4 { background: radial-gradient(ellipse, #ffe9bf24, transparent 70%); }
+.gear-art.enhanced-1 .gear-sparkle, .gear-art.enhanced-2 .gear-sparkle { animation: gear-spark 2.2s ease-in-out infinite; transform-origin: 32px 32px; }
+.gear-art .gear-enchant { stroke-dasharray: 10 30; animation: gear-enchant 2s linear infinite; }
+.gear-art.enhanced-2 { filter: drop-shadow(0 0 3px var(--gear-color)); }
+.gear-art.enhanced-2 .gear-halo { animation: gear-spark 1.8s ease-in-out infinite; }
+@keyframes gear-spark { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+@keyframes gear-enchant { to { stroke-dashoffset: -40; } }
+.gear-identity { display: flex; gap: 3px 7px; flex-wrap: wrap; margin: 4px 0; font-size: 10px; color: #b5c5bc; }
+.gear-element-label, .gear-set-label { border: 1px solid currentColor; border-radius: 3px; padding: 1px 4px; }
+.item-detail .gear-identity { justify-content: center; margin: 10px 0; }
+.gear-sets-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gear-set-card { border: 1px solid var(--set-color); border-radius: 6px; background: #111f19; padding: 10px; margin: 12px 0; }
+.gear-set-card.selected-set { box-shadow: inset 0 0 16px #dcd29418; }
+.gear-set-card > header { display: flex; align-items: center; gap: 8px; }
+.gear-set-card header b { display: block; color: var(--set-color); font-size: 13px; }
+.gear-set-card header small { display: block; margin-top: 5px; color: #bac9b3; font-size: 10px; }
+.set-emblem { display: grid; place-items: center; flex: 0 0 33px; width: 33px; height: 33px; border: 1px solid var(--set-color); border-radius: 50%; color: var(--set-color); background: #101815; font-family: Georgia, serif; font-size: 20px; }
+.set-rules { list-style: none; padding: 0; margin: 10px 0; }
+.set-rules li { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid #596349; font-size: 11px; }
+.set-rules .set-locked { color: #91a398; }
+.set-rules .set-unlocked { color: var(--set-color); }
+.set-rules small { font-size: 10px; }
+.set-summary { width: 100%; display: flex; gap: 8px; align-items: center; color: var(--set-color); border: 1px solid #5a5c3b; background: #17231b; text-align: left; border-radius: 4px; padding: 9px; margin: 7px 0; }
+.set-summary > span:last-child { min-width: 0; }
+.set-summary b { display: block; font-size: 11px; }
+.set-summary small { display: block; font-size: 10px; color: #c9d4bf; margin-top: 5px; line-height: 1.5; }
+.set-summary strong { display: block; font-size: 11px; margin-top: 5px; }
+.set-summary.full-set { border-color: var(--set-color); background: linear-gradient(135deg, #30422b, #14251c); }
+.mount-card { display: flex; align-items: center; gap: 7px; padding: 8px; margin: 0 0 12px; }
+.mount-card > span { font-size: 30px; color: #ead192; }
+.mount-card > div { flex: 1; min-width: 0; }
+.mount-card b { display: block; font-size: 11px; color: #ebd095; }
+.mount-card small { display: block; font-size: 9px; color: #c2caaa; line-height: 1.4; margin-top: 4px; }
+.mount-card button { flex: 0 0 auto; }
+.mount-shop { display: flex; gap: 10px; align-items: center; }
+.mount-shop > svg { flex: 0 0 48px; width: 48px; height: 48px; }
+#mount-toggle { position: absolute; left: 92px; bottom: 99px; width: 36px; height: 36px; display: grid; place-content: center; justify-items: center; padding: 1px; border-radius: 50%; color: #e9d9a0; background: #142519e8; z-index: 3; }
+#mount-toggle > span { font-size: 20px; line-height: 20px; }
+#mount-toggle > small { font-size: 7px; line-height: 8px; }
+#mount-toggle[aria-pressed="true"] { border-color: #ecce7d; box-shadow: 0 0 6px #ffe29655; }
+.app-shell:not([data-page="log"]) #mount-toggle, .app-shell.activities-open #mount-toggle { display: none; }
+@media (prefers-reduced-motion: reduce) { .gear-art .gear-sparkle, .gear-art .gear-enchant, .gear-art .gear-halo { animation: none; } }

@@ -1,4 +1,8 @@
-import type { HeroAppearance } from "./combat-art";
+import { drawAnimatedHero, type HeroAppearance } from "./combat-art";
+import { freshMotion } from "./combat";
+import { drawHorse, type MountAppearance } from "./mount-art";
+import { drawGearAura } from "./gear-effects";
+import { drawEquipmentIcon } from "./equipment-art";
 import { drawGlow } from "./battle-vfx";
 import { drawCultivationAura } from "./cultivation-art";
 import type { Cultivation } from "./cultivation";
@@ -162,8 +166,23 @@ function drawPortraitBody(
   ctx.save();
   ctx.translate(25, -77);
   ctx.rotate(0.38);
-  const staff = ["tianren", "kunlun", "gaibang"].includes(factionId),
-    spear = factionId === "tianwang";
+  const staff = appearance.weaponVariant
+      ? appearance.weaponVariant === "staff"
+      : ["tianren", "kunlun", "gaibang"].includes(factionId),
+    spear = appearance.weaponVariant
+      ? appearance.weaponVariant === "spear"
+      : factionId === "tianwang";
+  if (
+    appearance.weaponVariant === "fan" ||
+    appearance.weaponVariant === "crossbow"
+  ) {
+    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, 48, {
+      variant: appearance.weaponVariant,
+    });
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = ink;
   ctx.lineWidth = 7;
   ctx.beginPath();
@@ -250,6 +269,8 @@ export function drawCharacterPreview(
     sex: "male" | "female";
     appearance: HeroAppearance;
     cultivation: Cultivation;
+    horse?: MountAppearance;
+    simpleEffects?: boolean;
   },
   now: number,
 ): void {
@@ -263,7 +284,27 @@ export function drawCharacterPreview(
   ctx.save();
   ctx.scale(2.2, 2.2);
   drawCultivationAura(ctx, character.cultivation, now);
+  drawGearAura(ctx, character.appearance, now, character.simpleEffects);
   ctx.restore();
+  if (character.horse) {
+    ctx.translate(0, 15);
+    ctx.scale(3, 3);
+    const motion = freshMotion();
+    motion.stride = now / 250;
+    drawHorse(ctx, character.horse, motion, now);
+    ctx.translate(0, -20);
+    ctx.scale(0.8, 0.8);
+    drawAnimatedHero(
+      ctx,
+      character.factionId,
+      character.sex,
+      motion,
+      now,
+      character.appearance,
+    );
+    ctx.restore();
+    return;
+  }
   ctx.translate(0, 44);
   ctx.scale(1.5, 1.5);
   drawPortraitBody(

@@ -57,7 +57,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.10.0 · Nhân vật & Túi đồ** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.11.0 · Bộ ngũ hành & Tuấn mã** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -67,7 +67,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - 5 phẩm chất: **Thường (xám), Tốt (lục), Hiếm (lam), Cực phẩm (tím), Hoàng Kim (vàng)**. Hoàng Kim có khung viền vàng/ký hiệu riêng và cột sáng vàng khi rơi. Trang bị mới có 1/2/3/4/6 dòng phụ theo phẩm chất, cùng chỉ số chính; các dòng trùng loại cộng chung khi hiển thị.
 - Dòng phụ gồm công, phòng, sinh lực, nội lực, chí mạng và tốc độ di chuyển. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng theo 4% mỗi bậc, tối đa +10; chỉ số chính có mức tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên. Vì vậy đồ cấp thấp vẫn tăng sức mạnh khi +1. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
 - **Hành trang → Mặc đồ mạnh nhất** chọn món tăng tổng điểm lực chiến cao nhất cho từng vị trí, kể cả chỉ số phụ/cường hóa. Món cũ về túi; không mất đồ khi túi đầy.
-- **Vứt đồ theo lọc** chọn phẩm chất tối đa, cấp trang bị tối đa, chỉ đồ yếu hơn/bằng món đang mặc. Xem danh sách rồi xác nhận hoặc hủy. Luôn giữ đồ Hoàng Kim, đồ +1 trở lên, đồ đang mặc và Đồ chờ nhận. Đổi bộ lọc phải xem lại trước khi xác nhận; không vứt cả đồ mới nhặt sau khi xem trước.
+- **Vứt đồ theo lọc** chọn phẩm chất tối đa, cấp trang bị tối đa, chỉ đồ yếu hơn/bằng món đang mặc. Xem danh sách rồi xác nhận hoặc hủy. Luôn giữ đồ bộ, đồ Hoàng Kim, đồ +1 trở lên, đồ đang mặc và Đồ chờ nhận. Đổi bộ lọc phải xem lại trước khi xác nhận; không vứt cả đồ mới nhặt sau khi xem trước.
 - Boss xuất hiện theo giờ Việt Nam **12:00–12:20 Kim Giáp Lang Vương, 19:00–19:20 Hoàng Kim Thủ Vệ, 21:00–21:20 Xích Diệm Ma Vương**. Tab Giang hồ hiển thị đếm ngược và lịch. Từ cấp 5 có thể vào đấu trường trong khung giờ; có đòn báo vùng đỏ và cuồng nộ dưới 50% HP.
 - Hạ boss chắc chắn rơi **1 món Hoàng Kim**, 15% rơi thêm món thứ hai; thưởng 900 XP, 800 bạc, 8 đá. Mỗi nhân vật nhận một lần mỗi khung giờ; lưu cả dấu đã hạ và đồ chưa nhặt. Rời đấu trường thu hồi đồ; túi đầy chuyển Đồ chờ nhận. Hết giờ/chết/rời sớm không cấp thưởng hạ boss. Trận đang đánh không tiếp tục sau reload, có thể vào lại nếu chưa hạ và còn giờ. Luyện ải và nhiệm vụ Lang Vương được giữ riêng.
 
@@ -106,6 +106,27 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 | Luân Hồi Chí Tôn | Trùng sinh 5 lần | +120 công, +80 phòng, +600 HP, +5% chí mạng | Hai quỹ đạo |
 
 Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng danh hiệu trên nhân vật; atlas vẫn 28 KB. Những cơ chế này thuộc bản local lưu trên trình duyệt; authority và thời gian server tiếp tục thuộc P3/P5 của PLAN.
+
+## Bộ ngũ hành và cưỡi ngựa · v0.11.0
+
+- Trang bị mới có **28 chủng loại**: sáu vũ khí (kiếm, đao, thương, trượng, nỏ, quạt), ba giáp, ba mũ, hai loại cho từng nhóm giày/đai/dây chuyền/nhẫn/hộ uyển/ngọc bội, bốn ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ. Từ +3 có vệt ánh sáng, +7 có hiệu ứng sáng mạnh hơn; hình và huy hiệu ngũ hành dùng chung trên đất, trong túi, so sánh và trên nhân vật.
+- Năm bộ **Kim Phong / Thanh Trúc / Hàn Nguyệt / Xích Diệm / Huyền Nham** ứng với Kim/Mộc/Thủy/Hỏa/Thổ. Đồ Hoàng Kim mới luôn thuộc một bộ; đồ khác có cơ hội thuộc bộ. Đồ rơi ưu tiên hệ môn phái 60% khi chọn hệ. Save cũ giữ nguyên chỉ số, không tự thêm dòng phụ, hệ hoặc bộ.
+- **2 món:** +6 công, +4 phòng; **4 món:** thêm +90 HP, +24 MP; **6 món:** thêm chỉ số đặc trưng của hệ. **Đủ 11 vị trí**, gồm hai nhẫn và ngựa, mở thuộc tính ẩn bên dưới và trận sáng riêng. Công/phòng/HP/MP của bộ nhân với bậc món thấp nhất; cùng hệ môn phái tăng các thuộc tính bộ 20%, làm tròn lên. Bộ chỉ đếm các ô đang mặc; ngựa vẫn tính vào bộ khi đi bộ. Phối nhiều bộ nhận những mốc riêng đã đủ, không nhận thuộc tính ẩn của bộ thiếu món.
+
+| Bộ | Thuộc tính ẩn ở bậc 1, chưa cộng đồng hệ |
+| --- | --- |
+| Kim Phong · Kim | Kiếm Tâm: +30 công, +5% chí mạng |
+| Thanh Trúc · Mộc | Sinh Sinh Bất Tức: +250 HP, +12 tốc |
+| Hàn Nguyệt · Thủy | Băng Tâm: +160 HP, +120 MP |
+| Xích Diệm · Hỏa | Liệt Diễm: +40 công, +8 tốc |
+| Huyền Nham · Thổ | Bất Động Sơn: +30 phòng, +250 HP |
+
+- **Nhân vật → Ngũ hành** hoặc **Túi đồ → Bộ ngũ hành** xem mốc đang bật/tắt, số vị trí đã sở hữu và mặc các món của một bộ từ túi. So sánh lực chiến và Mặc đồ mạnh nhất tính cả thuộc tính bộ; thao tác mặc vẫn giữ đồ cũ trong túi. Vứt đồ theo lọc giữ mảnh bộ; có thể bán từng món bằng luồng xác nhận cũ.
+- **Tiệm → Chọn mảnh bộ** mua đúng bộ và vị trí còn thiếu: phẩm chất Tốt, cấp bằng cấp nhân vật, hai dòng phụ ngẫu nhiên, giá `120 + cấp × 8` bạc. Mua vào túi, không tự thay trang bị; túi đầy/thiếu bạc/đang trong phụ bản không mua được.
+- **Tiệm → Mua Tuấn Mã** giá 200 bạc hoặc nhặt ngựa từ quái. Mặc vào ô Ngựa, bấm **Lên/Xuống ngựa** trong Nhân vật, nút **♞** trên sân hoặc **H**. Không có ngựa thì nút đưa tới Tiệm. Ngựa có dáng chạy, quay hướng, yên/giáp và ánh sáng theo phẩm chất/cường hóa, hiện cả trên sân và chân dung. Vẫn đánh thường/thi triển khi cưỡi; chờ hết chiêu lướt để lên xuống.
+- Tốc độ cưỡi tăng `30 + bậc phẩm chất × 5 + bậc trang bị` phần trăm (Tuấn Mã cơ bản +36%, cao nhất +66%). Đi bộ trở lại tốc độ gốc; thao tác không cộng dồn và không tăng lực chiến/cảnh giới chỉ vì lên ngựa. Trạng thái cưỡi lưu cùng từng nhân vật; save cũ đi bộ, không có ngựa đang mặc thì tự về đi bộ.
+
+Kiểm tra bổ sung: `node --experimental-strip-types tests/gear-mount-browser.cjs` với cùng các biến môi trường Playwright bên dưới. Bộ này chạy luồng mua/mặc đồ thật, bật/tắt đủ bộ, kiểm tra dự đoán lực chiến, tốc độ di chuyển khi cưỡi, hình ngựa thực sự được vẽ trên hai Canvas, lưu/tải, dữ liệu sai và sáu kích thước màn hình. Unit test `gear-sets.test.mjs` kiểm tra biên mốc bộ, đồng hệ, bậc thấp nhất, giữ đồ khi thay, đồ cũ và tốc độ không cộng dồn.
 
 ## Cảnh giới theo lực chiến
 
