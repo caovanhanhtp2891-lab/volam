@@ -220,6 +220,15 @@ h3 small {
 .tier-4 .gear-halo { opacity: .25; }
 .discard-check { font-size: 11px; display: flex; gap: 7px; align-items: center; }
 .discard-list { max-height: 180px; overflow: auto; padding-left: 18px; font-size: 11px; }
+.hunt-status { display: flex; gap: 6px; align-items: center; padding: 6px 0; }
+.hunt-status span { flex: 1; min-width: 0; color: #d4c29a; font-size: 10px; }
+.hunt-status button { flex: none; }
+.enhancement-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px; }
+.enhancement-table td, .enhancement-table th { padding: 5px 3px; text-align: right; border-bottom: 1px solid #3a4938; }
+.enhancement-table td:first-child, .enhancement-table th:first-child { text-align: left; }
+.enhancement-table td:last-child { color: #91e3a2; }
+.enhancement-cost { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; margin: 10px 0; }
+.enhancement-result { font-size: 12px; color: #ffdb9b; margin: 8px 0; }
 .gold-header {
   display: flex;
   align-items: center;

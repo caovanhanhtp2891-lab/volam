@@ -1,2 +1,2 @@
-export const APP_VERSION = "0.5.0";
-export const RELEASE_NAME = "Hoàng Kim tái xuất";
+export const APP_VERSION = "0.6.0";
+export const RELEASE_NAME = "Tinh anh và lửa trại";

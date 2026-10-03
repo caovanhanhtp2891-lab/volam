@@ -17,7 +17,7 @@ Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát tr
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.5.0 · Hoàng Kim tái xuất** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.6.0 · Tinh anh và lửa trại** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -25,13 +25,22 @@ Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát tr
 
 - 11 hình trang bị vector dùng chung trên đất, trong túi và trên nhân vật. Không thêm ảnh bitmap: atlas vẫn 28 KB. Bậc trang bị 1–16 theo mỗi 10 cấp; cấp trang bị biểu thị sức mạnh, chưa có yêu cầu cấp để mặc.
 - 5 phẩm chất: **Thường (xám), Tốt (lục), Hiếm (lam), Cực phẩm (tím), Hoàng Kim (vàng)**. Hoàng Kim có khung viền vàng/ký hiệu riêng và cột sáng vàng khi rơi. Trang bị mới có 1/2/3/4/6 dòng phụ theo phẩm chất, cùng chỉ số chính; các dòng trùng loại cộng chung khi hiển thị.
-- Dòng phụ gồm công, phòng, sinh lực, nội lực, chí mạng và tốc độ di chuyển. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng chỉ số chính và từng dòng phụ 4% mỗi bậc, tối đa +10. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
+- Dòng phụ gồm công, phòng, sinh lực, nội lực, chí mạng và tốc độ di chuyển. Mặc vào cộng trực tiếp cho nhân vật/combat; cường hóa tăng theo 4% mỗi bậc, tối đa +10; chỉ số chính có mức tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên. Vì vậy đồ cấp thấp vẫn tăng sức mạnh khi +1. Chi tiết hiển thị từng dòng và chênh lệch so với món đang mặc. Save cũ giữ chỉ số chính, không tự tạo dòng ngẫu nhiên khi tải.
 - **Hành trang → Mặc đồ mạnh nhất** chọn món tăng tổng điểm lực chiến cao nhất cho từng vị trí, kể cả chỉ số phụ/cường hóa. Món cũ về túi; không mất đồ khi túi đầy.
 - **Vứt đồ theo lọc** chọn phẩm chất tối đa, cấp trang bị tối đa, chỉ đồ yếu hơn/bằng món đang mặc. Xem danh sách rồi xác nhận hoặc hủy. Luôn giữ đồ Hoàng Kim, đồ +1 trở lên, đồ đang mặc và Đồ chờ nhận. Đổi bộ lọc phải xem lại trước khi xác nhận; không vứt cả đồ mới nhặt sau khi xem trước.
 - Boss xuất hiện theo giờ Việt Nam **12:00–12:20 Kim Giáp Lang Vương, 19:00–19:20 Hoàng Kim Thủ Vệ, 21:00–21:20 Xích Diệm Ma Vương**. Tab Giang hồ hiển thị đếm ngược và lịch. Từ cấp 5 có thể vào đấu trường trong khung giờ; có đòn báo vùng đỏ và cuồng nộ dưới 50% HP.
 - Hạ boss chắc chắn rơi **1 món Hoàng Kim**, 15% rơi thêm món thứ hai; thưởng 900 XP, 800 bạc, 8 đá. Mỗi nhân vật nhận một lần mỗi khung giờ; lưu cả dấu đã hạ và đồ chưa nhặt. Rời đấu trường thu hồi đồ; túi đầy chuyển Đồ chờ nhận. Hết giờ/chết/rời sớm không cấp thưởng hạ boss. Trận đang đánh không tiếp tục sau reload, có thể vào lại nếu chưa hạ và còn giờ. Luyện ải và nhiệm vụ Lang Vương được giữ riêng.
 
 Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết bị, lưu trên trình duyệt; chưa dùng giờ server hay chống chỉnh save/đồng hồ. Việc chuẩn hóa bằng server nằm trong P3/P5 của PLAN.
+
+## Cường hóa, tinh anh và lửa trại · v0.6.0
+
+- Chạm trang bị đang mặc hoặc nút **Rèn** trong túi để xem bảng chỉ số hiện tại → bậc kế tiếp, chi phí và tỷ lệ. Chỉ trừ nguyên liệu khi bấm xác nhận. Đồ đang mặc cập nhật ngay công/phòng/HP/MP/chí mạng/tốc độ/lực chiến; đồ trong túi chỉ cộng sau khi mặc. Không cộng lặp khi tải lại.
+- Mỗi lần dùng **1 đá**, bạc = `45 + bậc hiện tại × 35`. Tỷ lệ lên +1–+3: **100%**, +4–+6: **78%**, +7–+8: **58%**, +9–+10: **42%**. Thất bại mất nguyên liệu đã báo, giữ nguyên bậc/chỉ số; thiếu nguyên liệu hoặc đã +10 không bị trừ. Cường hóa trong phụ bản bị chặn để giao dịch được lưu đúng.
+- Hạ quái **thường có cấp không cao hơn nhân vật** trong luyện ải hoặc Rừng Trúc sẽ tích lũy cơ hội gặp tinh anh. Trước 6 con chưa quay xác suất; từ con thứ 6: **15%**, mỗi con tiếp theo tăng 5 điểm phần trăm, tối đa 60%; con thứ 20 chắc chắn xuất hiện nếu trước đó chưa gặp. Khi xuất hiện, bộ đếm về 0; tối đa 1 tinh anh xuất hiện thêm còn sống. Quái tinh anh có sẵn không chặn cơ chế này. Phụ bản và đấu trường Hoàng Kim giữ đội hình riêng.
+- Tinh anh xuất hiện thêm mạnh hơn quái thường 2 cấp, có vòng/nhãn vàng và rơi đồ Hiếm. Lưu bộ đếm, vị trí/HP tinh anh còn sống; tải lại có thể tiếp tục đánh. Tinh anh này không tự hồi sinh sau khi chết; cần hạ quái thường để gọi lượt tiếp theo.
+- Hạ tinh anh, kể cả tinh anh có sẵn trong phụ bản, tạo **lửa trại 90 giây**, phạm vi **120 đơn vị**, thưởng **`6 + cấp tinh anh × 2` XP mỗi 3 giây**. Chỉ nhận khi nhân vật ở gần và đúng bản đồ; nhiều lửa không cộng chồng. Bấm lửa trên sân hoặc **Đến lửa trại** trong Giang hồ để dừng auto và đi tới; bấm **Tự động** để đánh tiếp.
+- Tối đa 3 lửa đồng thời, vẽ trực tiếp bằng Canvas; không thêm ảnh vào atlas 28 KB. Lửa trên cùng ải giữ qua các đợt, nhưng không cấp XP khi về thành, đổi bản đồ, vào boss hoặc đứng xa. Lửa phụ bản chỉ thuộc lượt đang chạy. Lửa trên world/luyện ải giữ thời hạn khi reload; không gia hạn và không nhận bù XP lúc đóng tab, tải lại hoặc chạy nền.
 
 ## Cảnh giới theo lực chiến
 
@@ -179,6 +188,14 @@ node tests/equipment-browser.cjs
 ```
 
 Bộ này kiểm tra sáu dòng cộng thật khi mặc, tải lại, xem trước/hủy/bảo vệ đồ khi lọc, boss trước/đúng/hết giờ Việt Nam, đồ Hoàng Kim dưới đất sau reload, không nhận lượt hai, túi đầy chuyển hàng chờ và sáu kích thước màn hình. Fixture mạnh chỉ kiểm tra luồng nhận thưởng, không thay thế playtest boss.
+
+Kiểm tra cường hóa và tinh anh/lửa trại bằng cùng các biến môi trường:
+
+```bash
+node tests/enhancement-elite-browser.cjs
+```
+
+Bộ này kiểm tra xem trước/chi phí/tỷ lệ, thất bại/thiếu đồ/+10, cộng chỉ số khi mặc và reload; diệt quái thường gọi tinh anh thật, tải tiếp trận, diệt tinh anh tạo lửa, XP gần/xa/hết hạn, không thưởng offline và sáu kích thước màn hình.
 
 Browser test kiểm tra mua/bán, bình hồi phục, migrate save, kích thước mobile, hai phụ bản/đợt/boss, nhận thưởng lặp, túi đầy, tải lại, chết và timeout. Bài kiểm tra clear phụ bản dùng fixture nhân vật mạnh để kiểm chứng luồng nhanh; không thay thế playtest cân bằng ở cấp tối thiểu.
 

@@ -36,7 +36,7 @@ import {
 } from "./combat";
 import { drawAnimatedHero, drawEquipmentIcon } from "./combat-art";
 import { equipmentMarkup, equipmentTier } from "./equipment-art";
-import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, totalGearStats, gearScore, rollGearBonuses, equipBestGear, discardCandidates, validBonuses, equipmentGrade, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
+import { RARITIES, RARITY_COLORS, STAT_LABELS, gearStats, totalGearStats, gearScore, rollGearBonuses, equipBestGear, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
 import {
   drawBattleEffect,
@@ -66,6 +66,7 @@ import {
 
 import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, type Sect as School, type SkillDefinition, type EffectMotif } from "./sects";
 import { drawSectEffect, skillIconMarkup } from "./sect-effects";
+import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
 
 type SectId = "kim" | "hoa" | "thuy";
 type Sect = School & { skills: [string, string]; ultimate: string };
@@ -137,6 +138,7 @@ interface Player {
   facingX: number;
   facingY: number;
   goldenClears: string[];
+  eliteHunt: EliteHunt;
 }
 
 interface Npc {
@@ -150,6 +152,7 @@ interface Npc {
 }
 
 interface Enemy {
+  wildElite?: boolean;
   element?: Element;
   id: string;
   name: string;
@@ -302,6 +305,7 @@ interface GameState {
   dungeonRewardClaimed: boolean;
   dungeonId: DungeonId | null;
   dungeonWave: number;
+  campfires: Campfire[];
   goldenEncounter?: { window: GoldenWindow; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
   onlinePlayers: OnlineSnapshot["players"];
   autoBattle: boolean;
@@ -823,11 +827,13 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     ...normalizeSupplies({}),
     pendingItems: [],
     goldenClears: [],
+    eliteHunt: normalizeEliteHunt(undefined),
     facingX: 1,
     facingY: 0,
   };
   const state: GameState = {
     combat: freshCombat(),
+    campfires: [],
     player,
     enemies: makeEnemies(),
     worldEnemies: [],
@@ -1613,8 +1619,9 @@ function killEnemy(enemy: Enemy): void {
   game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
   if (game.combat.corpses.length > 16) game.combat.corpses.shift();
   const idleFight = game.mapMode === "world" && playerIdleActive();
+  const huntEligible = game.mapMode === "world" && !game.goldenEncounter && enemy.kind === "normal" && enemy.level <= game.player.level;
   enemy.respawnAt =
-    idleFight || game.mapMode === "dungeon" || enemy.kind === "boss"
+    idleFight || game.mapMode === "dungeon" || enemy.kind === "boss" || enemy.wildElite
       ? Number.POSITIVE_INFINITY
       : nowMs() + 8000;
   if (idleFight) {
@@ -1703,6 +1710,14 @@ function killEnemy(enemy: Enemy): void {
     );
     persistGame();
   }
+  if (enemy.kind === "elite") {
+    game.campfires = game.campfires.filter(fire => fire.expiresAt > Date.now());
+    game.campfires.push(createCampfire(`camp-${enemy.id}-${Date.now()}`, huntArea(), enemy.x, enemy.y, enemy.level, Date.now()));
+    game.campfires = game.campfires.slice(-MAX_CAMPFIRES);
+    addLog(`Hạ tinh anh! Lửa trại cháy 90 giây. Ở trong vòng sáng nhận ${campfireXp(enemy.level)} XP mỗi 3 giây.`);
+  }
+  if (huntEligible && recordNormalKill(game.player.eliteHunt, game.enemies.some(other => !other.dead && other.wildElite))) spawnWildElite(enemy);
+  if (huntEligible || enemy.kind === "elite") persistGame();
 }
 
 function damagePlayer(amount: number, source: string): void {
@@ -1840,38 +1855,102 @@ function equipItem(index: number): void {
   refreshUi(true);
 }
 
+function findOwnedItem(id: string): Item | undefined {
+  return game ? [...game.player.inventory, ...Object.values(game.player.equipment)].find(item => item.id === id) : undefined;
+}
+function openEnhancement(item: Item, result = ""): void {
+  if (!game) return;
+  const info = enhancementInfo(item), next = { ...item, enhance: Math.min(10, item.enhance + 1) };
+  const before = gearStats(item), after = gearStats(next);
+  const equipped = game.player.equipment[item.slot]?.id === item.id;
+  const blocked = game.mapMode !== "world";
+  const poor = game.player.gold < info.cost || game.player.refiningStones < info.stones;
+  openUtility("Cường hóa trang bị", `<div class="item-detail">${equipmentMarkup(item.slot, item.color, item.rarity, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${before[key]}${key === "crit" ? "%" : ""}</td><td>${after[key]}${key === "crit" ? "%" : ""}</td><td>${after[key] > before[key] ? `+${after[key] - before[key]}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số chính tăng mỗi bậc; các dòng phụ tăng theo tỷ lệ. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? '<p class="enhancement-result">Đã đạt cường hóa tối đa +10.</p>' : `<div class="enhancement-cost"><b>${info.cost} bạc + ${info.stones} đá</b><span>Tỷ lệ ${Math.round(info.chance * 100)}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? "+10 tối đa" : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
+}
+function confirmEnhancement(id: string, rank: number): void {
+  if (!game || game.mapMode !== "world") return;
+  const item = findOwnedItem(id);
+  if (!item) return showToast("Trang bị không còn trong túi hoặc trên nhân vật.");
+  if (item.enhance !== rank) { openEnhancement(item, "Trang bị đã thay đổi. Hãy kiểm tra lại chỉ số và chi phí."); return; }
+  const outcome = attemptEnhancement(item, game.player);
+  if (outcome === "success") syncStats();
+  const message = outcome === "success" ? `Thành công: ${item.name} +${item.enhance}.` : outcome === "failed" ? `Thất bại: giữ nguyên +${item.enhance}, đã dùng bạc và 1 đá.` : outcome === "capped" ? "Trang bị đã đạt +10." : "Không đủ bạc hoặc đá tinh luyện.";
+  addLog(message); persistGame(); refreshUi(true); openEnhancement(item, message);
+}
+function huntArea(): string {
+  if (!game) return "none";
+  if (game.goldenEncounter) return "golden";
+  if (game.mapMode === "dungeon") return `dungeon-${game.dungeonId}`;
+  if (game.player.idle.inTown) return "town";
+  return game.player.idle.enabled ? `stage-${game.player.idle.stage}` : "world";
+}
+function activeCampfires(): Campfire[] {
+  return game ? game.campfires.filter(fire => fire.area === huntArea() && fire.expiresAt > Date.now()) : [];
+}
+function nearestCampfire(): Campfire | undefined {
+  return game ? activeCampfires().sort((a, b) => distance(game!.player, a) - distance(game!.player, b))[0] : undefined;
+}
+function saveWildElite(): SavedWildElite | undefined {
+  if (!game) return;
+  const elite = (game.goldenEncounter?.enemies ?? game.enemies).find(enemy => enemy.wildElite && !enemy.dead);
+  if (!elite) return;
+  return { id: elite.id, name: elite.name, area: game.player.idle.enabled ? `stage-${game.player.idle.stage}` : "world", x: elite.x, y: elite.y, level: elite.level, hp: elite.hp, element: elite.element };
+}
+function spawnWildElite(source: Enemy): void {
+  if (!game) return;
+  const radius = 25;
+  let x = source.x, y = source.y;
+  for (let i = 0; i < 8; i++) {
+    const angle = i * Math.PI / 4;
+    const nx = source.x + Math.cos(angle) * 65, ny = source.y + Math.sin(angle) * 65;
+    if (!isBlocked(nx, ny, radius)) { x = nx; y = ny; break; }
+  }
+  const elite = createEnemy(`wild-elite-${Date.now()}-${game.player.eliteHunt.spawned}`, `${source.name} tinh anh`, "elite", x, y, Math.min(160, source.level + 2), "#ffbf68");
+  elite.wildElite = true; elite.element = source.element;
+  for (const enemy of game.enemies) if (enemy.wildElite && enemy.dead) game.combat.enemyMotions.delete(enemy.id);
+  game.enemies = game.enemies.filter(enemy => !enemy.wildElite || !enemy.dead);
+  game.enemies.push(elite); game.worldEnemies = game.enemies;
+  idleNextWave = 0;
+  addLog(`${elite.name} đã xuất hiện! Hạ tinh anh để nhóm lửa trại.`);
+}
+function restAtCampfire(fire: Campfire): void {
+  if (!game || fire.area !== huntArea() || fire.expiresAt <= Date.now()) return;
+  game.autoBattle = false; game.targetId = null; game.combat.lootTarget = null;
+  game.moveTarget = { x: fire.x, y: fire.y };
+  closeUtility(); showIdlePage("log");
+  addLog("Đi tới lửa trại để nhận XP theo thời gian. Bấm Tự động để tiếp tục đánh quái.");
+}
+function refreshHuntUi(): void {
+  if (!game) return;
+  const fire = nearestCampfire(), hunt = game.player.eliteHunt;
+  const elite = game.enemies.some(enemy => !enemy.dead && enemy.wildElite);
+  const message = fire ? `${nearCampfire(fire, game.player) ? "Đang hưởng" : "Lửa trại"}: +${campfireXp(fire.level)} XP/3s · còn ${countdown(fire.expiresAt - Date.now())}` : elite ? "Tinh anh đã xuất hiện · Hạ quái để nhóm lửa trại." : hunt.normalKills < ELITE_MIN_KILLS ? `Quái thường ${hunt.normalKills}/${ELITE_MIN_KILLS} · Tích lũy cơ hội gặp tinh anh` : `Đã hạ ${hunt.normalKills} quái · Cơ hội lượt tới ${Math.round(eliteChance(hunt.normalKills + 1) * 100)}%`;
+  document.getElementById("elite-hunt-status")!.textContent = message;
+  document.querySelector<HTMLButtonElement>("#campfire-btn")!.disabled = !fire;
+}
+function drawCampfire(fire: Campfire, now: number): void {
+  if (!game || fire.x < game.cameraX - CAMPFIRE_RADIUS || fire.x > game.cameraX + VIEW_WIDTH + CAMPFIRE_RADIUS || fire.y < game.cameraY - CAMPFIRE_RADIUS || fire.y > game.cameraY + VIEW_HEIGHT + CAMPFIRE_RADIUS) return;
+  ctx.save(); ctx.translate(fire.x, fire.y);
+  ctx.strokeStyle = nearCampfire(fire, game.player) ? "#ffd178" : "#c39a55";
+  ctx.lineWidth = 1; ctx.globalAlpha = .35; ctx.setLineDash([5, 8]);
+  ctx.beginPath(); ctx.arc(0, 0, CAMPFIRE_RADIUS, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+  ctx.fillStyle = "#3d2c21"; ctx.beginPath(); ctx.ellipse(0, 7, 21, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "#99724a"; ctx.lineWidth = 6; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-12, 9); ctx.lineTo(12, 1); ctx.moveTo(-12, 1); ctx.lineTo(12, 9); ctx.stroke();
+  const flicker = Math.sin(now / 120 + fire.x) * 2;
+  for (const [color, width, height] of [["#ed7042", 14, 32], ["#ffbf4e", 9, 25], ["#ffed9e", 4, 16]] as const) {
+    ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-width, 4); ctx.quadraticCurveTo(-width, -height / 2, flicker, -height); ctx.quadraticCurveTo(width, -height / 2, width, 4); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = "#ffe6a4"; ctx.font = "600 10px sans-serif"; ctx.textAlign = "center";
+  drawOutlinedText(`Lửa trại · ${countdown(fire.expiresAt - Date.now())}`, 0, -39);
+  ctx.restore();
+}
+
 function enhanceItem(index: number, equippedSlot?: ItemSlot): void {
   if (!game) return;
-  const item = equippedSlot
-    ? game.player.equipment[equippedSlot]
-    : game.player.inventory[index];
-  if (!item) return;
-  if (item.enhance >= 10)
-    return addLog(`${item.name} đã đạt giới hạn +10 của prototype.`);
-  const cost = 45 + item.enhance * 35;
-  if (game.player.gold < cost || game.player.refiningStones < 1) {
-    addLog(`Cần ${cost} bạc và 1 đá tinh luyện để cường hóa.`);
-    return;
-  }
-  game.player.gold -= cost;
-  game.player.refiningStones -= 1;
-  const chance =
-    item.enhance < 3
-      ? 1
-      : item.enhance < 6
-        ? 0.78
-        : item.enhance < 8
-          ? 0.58
-          : 0.42;
-  if (Math.random() <= chance) {
-    item.enhance += 1;
-    syncStats();
-    addLog(`Cường hóa thành công: ${item.name} +${item.enhance}.`);
-  } else {
-    addLog(`Cường hóa thất bại: ${item.name} vẫn ở +${item.enhance}.`);
-  }
-  persistGame();
-  refreshUi(true);
+  const item = equippedSlot ? game.player.equipment[equippedSlot] : game.player.inventory[index];
+  if (item) openEnhancement(item);
 }
 
 function persistGame(): boolean {
@@ -1879,6 +1958,8 @@ function persistGame(): boolean {
   const snapshot = {
     version: 2,
     savedAt: Date.now(),
+    campfires: game.campfires.filter(fire => fire.expiresAt > Date.now() && !fire.area.startsWith("dungeon-")),
+    wildElite: saveWildElite(),
     player: game.goldenEncounter ? { ...game.player, x: game.goldenEncounter.x, y: game.goldenEncounter.y, idle: { ...game.player.idle, inTown: game.goldenEncounter.inTown } } : game.player,
     groundLoot: [...(game.goldenEncounter?.loot ?? []), ...game.loot].map(({ id, x, y, item, gold, stones }) => ({
       id,
@@ -1943,6 +2024,7 @@ function loadGame(): void {
     const worldEnemies = makeEnemies();
     game = {
       combat: freshCombat(),
+      campfires: restoreCampfires(snapshot.campfires, Date.now()),
       player: snapshot.player,
       enemies: worldEnemies,
       worldEnemies,
@@ -1983,6 +2065,13 @@ function loadGame(): void {
       }
       prepareIdleWave();
       game.autoBattle = !game.player.idle.inTown;
+    }
+    if (snapshot.wildElite && snapshot.wildElite.area === huntArea()) {
+      const saved = snapshot.wildElite;
+      const elite = createEnemy(saved.id, saved.name, "elite", saved.x, saved.y, saved.level, "#ffbf68");
+      elite.wildElite = true; elite.element = saved.element as Element | undefined;
+      elite.hp = Math.min(elite.maxHp, saved.hp);
+      game.enemies.push(elite);
     }
     game.loot = (snapshot.groundLoot ?? []).map((loot) => ({
       ...loot,
@@ -2079,15 +2168,17 @@ function selectAt(world: { x: number; y: number }): void {
     return;
   }
   game.combat.lootTarget = null;
-  const hit = game.enemies.find(
+  const hit = game.enemies.filter(
     (enemy) => !enemy.dead && distance(world, enemy) <= enemy.radius + 28,
-  );
+  ).sort((a, b) => distance(world, a) - distance(world, b))[0];
   if (hit) {
     game.targetId = hit.id;
     game.moveTarget = null;
     addLog(`Mục tiêu: ${hit.name}.`);
     return;
   }
+  const fire = activeCampfires().find(candidate => distance(world, candidate) <= 25);
+  if (fire) { restAtCampfire(fire); return; }
   const npc =
     game.mapMode === "world"
       ? NPCS.find((candidate) => distance(world, candidate) <= 32)
@@ -2180,6 +2271,9 @@ function update(dt: number, now: number): void {
   if (!game) return;
   const player = game.player;
   const before = { x: player.x, y: player.y };
+  game.campfires = game.campfires.filter(fire => fire.expiresAt > Date.now());
+  const fireXp = tickCampfires(game.campfires, huntArea(), player, Date.now());
+  if (fireXp) { rewardExperience(fireXp); persistGame(); }
   if (game.goldenEncounter && Date.now() >= game.goldenEncounter.window.endsAt) {
     leaveGoldenBoss("Khung giờ boss đã kết thúc.");
     return;
@@ -2528,6 +2622,7 @@ function drawWorld(now: number): void {
     if (!playerIdleActive() && !game.goldenEncounter) for (const npc of NPCS) drawNpc(npc, now);
   }
 
+  for (const fire of activeCampfires()) drawCampfire(fire, now);
   for (const zone of game.zones) drawSectEffect(ctx, { ...zone, kind: zone.kind as EffectMotif }, ((now - zone.startedAt) % 1200) / 1200, true);
   const groundEffects = new Set(["burst", "heal", "shield"]);
   for (const effect of game.effects)
@@ -3032,6 +3127,11 @@ function drawEnemy(enemy: Enemy, now: number): void {
     ctx.fillStyle = "#ffd35a"; ctx.font = "18px Georgia"; ctx.textAlign = "center";
     ctx.fillText("✦", 0, -enemy.radius * 2.5);
   }
+  if (enemy.kind === "elite") {
+    ctx.strokeStyle = "#ffbf68"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 5, enemy.radius + 5, 10, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#ffbf68"; ctx.font = "13px Georgia"; ctx.textAlign = "center"; ctx.fillText("◆", 0, -enemy.radius * 2.6);
+  }
   drawEnemySprite(enemy, now);
   ctx.restore();
   const barWidth =
@@ -3416,7 +3516,8 @@ function renderSkillBar(): void {
 
 function itemRow(item: Item, index: number, equipped = false): string {
   const statLabel = `${equipmentGrade(item.level)} · LC ${formatNumber(gearScore(item))}`;
-  const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>+ Cường hóa</button>`;
+  const info = enhancementInfo(item);
+  const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>${info.capped ? "+10 tối đa" : `Rèn +${item.enhance + 1} · ${info.cost} bạc`}</button>`;
   const equipButton = equipped
     ? ""
     : `<button class="mini-button equip-btn" data-index="${index}">Mặc đồ</button>`;
@@ -3493,7 +3594,7 @@ function renderInventory(): void {
       )
       .join("");
     inventoryContent.innerHTML = `
-      <div class="smith-intro"><span class="smith-icon">⚒</span><div><strong>Lò rèn Rừng Trúc</strong><p>Dùng bạc và đá tinh luyện. Thất bại không làm mất cấp.</p></div></div>
+      <div class="smith-intro"><span class="smith-icon">⚒</span><div><strong>Lò rèn Rừng Trúc</strong><p>Xem trước chi phí, tỷ lệ và chỉ số trước khi rèn. Thất bại giữ nguyên cấp; tối đa +10.</p></div></div>
       <div class="resource-hint"><span>Chi phí hiện tại phụ thuộc cấp cường hóa</span><b>${player.refiningStones} đá · ${player.gold} bạc</b></div>
       <div class="item-list smith-list">${equipment}</div>
     `;
@@ -3915,6 +4016,7 @@ function refreshIdleUi(): void {
       : "Có quà chờ nhận",
   );
   const cultivation = cultivationForPower(currentCombatPower());
+  refreshHuntUi();
   text("combat-power", formatNumber(cultivation.power));
   text("header-combat-power", `⚔ ${formatNumber(cultivation.power)}`);
   document.getElementById("header-combat-power")!.title = `Lực chiến ${formatNumber(cultivation.power)}`;
@@ -4074,6 +4176,8 @@ function validateSave(value: unknown): {
   enemies: Enemy[];
   savedAt?: number;
   groundLoot?: GroundLoot[];
+  campfires?: Campfire[];
+  wildElite?: SavedWildElite;
 } {
   if (!value || typeof value !== "object") throw new Error("save-invalid");
   const data = value as {
@@ -4081,6 +4185,8 @@ function validateSave(value: unknown): {
       enemies: Enemy[];
       savedAt?: number;
       groundLoot?: GroundLoot[];
+      campfires?: Campfire[];
+      wildElite?: SavedWildElite;
     },
     player = data.player;
   if (
@@ -4123,6 +4229,8 @@ function validateSave(value: unknown): {
     throw new Error("save-invalid");
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
+  player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
+  if (!validCampfires(data.campfires) || !validWildElite(data.wildElite)) throw new Error("save-invalid");
 
   player.facingX = Number.isFinite(player.facingX)
     ? clamp(player.facingX, -1, 1)
@@ -4463,6 +4571,8 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const enhanceConfirm = target.closest<HTMLButtonElement>("[data-confirm-enhance]");
+      if (enhanceConfirm) confirmEnhancement(enhanceConfirm.dataset.confirmEnhance!, Number(enhanceConfirm.dataset.enhanceRank));
       if (target.closest("#preview-discard")) previewDiscard();
       if (target.closest("#confirm-discard")) confirmDiscard();
       if (target.closest("#cancel-discard")) { discardPreview = null; closeUtility(); }
@@ -4643,6 +4753,7 @@ function bindIdleUi(): void {
         `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, 5 phẩm chất, nhiều dòng chỉ số và cường hóa đến +10. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
       ),
     );
+  document.getElementById("campfire-btn")!.addEventListener("click", () => { const fire = nearestCampfire(); if (fire) restAtCampfire(fire); });
   document.getElementById("golden-boss-btn")!.addEventListener("click", openGoldenBoss);
   document.getElementById("slot-btn")!.addEventListener("click", openSlots);
   document.getElementById("adventure-btn")!.addEventListener("click", () => {

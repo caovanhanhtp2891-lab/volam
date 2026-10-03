@@ -10,6 +10,17 @@ Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot 
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
 
+Lát cường hóa và tinh anh local ngày 03/10/2026 · **v0.6.0 Tinh anh và lửa trại**:
+
+- [x] Sửa làm tròn cho đồ nhỏ: chỉ số chính tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên; hệ số 4%/bậc, tối đa +10. Tính từ dữ liệu gốc, không cộng lặp khi sync/reload.
+- [x] Xem trước chỉ số/chi phí/tỷ lệ rồi xác nhận. Một đá và `45 + bậc × 35` bạc; tỷ lệ 100/78/58/42%. Thất bại giữ chỉ số, thiếu nguyên liệu/capped không trừ, đồ trong túi chỉ cộng khi mặc. Chặn giao dịch rèn trong phụ bản chưa lưu.
+- [x] Hạ quái thường <= cấp nhân vật ở world/luyện ải: 6 con bắt đầu quay 15%, mỗi con tăng 5 điểm %, tối đa 60%, con thứ 20 bảo đảm xuất hiện. Giới hạn 1 tinh anh xuất hiện thêm còn sống, không chặn bởi tinh anh có sẵn; không thêm quái vào đội hình phụ bản/boss Hoàng Kim.
+- [x] Tinh anh ngẫu nhiên +2 cấp, vòng/nhãn vàng, loot Hiếm; không tự hồi sinh. Lưu bộ đếm và tinh anh còn sống với HP/vị trí để tiếp tục sau reload; không tích vô hạn xác/quái cũ.
+- [x] Hạ tinh anh tạo lửa 90 giây, phạm vi 120, `6 + cấp × 2` XP/3 giây. Tối đa 3 lửa, không cộng chồng kể cả lửa sinh lệch thời điểm; không thưởng khi xa/sai map/về thành/boss. Chạm lửa/nút Đến lửa trại dừng auto và đi tới. Giữ lửa qua đợt cùng ải.
+- [x] Lửa Canvas đơn giản, không tăng bitmap 28 KB; world/luyện ải lưu thời hạn, không gia hạn hoặc cộng XP offline/catch-up khi reload/chạy nền. Lửa phụ bản chỉ thuộc instance đang chạy.
+- [x] Kiểm tra local: 77 unit test và 7 bộ browser (cường hóa/tinh anh/lửa trại, trang bị/boss, idle, combat, cửa hàng/phụ bản, cảnh giới, 10 phái). Luồng mới chạy trên build production `/volam/`; xác nhận chi phí/chỉ số thật, reload, thất bại, +10, XP gần/xa/hết hạn và 6 viewport 320×568 đến desktop. Typecheck/build thành công; atlas giữ 28.026 byte.
+- [ ] Playtest tỷ lệ/tốc độ XP và kinh tế rèn trên điện thoại thật; authority/giao dịch/giờ server thuộc P3/P5, chưa hoàn thành bởi các cơ chế local này.
+
 Lát trang bị và boss local ngày 03/10/2026 · **v0.5.0 Hoàng Kim tái xuất**:
 
 - [x] Phẩm chất xám/lục/lam/tím/vàng, 11 icon SVG/Canvas riêng, bậc trang bị 1–16; không thêm bitmap vào ngân sách atlas 28 KB.

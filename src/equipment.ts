@@ -20,10 +20,24 @@ export function equipmentGrade(level: number): string {
 // Old items retain their primary power; bonus rolls only exist on new drops.
 export function gearStats(item: EquipmentData): GearStats {
   const stats = emptyStats();
-  const scale = (value: number) => value + Math.floor(value * item.enhance * .04);
-  stats[item.slot === "weapon" ? "attack" : "defense"] = scale(item.power);
+  const scale = (value: number) => value + Math.ceil(value * item.enhance * .04);
+  // Every successful rank improves the primary stat, even on low-level gear.
+  stats[item.slot === "weapon" ? "attack" : "defense"] = item.power + (item.power > 0 ? Math.max(item.enhance, Math.ceil(item.power * item.enhance * .04)) : 0);
   for (const key of Object.keys(stats) as GearStat[]) stats[key] += scale(item.bonuses?.[key] ?? 0);
   return stats;
+}
+export const MAX_ENHANCEMENT = 10;
+export function enhancementInfo(item: EquipmentData) {
+  return { capped: item.enhance >= MAX_ENHANCEMENT, cost: 45 + item.enhance * 35, stones: 1, chance: item.enhance < 3 ? 1 : item.enhance < 6 ? .78 : item.enhance < 8 ? .58 : .42 };
+}
+export function attemptEnhancement(item: EquipmentData, owner: { gold: number; refiningStones: number }, random = Math.random): "success" | "failed" | "capped" | "poor" {
+  const info = enhancementInfo(item);
+  if (info.capped) return "capped";
+  if (owner.gold < info.cost || owner.refiningStones < info.stones) return "poor";
+  owner.gold -= info.cost;
+  owner.refiningStones -= info.stones;
+  if (random() < info.chance) { item.enhance++; return "success"; }
+  return "failed";
 }
 export function totalGearStats(items: readonly EquipmentData[]): GearStats {
   const total = emptyStats();

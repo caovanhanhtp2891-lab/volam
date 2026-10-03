@@ -28,6 +28,7 @@ export function idleShell(): string {
         <div class="todo-card"><b>Việc cần làm</b><button id="todo-reward" class="mini-button">Có quà chờ nhận</button><button class="mini-button" data-idle-open="dungeon">Phụ bản</button></div>
         <div class="stage-card"><div><strong id="stage-name">Hoa Sơn · Ải 1/10</strong><small id="stage-description">Chọn môn phái để bắt đầu</small></div><div class="stage-actions"><button id="stage-prev" aria-label="Ải trước">◀</button><button id="stage-push" aria-pressed="true">Vượt ải</button><button id="stage-next" aria-label="Ải tiếp theo">▶</button></div></div>
         <div class="card golden-card"><div><b>✦ Boss Hoàng Kim</b><small id="golden-status">12:00 · 19:00 · 21:00 (VN)</small></div><button id="golden-boss-btn" class="mini-button">Lịch boss</button></div>
+        <div class="hunt-status"><span id="elite-hunt-status">Hạ quái thường để tìm tinh anh.</span><button id="campfire-btn" class="mini-button" disabled>Đến lửa trại</button></div>
         <section class="quest-panel"><button id="quest-toggle" class="quest-toggle" aria-label="Mở nhiệm vụ" aria-expanded="false">⌄</button><b id="quest-title">Dấu chân trong Rừng Trúc</b><p id="quest-text"></p><div class="quest-progress"><span id="quest-kill-progress"></span><span id="quest-boss-progress"></span></div><small id="quest-reward"></small></section>
         <div class="log-panel"><div id="log-list" class="log-list"></div></div>
         <div class="target-panel"><div id="target-content"></div></div>
@@ -37,7 +38,7 @@ export function idleShell(): string {
       <section class="character-panel tab-page" data-page="char">
         <div class="card character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small><p>Lực chiến <strong id="combat-power">0</strong></p></div><span id="character-element" class="element-badge">金</span></div>
         <div id="cultivation-card" class="card cultivation-card"><div class="cultivation-heading"><div><small id="realm-plane">Phàm giới · Bậc 1/19</small><strong id="realm-name">Luyện Thể</strong><span id="realm-phase">Tầng 1</span></div><button id="realm-guide-btn" class="mini-button">19 cảnh giới</button></div><div id="realm-meter" class="realm-meter" role="progressbar" aria-label="Tiến tới cảnh giới tiếp theo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="realm-progress"></span></div><p id="realm-next"></p><small class="dim">Tăng lực chiến bằng cấp độ, tiềm năng và trang bị đang mặc.</small></div>
-        <div id="equipment-grid" class="equipment-grid"></div><p class="dim">Chạm trang bị để cường hóa. Đồ tốt hơn có thể mặc trong Hành trang.</p>
+        <div id="equipment-grid" class="equipment-grid"></div><p class="dim">Chạm trang bị để xem trước chỉ số và cường hóa. Đồ tốt hơn có thể mặc trong Hành trang.</p>
         <h3>Tiềm năng <small id="attribute-points">0 điểm</small></h3><div id="attribute-list" class="card"></div>
         <h3>Chỉ số nhân vật</h3><div id="stat-grid" class="stat-grid"></div>
         <div class="currency-row"><span>✦ <b id="stone-label">0</b> đá tinh luyện</span><span>◇ <b id="token-label">0</b> lệnh bài</span></div>
