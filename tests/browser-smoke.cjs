@@ -167,6 +167,9 @@ async function audit(page, width, height) {
     console.log("PASS purchases, wallet, stack counts, stable focus, sale confirmation/cancel");
 
     await closeSheet(page);
+    // Isolate manual potion checks from enemies advancing during the shop checks.
+    await seed(page, { x: 300, y: 300, hp: 20, mp: 10, defense: 1000, potionCooldown: 0 });
+    assert.deepEqual((await saved(page)).player.potions, { hp: 4, mp: 7 });
     await page.locator('.potion-shortcuts [data-use-potion="hp"]').click();
     await page.waitForFunction(key => JSON.parse(localStorage.getItem(key)).player.potions.hp === 3, saveKey);
     state = (await saved(page)).player;

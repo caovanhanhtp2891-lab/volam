@@ -9,10 +9,16 @@ export function drawCultivationAura(
   now: number,
 ): void {
   const {
-    rank,
+    rank: realmRank,
     phaseIndex,
     realm: { color, accent },
   } = cultivation;
+  if (realmRank === 0) {
+    ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = .3; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(0, 19, 27, 9, 0, 0, TAU); ctx.stroke(); ctx.restore();
+    return;
+  }
+  const rank = realmRank - 1;
   const radius = 34 + rank * 1.8 + phaseIndex * 0.4;
   const rotation = now / (11000 - rank * 200);
   const rings = 1 + Math.floor(rank / 4);

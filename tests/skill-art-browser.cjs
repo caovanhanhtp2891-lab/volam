@@ -107,7 +107,7 @@ function capture() {
     await page.screenshot({ path: '/tmp/volam-skill-preview-mobile.png' });
     assert.deepEqual(errors, [], 'no browser or asset errors');
     const gallery = await browser.newPage({ viewport: { width: 1080, height: 900 } });
-    const html = `<meta charset="utf-8"><style>body{margin:20px;background:#0a1819;color:#e9dab7;font:14px system-ui}h1{font-size:24px}main{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}article{background:#142c26;border:1px solid #4a6251;border-radius:7px;padding:8px}img{width:100%}header{display:flex;align-items:center;gap:8px}svg{width:44px;height:44px;flex-shrink:0}small{display:block;color:#adc6b6}</style><h1>Giang Hồ Dị Truyện · Thập đại môn phái · v0.8.0</h1><main>${cards.map(card => `<article><header>${card.icon}<div><b>${card.sect}</b><small>${card.skill}</small></div></header><img src="${card.image}"></article>`).join('')}</main>`;
+    const html = `<meta charset="utf-8"><style>body{margin:20px;background:#0a1819;color:#e9dab7;font:14px system-ui}h1{font-size:24px}main{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}article{background:#142c26;border:1px solid #4a6251;border-radius:7px;padding:8px}img{width:100%}header{display:flex;align-items:center;gap:8px}svg{width:44px;height:44px;flex-shrink:0}small{display:block;color:#adc6b6}</style><h1>Giang Hồ Dị Truyện · Thập đại môn phái · v0.9.0</h1><main>${cards.map(card => `<article><header>${card.icon}<div><b>${card.sect}</b><small>${card.skill}</small></div></header><img src="${card.image}"></article>`).join('')}</main>`;
     await fs.writeFile('/tmp/volam-skill-gallery.html', html);
     await gallery.setContent(html);
     await gallery.screenshot({ path: '/tmp/volam-skill-gallery.png', fullPage: true });

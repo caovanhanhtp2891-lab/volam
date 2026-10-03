@@ -63,7 +63,7 @@ async function auraPixels(page) {
       CanvasRenderingContext2D.prototype.fillText = function (label, ...args) {
         if (
           this.canvas.id === "game-canvas" &&
-          /· (Tầng \d+|Sơ kỳ|Trung kỳ|Hậu kỳ|Đỉnh phong|Đại viên mãn)$/.test(
+          /^(Phàm Nhân$|.*· (Tầng \d+|Sơ kỳ|Trung kỳ|Hậu kỳ|Đỉnh phong|Đại viên mãn))$/.test(
             label,
           )
         ) {
@@ -102,10 +102,10 @@ async function auraPixels(page) {
         enhance: 0,
       }));
     });
-    assert.equal(await page.locator("#realm-name").textContent(), "Luyện Khí");
+    assert.equal(await page.locator("#realm-name").textContent(), "Phàm Nhân");
     for (const [id, expected] of [
-      ["realm-sword-0", "Trúc Cơ"],
-      ["realm-sword-1", "Luyện Khí"],
+      ["realm-sword-0", "Luyện Thể"],
+      ["realm-sword-1", "Phàm Nhân"],
     ]) {
       await page.locator('[data-idle-tab="inv"]').click();
       await page.locator(`.bag-slot[data-inspect-item="${id}"]`).click();
@@ -114,13 +114,13 @@ async function auraPixels(page) {
       assert.equal(await page.locator("#realm-name").textContent(), expected);
       await page.waitForFunction(
         (name) =>
-          window.__realmLabels.some((label) => label.startsWith(`${name} ·`)),
+          window.__realmLabels.some((label) => label === name || label.startsWith(`${name} ·`)),
         expected,
       );
     }
     await page.reload({ waitUntil: "networkidle" });
     await page.locator('[data-idle-tab="char"]').click();
-    assert.equal(await page.locator("#realm-name").textContent(), "Luyện Khí");
+    assert.equal(await page.locator("#realm-name").textContent(), "Phàm Nhân");
     console.log(
       "PASS equipping stronger/weaker gear immediately changes realm, including after reload",
     );
@@ -134,15 +134,15 @@ async function auraPixels(page) {
           power: Number(row.cells[2].textContent.replaceAll(".", "")),
         })),
       );
-    assert.equal(realms.length, 19);
-    assert.equal(realms[0].name, "Luyện Thể");
-    assert.equal(realms[18].name, "Đạo Tổ");
+    assert.equal(realms.length, 23);
+    assert.equal(realms[0].name, "Phàm Nhân");
+    assert.equal(realms[19].name, "Đạo Tổ");
     await page.locator("#utility-close").click();
     let low;
     for (let rank = 0; rank < realms.length; rank++) {
-      const target = Math.max(50, realms[rank].power + 5);
+      const target = Math.max(5000, realms[rank].power * 1.0001 + 5);
       await seed(page, (s) => {
-        s.player.attack = (target - 145 * 0.15) / 3;
+        s.player.attack = (Math.cbrt(target * 1000) - 165 * 0.15) / 3;
         s.player.defense = 0;
         s.player.equipment = {};
         s.player.idle.attributes = {
@@ -154,7 +154,7 @@ async function auraPixels(page) {
       });
       await page.waitForFunction(
         (name) =>
-          window.__realmLabels.some((label) => label.startsWith(`${name} ·`)),
+          window.__realmLabels.some((label) => label === name || label.startsWith(`${name} ·`)),
         realms[rank].name,
       );
       assert.equal(
@@ -172,7 +172,7 @@ async function auraPixels(page) {
       );
       await page.waitForTimeout(120);
       if (rank === 0) low = await auraPixels(page);
-      if ([0, 3, 9, 13, 18].includes(rank))
+      if ([0, 3, 10, 14, 19, 22].includes(rank))
         await page.screenshot({
           path: path.join(captureDir, `realm-${rank + 1}-mobile.png`),
         });
@@ -189,12 +189,12 @@ async function auraPixels(page) {
       "the aura animates while standing still",
     );
     console.log(
-      "PASS all nineteen realm labels are drawn above the hero; higher auras brighten and animate",
+      "PASS all twenty-three realm labels are drawn above the hero; higher auras brighten and animate",
     );
     await page.locator("#realm-guide-btn").click();
     assert.match(
       await page.locator(".realm-table [aria-current]").textContent(),
-      /Đạo Tổ/,
+      /Vô Cực/,
     );
     await page.screenshot({
       path: path.join(captureDir, "realm-guide-mobile.png"),

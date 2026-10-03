@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.8.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.9.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -159,7 +159,7 @@ async function fit(page, width, height) {
     console.log("PASS daily gift awarded once, including after a page reload");
 
     await tab(page, "more");
-    assert.match(await page.locator(".release-stamp").textContent(), /v0\.8\.0/);
+    assert.match(await page.locator(".release-stamp").textContent(), /v0\.9\.0/);
     await page.locator("#settings-name").fill("");
     await page.locator("#settings-name").pressSequentially("WASD Lữ");
     await page.locator("#settings-sex").selectOption("female");
@@ -294,6 +294,8 @@ async function fit(page, width, height) {
         await fit(page, width, height);
       }
       await tab(page, "log");
+      if (await page.locator(".game-layout").isVisible()) await page.locator("#world-panel-close").click();
+      await fit(page, width, height);
       await page.screenshot({ path: `/tmp/volam-idle-${width}x${height}.png` });
       console.log(`PASS ${width}x${height}: all five tabs, reachable controls, no overflow or overlaps`);
     }
@@ -314,6 +316,7 @@ async function fit(page, width, height) {
     assert.equal((await state(page)).player.idle.enabled, false);
     assert.equal((await state(page)).player.inventory.length, beforeMigration.player.inventory.length);
     await tab(page, "log");
+    if (!(await page.locator(".game-layout").isVisible())) await tab(page, "log");
     assert.equal(await page.locator("#legacy-training").isVisible(), true);
     const legacy = await save(page);
     await page.locator("#legacy-training-btn").click();

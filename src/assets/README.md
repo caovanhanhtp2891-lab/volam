@@ -21,10 +21,10 @@ Mỗi hiệu ứng dùng hình học có giới hạn: tối đa 8 nét/cánh ch
 
 Nền Rừng Trúc/phụ bản/sân luyện được vẽ một lần từ dữ liệu trong `src/map-art.ts`, minimap tái sử dụng nền. Vật cản và collider dùng cùng dữ liệu. Game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; mô phỏng/input giữ cập nhật theo thời gian. UI không cần backdrop blur.
 
-`src/equipment-art.ts` giữ SVG/Path2D dùng chung cho trang bị trên đất, túi, nhân vật và so sánh. `src/cultivation-art.ts` vẫn vẽ vòng cảnh giới dưới chân theo 19 bậc, có giới hạn số vòng/phù văn/hạt và dùng quầng sáng đã lưu. Tên cảnh giới giữ bên trong chiều ngang sân đấu; nhãn đã đưa gần nhân vật nhỏ hơn.
+`src/equipment-art.ts` giữ SVG/Path2D dùng chung cho trang bị trên đất, túi, nhân vật và so sánh. `src/cultivation-art.ts` vẽ vòng cảnh giới dưới chân theo 23 bậc ở v0.9.0 (Phàm Nhân vòng mờ, 22 bậc sau đổi màu/chi tiết), có giới hạn số vòng/phù văn/hạt và dùng quầng sáng đã lưu. Tên cảnh giới giữ bên trong chiều ngang sân đấu; nhãn đã đưa gần nhân vật nhỏ hơn.
 
 Tinh anh dùng sprite quái có sẵn với vòng/nhãn vàng. Lửa trại dùng hai khúc gỗ và ba lớp ngọn lửa vẽ Canvas, phạm vi nét đứt, tối đa ba lửa cùng lúc; nhấp nhô theo thời gian, không có bitmap hoặc bộ particle mới. Atlas vẫn giữ 28.026 byte ở v0.6.0.
 
-URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`, `skill-art-browser.cjs`.
+URL ảnh được Vite xử lý cho GitHub Pages `/volam/`. Kiểm tra bằng `pnpm test` và các bộ browser `sects-browser.cjs`, `combat-browser-smoke.cjs`, `cultivation-browser-smoke.cjs`, `skill-art-browser.cjs`, `hud-browser.cjs`.
 
 Danh hiệu v0.7.0 dùng `src/title-art.ts`: 12 motif riêng (lá, mũi kiếm, tinh thể, vương miện, trận phù, kim tiền, tia lửa, song kiếm, tinh tú, mặt trời, sen và quỹ đạo), vài nét Canvas dưới chân, một danh hiệu được đeo. Preview dùng cùng hàm vẽ; không thêm sprite, texture hay hệ particle. Có thể tắt tên/hiệu ứng trong Cài đặt; atlas giữ 28.026 byte.

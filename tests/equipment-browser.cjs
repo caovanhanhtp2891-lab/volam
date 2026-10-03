@@ -12,7 +12,7 @@ async function seed(page, mutate) {
 }
 const gear = (id, slot, changes = {}) => ({ id, slot, name: `Trang bị ${id}`, level: 5, rarity: "Tốt", color: "#73d19b", icon: "◆", power: 20, enhance: 0, ...changes });
 async function clock(page, value) { await page.evaluate(value => window.__bossNow = value, value); await page.waitForTimeout(200); }
-async function boss(page) { await page.locator('[data-idle-tab="log"]').click(); await page.locator("#golden-boss-btn").click(); }
+async function boss(page) { await page.locator('[data-idle-tab="log"]').click(); if (!(await page.locator(".game-layout").isVisible())) await page.locator('[data-idle-tab="log"]').click(); await page.locator("#golden-boss-btn").click(); }
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.VOLAM_CHROMIUM_PATH || "/usr/bin/chromium", headless: true, args: ["--no-sandbox"] });
   const errors = [];
@@ -52,7 +52,7 @@ async function boss(page) { await page.locator('[data-idle-tab="log"]').click();
     assert.equal(after.player.speed, before.player.speed + 8);
     await page.locator('[data-idle-tab="char"]').click();
     const stats = await page.locator("#stat-grid").textContent(); assert.match(stats, /82/); assert.match(stats, /16%/);
-    assert.equal((await page.locator("#header-combat-power").textContent()).replace("⚔ ", ""), await page.locator("#combat-power").textContent());
+    assert.equal((await page.locator("#header-combat-power").getAttribute("title")).replace("Lực chiến ", ""), await page.locator("#combat-power").textContent());
     await page.reload({ waitUntil: "networkidle" });
     assert.deepEqual((await read(page)).player.equipment.weapon.bonuses, after.player.equipment.weapon.bonuses);
     console.log("PASS all six equipped stats affect character, header power, strongest loadout and reload");

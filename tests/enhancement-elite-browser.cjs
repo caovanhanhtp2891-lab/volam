@@ -95,6 +95,7 @@ async function clickEnemy(page, enemy) {
     const killed = await read(page), fire = killed.campfires[0]; assert.equal(killed.wildElite, undefined); assert.equal(fire.area, "world"); assert.equal(killed.player.eliteHunt.spawned, 1);
     await page.waitForFunction(() => !document.querySelector("#campfire-btn").disabled, undefined, { timeout: 2000 });
     assert.equal(await page.locator("#campfire-btn").isDisabled(), false);
+    await page.locator('[data-idle-tab="log"]').click();
     await page.locator("#campfire-btn").click(); assert.equal(await page.locator("#mobile-auto").getAttribute("aria-pressed"), "false");
     await page.waitForTimeout(1000);
     const near = (await save(page)).player; assert.ok(Math.hypot(near.x - fire.x, near.y - fire.y) <= 120);

@@ -10,6 +10,15 @@ Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot 
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
 
+Lát HUD và cảnh giới local ngày 03/10/2026 · **v0.9.0 Phàm nhân nhập đạo**:
+
+- [x] Bố cục theo ảnh người dùng: sân đấu toàn vùng phía trên menu; avatar/tên/cấp/HP/MP/XP trái trên, bạc/quà/cài đặt phải trên; minimap/nhiệm vụ thu gọn phải, loot trái; joystick/Auto trái dưới, cụm nút tròn kỹ năng/thuốc/về thành phải dưới, nhật ký một dòng và năm tab đáy.
+- [x] Bảng chức năng cuộn nội bộ, không đẩy trang dài xuống; Giang hồ trả về sân, chạm lại mở hoạt động với ải/boss/lửa trại/phụ bản. Shortcut chỉ số/cài đặt/nhật ký có hành vi thật. Bố cục ngang giữ bản đồ khỏi nút kỹ năng; toast nằm trên vùng điều khiển.
+- [x] Thêm Phàm Nhân 0–<100.000; Luyện Thể 100.000–<1 triệu. Phân bố 23 bậc đến Đạo Tổ 10 tỷ, Hỗn Nguyên 100 tỷ, Hồng Mông 1.000 tỷ, Vô Cực 10.000 tỷ. Tầng/giai đoạn và bảng ngưỡng theo cùng dữ liệu; Phàm Nhân dùng vòng chân mờ.
+- [x] Lực chiến = phần nguyên tổng điểm sức mạnh mũ ba /1.000; tính từ mọi chỉ số thật, giới hạn số nguyên an toàn. Không nhân lại công/phòng/HP và không thay schema save. Số rút gọn cạnh tên, số đầy đủ trong bảng; dự đoán chênh lệch trang bị và cường hóa khớp lực chiến thực sau mặc/nâng.
+- [x] 88 unit test và 9 bộ browser (HUD, cảnh giới, idle, trang bị/boss, cường hóa/tinh anh, tiến trình/danh hiệu, combat, 10 phái, hình skill) trên build production `/volam/`; typecheck client/server và build đạt. HUD 320×568, 360×640, 390×844, 600×960, 844×390, 1440×900 không cuộn trang/chồng nút; dự đoán lực chiến đồ/cường hóa khớp thực tế, 23 cảnh giới và save cũ hoạt động. Atlas 28.026 byte, JS gzip khoảng 70,6 KB, CSS gzip 9,4 KB theo Vite.
+- [ ] Playtest trên điện thoại thật và nhịp đạt cảnh giới sau nhiều lần trùng sinh; authority online tiếp tục thuộc các gate P3/P5.
+
 Lát võ học local ngày 03/10/2026 · **v0.8.0 Võ học rực sáng**:
 
 - [x] 30 icon SVG riêng: nền ánh màu, vũ khí/biểu tượng, lõi sáng và dấu tuyệt chiêu; nhận diện đúng 10 phái ở màn nhập môn, nút chiến đấu và danh sách võ công.

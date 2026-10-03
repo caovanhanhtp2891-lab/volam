@@ -2,6 +2,14 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Phàm nhân nhập đạo · v0.9.0
+
+- Sân đấu chiếm toàn bộ phần màn hình phía trên menu đáy. Ảnh đại diện, cấp, tên/lực chiến và HP/MP/XP ở góc trái; bạc, quà ngày, cài đặt ở góc phải. Minimap và nhiệm vụ có thể thu gọn ở bên phải; thông báo nhặt đồ ở bên trái. Joystick/Tự động bên trái, cụm nút tròn kỹ năng/thuốc/về thành bên phải, nhật ký một dòng sát menu.
+- Chạm **Nhân vật / Võ công / Hành trang / Khác** để mở bảng cuộn bên trong màn hình. Chạm **Giang hồ** để quay về sân; chạm lần nữa mở bảng hoạt động (ải, luyện công, lịch boss, phụ bản, lửa trại). Nút × đóng bảng hoạt động. Chạm ảnh đại diện mở chỉ số, bánh răng mở cài đặt, dòng nhật ký mở lịch sử; nút trong minimap ẩn/hiện HUD.
+- **23 cảnh giới** từ Phàm Nhân đến Vô Cực: Phàm Nhân dưới 100.000, Luyện Thể từ 100.000 đến dưới 1 triệu, Đạo Tổ từ 10 tỷ; sau đó Hỗn Nguyên từ 100 tỷ, Hồng Mông từ 1.000 tỷ, Vô Cực từ 10.000 tỷ. Bảng đầy đủ ở phần cảnh giới và trong game.
+- Lực chiến mới tăng theo tổng chỉ số; số cạnh tên rút gọn K/tr/tỷ, bảng Nhân vật giữ con số đầy đủ. So sánh đồ và xem trước cường hóa đồ đang mặc hiển thị mức lực chiến nhân vật thực sự đạt sau thay đổi. Giữ nguyên chỉ số chiến đấu và dữ liệu lưu; không cộng lại vào công/phòng hay trang bị.
+- Giữ hình 2D đơn giản: atlas vẫn **28.026 byte**, không thêm ảnh nền/texture. Phàm Nhân chỉ có vòng mờ; bậc cao dùng vòng sáng Canvas giới hạn như trước.
+
 ## Võ học rực sáng · v0.8.0
 
 Thiết kế lại **30 icon và hiệu ứng võ công** theo đặc trưng thập đại môn phái, lấy cảm hứng từ võ học Võ Lâm/Kiếm Thế. Hình SVG/Canvas do dự án tự vẽ; không sao chép texture hay tải ảnh kỹ năng bên ngoài.
@@ -35,11 +43,11 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 ## Giao diện và vòng chơi idle
 
 - Chọn một trong 10 môn phái thuộc 5 hệ ngũ hành, đặt tên và giới tính nhân vật. Mỗi phái có ngoại hình riêng và bộ 2 võ công + 1 tuyệt chiêu với hành vi chiến đấu khác nhau.
-- Sân đấu nằm phía trên, năm tab **Giang hồ / Nhân vật / Võ công / Hành trang / Khác** nằm dưới. Giao diện xanh rêu, viền vàng, dùng chung trên điện thoại và desktop.
+- Sân đấu phủ phần màn hình phía trên menu, các bảng mở khi chạm năm tab **Giang hồ / Nhân vật / Võ công / Hành trang / Khác** nằm dưới. Giao diện xanh rêu, viền vàng, dùng chung trên điện thoại và desktop.
 - Có 16 vùng, 160 ải; mỗi ải có 4 đợt, trùm ở đợt cuối của mỗi ải thứ 10. **Vượt ải** mở ải kế tiếp; **Luyện công** lặp lại ải hiện tại. Chỉ đi tới vùng/ải đã mở.
 - Tự tìm quái, dùng võ công, dùng thuốc và nhặt đồ. WASD hoặc joystick chuyển sang điều khiển tay; bấm **Tự động** để tiếp tục. Khắc chế ngũ hành tăng 25% hoặc giảm 20% sát thương.
 - Nhân vật nhỏ 46 × 50, áo/tóc/vũ khí riêng cho từng phái; nhún/đảo hướng theo di chuyển, nghiêng người khi đánh/thi triển và lướt có thời gian. Camera bám mềm; chuyển đợt giữ vị trí nhân vật. Quái có động tác lao đánh, phản ứng trúng đòn và ngã xuống.
-- Cảnh giới tu tiên tự tính từ lực chiến hiện tại: đủ 19 bậc từ Luyện Thể đến Đạo Tổ. Tên cảnh giới và tầng/giai đoạn nằm trên đầu nhân vật; vòng sáng dưới chân tăng màu, lớp vòng, phù văn, hoa sen, tia và hạt sáng theo bậc. Tab **Nhân vật** hiển thị cảnh giới, lực chiến còn thiếu và bảng các ngưỡng.
+- Cảnh giới tu tiên tự tính từ lực chiến hiện tại: đủ 23 bậc từ Phàm Nhân đến Vô Cực. Tên cảnh giới và tầng/giai đoạn nằm trên đầu nhân vật; vòng sáng dưới chân tăng màu, lớp vòng, phù văn, hoa sen, tia và hạt sáng theo bậc. Tab **Nhân vật** hiển thị cảnh giới, lực chiến còn thiếu và bảng các ngưỡng.
 - Đánh thường cận chiến có vệt chém, đòn tầm xa có đạn bay và gây sát thương khi chạm mục tiêu. Hiệu ứng theo năm hệ: kim nhận, lá/ám khí, băng, lửa và lôi. Chiêu ngoài tầm không tiêu hao MP hoặc hồi chiêu.
 - Trang bị bật ra rồi rơi xuống đất, có hình kiếm, áo, mũ, giày, nhẫn và thú cưỡi theo vị trí; màu và ánh sáng theo phẩm chất dùng chung trên đất, Hành trang, Nhân vật và màn so sánh. Đồ Hiếm/Cực phẩm có cột sáng và quầng sáng dưới chân khi mặc; vũ khí phát sáng theo màu trang bị. Đồ nằm trên sân ít nhất 1,6 giây trước khi tự nhặt. Chạm đồ để đi tới nhặt hoặc dùng **E**. Đồ tự nhặt bay về nhân vật, thông báo có thể mở so sánh với trang bị đang dùng. Đồ chưa nhặt được lưu cùng nhân vật; túi đầy vẫn nhặt được bạc, trang bị tự nhặt được giữ trong Đồ chờ nhận.
 - Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Cộng/rút tiềm năng thay đổi chỉ số thật. Võ công nâng đến bậc 20, có thể rút các điểm đã nâng, giữ bậc nhập môn.
@@ -47,7 +55,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.7.0 · Trùng sinh và danh hiệu** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.9.0 · Phàm nhân nhập đạo** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -99,31 +107,37 @@ Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng 
 
 ## Cảnh giới theo lực chiến
 
-Lực chiến = phần nguyên của **Công × 3 + Phòng × 2 + HP tối đa × 0,15**, cộng phần nguyên của tổng điểm phụ từ trang bị, trùng sinh và danh hiệu đang đeo: **MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Bao gồm trang bị đã mặc/cường hóa, tiềm năng, trùng sinh và danh hiệu đang đeo; hiển thị cạnh tên nhân vật trên thanh đầu. Chí mạng chiến đấu = 12% cơ bản + trang bị + danh hiệu đang đeo, giới hạn 40%; hệ số điểm lực chiến vẫn tính toàn bộ dòng trang bị để so sánh bộ đồ. Cảnh giới dùng chính con số này; thay đồ hoặc phân phối lại tiềm năng sẽ cập nhật tên và vòng sáng ngay. HP đang mất khi chiến đấu không làm tụt cảnh giới. Tiến trình cũ không cần thêm trường lưu hoặc tạo lại nhân vật.
+Tổng điểm sức mạnh **S = Công × 3 + Phòng × 2 + HP tối đa × 0,15 + MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Lực chiến = **⌊S³ / 1.000⌋**, giới hạn ở số nguyên an toàn của JavaScript. Bao gồm trang bị/cường hóa, tiềm năng, trùng sinh và danh hiệu đang đeo; không làm thay đổi sát thương/HP hoặc ghi thang điểm mới vào chỉ số gốc. Mọi dòng đều góp phần; trang bị mạnh hơn theo tổng điểm vẫn tăng lực chiến. Thay đồ/cường hóa cập nhật ngay cả bảng Nhân vật, thanh trên và vòng cảnh giới. HP đang mất không làm tụt cảnh giới; save cũ được tính lại mà không tạo lại nhân vật.
 
-| Bậc | Cảnh giới        | Lực chiến từ |
-| --- | ---------------- | -----------: |
-| 1   | Luyện Thể        |            0 |
-| 2   | Luyện Khí        |          250 |
-| 3   | Trúc Cơ          |          650 |
-| 4   | Kim Đan          |        1.200 |
-| 5   | Nguyên Anh       |        2.000 |
-| 6   | Hóa Thần         |        3.000 |
-| 7   | Luyện Hư         |        4.200 |
-| 8   | Hợp Thể          |        5.600 |
-| 9   | Đại Thừa         |        7.200 |
-| 10  | Độ Kiếp          |        9.000 |
-| 11  | Chân Tiên        |       11.000 |
-| 12  | Thiên Tiên       |       13.000 |
-| 13  | Huyền Tiên       |       15.000 |
-| 14  | Kim Tiên         |       17.000 |
-| 15  | Thái Ất Kim Tiên |       19.000 |
-| 16  | Đại La Kim Tiên  |       21.500 |
-| 17  | Tiên Vương       |       24.000 |
-| 18  | Tiên Đế          |       27.000 |
-| 19  | Đạo Tổ           |       30.000 |
+Chí mạng chiến đấu = 12% cơ bản + trang bị + danh hiệu, giới hạn 40%; điểm sức mạnh vẫn tính toàn bộ dòng để xếp đồ. Phần MP/tốc/chí mạng cộng thêm không tính lại giá trị cơ bản của môn phái. Con số cạnh tên được rút gọn, số đầy đủ có trong tooltip và tab Nhân vật. Trong túi, **Điểm trang bị** là điểm xếp hạng của riêng món; **chênh lệch lực chiến** là dự đoán thật sau khi thay món đang mặc, gồm cả HP do phòng thủ của bộ đồ tạo ra. Cường hóa món chưa mặc không cộng cho nhân vật.
 
-Hai bậc đầu chia đều thành 9 tầng; từ Trúc Cơ chia thành **Sơ kỳ → Trung kỳ → Hậu kỳ → Đỉnh phong → Đại viên mãn** trong khoảng lực chiến của mỗi bậc. Đạo Tổ chia theo các mốc 30.000 / 30.400 / 30.800 / 31.200 / 31.600. Ngưỡng được chọn cho quy mô chỉ số hiện tại của 160 cấp; dữ liệu nằm trong `src/cultivation.ts`. Việc chuyển bậc tự diễn ra khi đủ lực chiến, chưa có thao tác dùng đan hoặc nhiệm vụ thiên kiếp riêng.
+| Bậc | Cảnh giới | Lực chiến từ |
+| --- | --- | ---: |
+| 1 | Phàm Nhân | 0 |
+| 2 | Luyện Thể | 100.000 |
+| 3 | Luyện Khí | 1.000.000 |
+| 4 | Trúc Cơ | 3.000.000 |
+| 5 | Kim Đan | 8.000.000 |
+| 6 | Nguyên Anh | 20.000.000 |
+| 7 | Hóa Thần | 50.000.000 |
+| 8 | Luyện Hư | 100.000.000 |
+| 9 | Hợp Thể | 200.000.000 |
+| 10 | Đại Thừa | 400.000.000 |
+| 11 | Độ Kiếp | 700.000.000 |
+| 12 | Chân Tiên | 1.000.000.000 |
+| 13 | Thiên Tiên | 1.500.000.000 |
+| 14 | Huyền Tiên | 2.200.000.000 |
+| 15 | Kim Tiên | 3.000.000.000 |
+| 16 | Thái Ất Kim Tiên | 4.200.000.000 |
+| 17 | Đại La Kim Tiên | 5.600.000.000 |
+| 18 | Tiên Vương | 7.200.000.000 |
+| 19 | Tiên Đế | 8.800.000.000 |
+| 20 | Đạo Tổ | 10.000.000.000 |
+| 21 | Hỗn Nguyên | 100.000.000.000 |
+| 22 | Hồng Mông | 1.000.000.000.000 |
+| 23 | Vô Cực | 10.000.000.000.000 |
+
+Mỗi bậc kéo dài đến dưới ngưỡng tiếp theo, tránh trùng mốc: đúng 100.000 vào Luyện Thể, đúng 1 triệu vào Luyện Khí. Phàm Nhân chưa chia tầng; Luyện Thể/Luyện Khí có 9 tầng; từ Trúc Cơ có **Sơ kỳ → Trung kỳ → Hậu kỳ → Đỉnh phong → Đại viên mãn**. Vô Cực chia theo các mốc 10.000 / 12.000 / 14.000 / 16.000 / 18.000 tỷ. Cảnh giới tự đổi theo lực chiến; chưa có thao tác dùng đan hoặc nhiệm vụ thiên kiếp. Các bậc sau Đạo Tổ dành cho tiến trình trùng sinh dài hạn; nhịp đạt mốc cần tiếp tục playtest. Dữ liệu nằm trong `src/cultivation.ts`.
 
 ## Chạy local
 
@@ -209,6 +223,14 @@ pnpm exec vite build --base=/volam/
 
 GitHub Actions chạy unit test trước khi build/deploy Pages. Browser smoke test tùy chọn trong `tests/browser-smoke.cjs`, cần Playwright và Chromium cài sẵn; đặt `VOLAM_PLAYWRIGHT_PATH`, `VOLAM_CHROMIUM_PATH` và `VOLAM_TEST_URL` khi khác mặc định rồi chạy `node tests/browser-smoke.cjs`.
 
+Kiểm tra bố cục theo ảnh, vị trí nút chạm trên sáu viewport, thao tác mở/đóng bảng, minimap/nhiệm vụ/nhật ký và dự đoán lực chiến chính xác khi thay đồ/cường hóa:
+
+```bash
+node tests/hud-browser.cjs
+```
+
+Bộ này chạy trên build production với cùng các biến Playwright/Chromium/URL dưới đây; ảnh chụp lưu `/tmp/volam-hud-<width>x<height>.png`.
+
 Bộ kiểm tra giao diện idle mới:
 
 ```bash
@@ -234,7 +256,7 @@ Kiểm tra cảnh giới bằng cùng các biến môi trường:
 node tests/cultivation-browser-smoke.cjs
 ```
 
-Bộ này mặc đổi đồ mạnh/yếu qua giao diện thật, kiểm tra cảnh giới sau reload, 19 tên được vẽ trên đầu dù giữ nguyên cấp nhân vật, màu sáng thực trên Canvas, vòng sáng chuyển động khi đứng yên, bảng ngưỡng và sáu kích thước màn hình. Ảnh chụp mặc định lưu vào `/tmp/volam-cultivation`; có thể đổi bằng `VOLAM_CAPTURE_DIR`.
+Bộ này mặc đổi đồ mạnh/yếu qua giao diện thật, kiểm tra cảnh giới sau reload, 23 tên được vẽ trên đầu dù giữ nguyên cấp nhân vật, màu sáng thực trên Canvas, vòng sáng chuyển động khi đứng yên, bảng ngưỡng và sáu kích thước màn hình. Ảnh chụp mặc định lưu vào `/tmp/volam-cultivation`; có thể đổi bằng `VOLAM_CAPTURE_DIR`.
 
 Kiểm tra trang bị nhiều dòng, mặc bộ mạnh nhất, lọc/vứt đồ và lịch boss bằng cùng các biến môi trường:
 

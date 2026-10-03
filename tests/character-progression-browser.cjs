@@ -47,7 +47,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.8.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.9.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;
@@ -157,7 +157,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').isDisabled(),true); assert.equal(await page.locator('#skill-effects-quality').isDisabled(),true);
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.match(await page.locator('#rebirth-blocked').textContent(),/phụ bản/); await page.locator('#utility-close').click();
     await page.locator('#titles-btn').click(); assert.equal(await page.locator('[data-wear-title="novice"]').isDisabled(),true); await page.locator('#utility-close').click();
-    await page.locator('#mobile-auto').click();
+    await tab(page,'log'); await page.locator('#mobile-auto').click();
     await tab(page,'inv'); await page.locator('[data-tab="dungeon"]').click();
     await page.waitForSelector('[data-dungeon-action="claim"]',{timeout:45000});
     const xpBeforeClaim=Number((await page.locator('#xp-label').textContent()).split(' / ')[0].replace(/\./g,''));
@@ -166,10 +166,10 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
 
     await seed(page,s=>{s.player.idle.inTown=true;s.player.xp=0;s.player.preferences.xpMultiplier=10;s.player.gold=100;s.player.goldenClears=[];s.groundLoot=[];s.campfires=[];});
     await page.evaluate(()=>window.__now=Date.parse('2026-10-03T12:00:00+07:00'));
-    await tab(page,'log'); await page.locator('#golden-boss-btn').click(); await page.locator('#golden-enter').click();
+    await tab(page,'log'); if (!(await page.locator('.game-layout').isVisible())) await tab(page,'log'); await page.locator('#golden-boss-btn').click(); await page.locator('#golden-enter').click();
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.match(await page.locator('#rebirth-blocked').textContent(),/Hoàng Kim/); await page.locator('#utility-close').click();
     await page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).player.goldenClears.length>0,key,{timeout:12000});
-    assert.equal((await read(page)).player.xp,900*10); assert.ok((await read(page)).player.journey.unlockedTitles.includes('golden')); await page.locator('#town-btn').click();
+    assert.equal((await read(page)).player.xp,900*10); assert.ok((await read(page)).player.journey.unlockedTitles.includes('golden')); await tab(page,'log'); await page.locator('#town-btn').click();
     console.log("PASS Golden boss reward uses x10, opens its title and prevents rebirth during the encounter");
 
     for (const [width,height] of [[320,568],[360,640],[390,844],[430,932],[844,390],[1280,900]]) {
