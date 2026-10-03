@@ -3232,14 +3232,14 @@ function refreshUi(force = false): void {
   mobileAuto.textContent = game.autoBattle ? "⚙ Tự động" : "☝ Thủ công";
   setText(
     "#mobile-map-name",
-    game.mapMode === "world"
+    game.goldenEncounter ? "HOÀNG KIM" : game.mapMode === "world"
       ? playerIdleActive()
         ? stageInfo(player.idle.stage).name.toLocaleUpperCase("vi")
         : "RỪNG TRÚC"
       : DUNGEONS[game.dungeonId!].shortName,
   );
   document.querySelector(".mobile-map-channel")!.textContent =
-    game.mapMode === "world"
+    game.goldenEncounter ? (game.enemies.every(enemy => enemy.dead) ? "Đã hạ boss" : "Khiêu chiến") : game.mapMode === "world"
       ? playerIdleActive()
         ? `Đợt ${player.idle.wave}/4`
         : "Thanh Khê Trấn"
@@ -3734,7 +3734,7 @@ function refreshGoldenUi(): void {
   const now = Date.now(), encounter = game.goldenEncounter, status = goldenStatus(now, game.player.goldenClears);
   const message = encounter ? `${encounter.window.boss.name} · Còn ${countdown(encounter.window.endsAt - now)}` : status.active ? `${status.active.boss.name} · ${status.defeated ? "Đã hạ lượt này" : `Đang xuất hiện · ${countdown(status.active.endsAt - now)}`}` : `${status.next.boss.name} · Sau ${countdown(status.next.startsAt - now)}`;
   document.getElementById("golden-status")!.textContent = message;
-  document.getElementById("golden-boss-btn")!.textContent = encounter ? "Đang đấu" : status.active && !status.defeated ? "Khiêu chiến" : "Lịch boss";
+  document.getElementById("golden-boss-btn")!.textContent = encounter ? (game.enemies.every(enemy => enemy.dead) ? "Thu hồi đồ" : "Đang đấu") : status.active && !status.defeated ? "Khiêu chiến" : "Lịch boss";
   const dialog = document.getElementById("golden-dialog-status");
   if (dialog) {
     dialog.textContent = message;
@@ -3898,6 +3898,7 @@ function refreshIdleUi(): void {
     progress.stage <= 1 || game.mapMode === "dungeon" || Boolean(game.goldenEncounter);
   document.querySelector<HTMLButtonElement>("#stage-next")!.disabled =
     progress.stage >= progress.maxStage || game.mapMode === "dungeon" || Boolean(game.goldenEncounter);
+  document.querySelector<HTMLButtonElement>("#stage-push")!.disabled = Boolean(game.goldenEncounter) || game.mapMode === "dungeon";
   document
     .querySelector(".quest-panel")!
     .classList.toggle("hidden", progress.enabled);
@@ -4379,7 +4380,7 @@ function bindIdleUi(): void {
     if (button) changeStage(Number(button.dataset.region) * 10 + 1);
   });
   document.getElementById("stage-push")!.addEventListener("click", () => {
-    if (!game) return;
+    if (!game || game.goldenEncounter || game.mapMode === "dungeon") return;
     game.player.idle.push = !game.player.idle.push;
     persistGame();
     refreshUi(true);
