@@ -10,6 +10,17 @@ Lát visual ngày 02/10/2026: đã thay hình khối nhân vật/quái/NPC/loot 
 
 Điều chỉnh theo yêu cầu hình 2D thật đơn giản và nhẹ: dùng một atlas phẳng 480 × 384 px, tối đa 64 màu, 28 KB; ngân sách atlas dưới 32 KB. Loại ảnh nền/cảnh vật chi tiết khỏi bản tải; vẽ nền và vật cản một lần từ dữ liệu gameplay rồi tái sử dụng. Giới hạn vẽ 30 FPS, minimap khoảng 5 lần/giây, giảm blur/glow và gradient động. Bản tải giữ một atlas dưới 32 KB; bố cục và các thao tác mobile vẫn được giữ.
 
+Lát tiến trình local ngày 03/10/2026 · **v0.7.0 Trùng sinh và danh hiệu**:
+
+- [x] Cài đặt XP x1/x5/x10/x100/x1000 lưu từng nhân vật, áp dụng một lần qua nguồn thưởng chung cho quái/nhiệm vụ/phụ bản/boss/lửa trại/vắng mặt. Lên nhiều cấp nhận đúng điểm, tối đa 160, XP dư không tích sang trùng sinh.
+- [x] Công tắc số sát thương/minimap/tên danh hiệu/hiệu ứng danh hiệu có hành vi thật; không thay chỉ số khi chỉ ẩn đồ họa. Chặn thay đổi trong phụ bản chưa lưu.
+- [x] Trùng sinh đạt cấp 160: xem trước/xác nhận/hủy; về cấp 1/XP 0/ải 1 ở thành; bonus vĩnh viễn mỗi lần +80 công/+50 phòng/+600 HP/+120 MP/+4 tốc tính từ số lần, không cộng lặp vào base.
+- [x] Giữ đồ/cường hóa/bạc/đá/võ học/tiềm năng/các ải đã mở/thành tích/danh hiệu/lượt thưởng; thu hồi đồ dưới đất. Backup trước, kiểm tra lại điều kiện/số lần, chặn nhấn lặp và lỗi backup; không trùng sinh trong phụ bản/boss Hoàng Kim.
+- [x] 12 danh hiệu mở theo thành tích/cấp/cường hóa/phụ bản/boss/trùng sinh. Chỉ một danh hiệu được đeo cộng bonus thật; tháo/đổi cập nhật HP/MP/công/phòng/chí mạng/tốc/lực chiến, giữ danh hiệu đã mở sau trùng sinh.
+- [x] 12 hình hiệu ứng Canvas riêng dưới chân và preview, có màu/nhãn/điều kiện/tiến độ; không thêm bitmap, atlas 28.026 byte. Save cũ bắt đầu x1/0 trùng sinh/không tự đeo, lấy thành tích đã biết từ dữ liệu cũ.
+- [x] 88 unit test và 8 bộ browser trên build production: XP từng nguồn/hệ số, max cấp, trùng sinh hai lần/nhấn lặp/lỗi backup/túi đầy, bonus danh hiệu/hiển thị/12 preview khác nhau, migrate/export/import/reload và hồi quy combat/phụ bản/boss/cảnh giới/10 phái. Bố cục 6 viewport; preview/nút đóng danh hiệu cố định, danh sách cuộn nội bộ. Typecheck/build thành công, atlas giữ 28.026 byte.
+- [ ] Playtest XP x100/x1000, bonus trùng sinh và danh hiệu; authority/ledger/giờ server ở P3/P5 chưa hoàn thành bởi các cơ chế local.
+
 Lát cường hóa và tinh anh local ngày 03/10/2026 · **v0.6.0 Tinh anh và lửa trại**:
 
 - [x] Sửa làm tròn cho đồ nhỏ: chỉ số chính tăng tối thiểu 1 điểm mỗi bậc, dòng phụ làm tròn phần tăng lên; hệ số 4%/bậc, tối đa +10. Tính từ dữ liệu gốc, không cộng lặp khi sync/reload.

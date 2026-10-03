@@ -67,6 +67,8 @@ import {
 import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, type Sect as School, type SkillDefinition, type EffectMotif } from "./sects";
 import { drawSectEffect, skillIconMarkup } from "./sect-effects";
 import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
+import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
+import { drawTitleEffect } from "./title-art";
 
 type SectId = "kim" | "hoa" | "thuy";
 type Sect = School & { skills: [string, string]; ultimate: string };
@@ -139,6 +141,8 @@ interface Player {
   facingY: number;
   goldenClears: string[];
   eliteHunt: EliteHunt;
+  preferences: GamePreferences;
+  journey: Journey;
 }
 
 interface Npc {
@@ -548,8 +552,6 @@ const randomInt = (min: number, max: number) =>
   Math.floor(randomBetween(min, max + 1));
 const formatNumber = (value: number) =>
   Math.floor(value).toLocaleString("vi-VN");
-const xpToNext = (level: number) =>
-  Math.floor(100 + 35 * level + 8 * level * level);
 const nowMs = () => performance.now();
 
 function escapeHtml(value: string): string {
@@ -828,6 +830,8 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     pendingItems: [],
     goldenClears: [],
     eliteHunt: normalizeEliteHunt(undefined),
+    preferences: normalizePreferences(),
+    journey: normalizeJourney(),
     facingX: 1,
     facingY: 0,
   };
@@ -894,12 +898,13 @@ function equipmentBonuses(): GearStats {
 }
 function equipmentAttack(): number { return equipmentBonuses().attack; }
 function equipmentDefense(): number { return equipmentBonuses().defense; }
-function criticalChance(): number { return Math.min(40, 12 + equipmentBonuses().crit); }
+function characterBonuses(): GearStats { return game ? progressionBonuses(game.player.journey) : { attack: 0, defense: 0, hp: 0, mp: 0, crit: 0, speed: 0 }; }
+function criticalChance(): number { return Math.min(40, 12 + equipmentBonuses().crit + characterBonuses().crit); }
 
 function effectiveAttack(): number {
   return game
     ? game.player.attack +
-        equipmentAttack() +
+        equipmentAttack() + characterBonuses().attack +
         game.player.idle.attributes.strength * 2
     : 0;
 }
@@ -907,18 +912,19 @@ function effectiveAttack(): number {
 function effectiveDefense(): number {
   return game
     ? game.player.defense +
-        equipmentDefense() +
+        equipmentDefense() + characterBonuses().defense +
         game.player.idle.attributes.dexterity
     : 0;
 }
 
 function currentCombatPower(): number {
   const gear = equipmentBonuses();
+  const bonus = characterBonuses();
   return Math.floor(combatPower(
     effectiveAttack(),
     effectiveDefense(),
     game?.player.maxHp ?? 0,
-  ) + gear.mp * .1 + gear.crit * 8 + gear.speed * 2);
+  ) + (gear.mp + bonus.mp) * .1 + (gear.crit + bonus.crit) * 8 + (gear.speed + bonus.speed) * 2);
 }
 
 function skillScale(skill: SkillKey, base: number): number {
@@ -946,6 +952,7 @@ function addFloatingText(
   size = 18,
 ): void {
   if (!game) return;
+  if (!game.player.preferences.damageNumbers && /^-\d/.test(text)) return;
   game.floatingTexts.push({
     x,
     y,
@@ -999,8 +1006,8 @@ function checkMainQuest(): void {
   ) {
     player.questRewardClaimed = true;
     player.gold += 300;
-    rewardExperience(100);
-    addLog("Nhiệm vụ Dấu chân trong Rừng Trúc hoàn tất: +100 XP · +300 bạc.");
+    const awarded = rewardExperience(100);
+    addLog(`Nhiệm vụ Dấu chân trong Rừng Trúc hoàn tất: +${formatNumber(awarded)} XP · +300 bạc.`);
   }
 }
 
@@ -1135,7 +1142,7 @@ function claimDungeonReward(): void {
   player.dungeonTokens += dungeon.reward.tokens;
   player.gold += dungeon.reward.gold;
   player.refiningStones += dungeon.reward.stones;
-  rewardExperience(dungeon.reward.xp);
+  const awarded = rewardExperience(dungeon.reward.xp);
   const recovered: Item[] = [createItem(dungeon.reward.itemLevel, "Hiếm")];
   for (const loot of game.loot) {
     player.gold += loot.gold;
@@ -1144,7 +1151,7 @@ function claimDungeonReward(): void {
   }
   storeRewardItems(player, recovered);
   addLog(
-    `Nhận thưởng ${dungeon.name}: +${dungeon.reward.xp} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá. Đã thu hồi đồ chưa nhặt.`,
+    `Nhận thưởng ${dungeon.name}: +${formatNumber(awarded)} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá. Đã thu hồi đồ chưa nhặt.`,
   );
   if (player.pendingItems.length)
     addLog(
@@ -1239,14 +1246,15 @@ function syncStats(fullHeal = false): void {
   const player = game.player;
   const sect = playerSect(player);
   const oldMaxHp = player.maxHp;
+  const bonus = characterBonuses();
   player.maxHp =
     sect.baseHp +
     (player.level - 1) * 34 +
     Math.floor(equipmentDefense() * 1.45) +
-    player.idle.attributes.vitality * 12 + equipmentBonuses().hp;
+    player.idle.attributes.vitality * 12 + equipmentBonuses().hp + bonus.hp;
   player.maxMp =
-    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp;
-  player.speed = sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed;
+    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp + bonus.mp;
+  player.speed = sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed + bonus.speed;
   if (fullHeal) {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
@@ -1569,24 +1577,13 @@ function castSkill(key: SkillKey, automatic = false): void {
 
 
 
-function rewardExperience(amount: number): void {
-  if (!game) return;
+function rewardExperience(base: number): number {
+  if (!game) return 0;
   const player = game.player;
-  player.xp += amount;
-  addFloatingText(player.x, player.y - 35, `+${amount} XP`, "#a9e8a8", 13);
-  let leveled = false;
-  while (player.xp >= xpToNext(player.level) && player.level < 160) {
-    player.xp -= xpToNext(player.level);
-    player.level += 1;
-    leveled = true;
-    player.skillPoints += 1;
-    player.idle.attributePoints += 5;
-    player.attack += 3;
-    player.defense += 2;
-    player.maxHp += 34;
-    player.maxMp += 13;
-  }
-  if (leveled) {
+  const { amount, levels } = applyExperience(player, base, player.preferences.xpMultiplier);
+  player.journey.highestLevel = Math.max(player.journey.highestLevel, player.level);
+  if (amount) addFloatingText(player.x, player.y - 35, `+${formatNumber(amount)} XP${player.preferences.xpMultiplier > 1 ? ` · x${player.preferences.xpMultiplier}` : ""}`, "#a9e8a8", 13);
+  if (levels) {
     syncStats(true);
     addFloatingText(
       player.x,
@@ -1598,7 +1595,8 @@ function rewardExperience(amount: number): void {
     addLog(
       `Bạn đã đạt cấp ${player.level}. Chỉ số được tăng và hồi đầy sinh lực.`,
     );
-    addLog("Nhận 1 điểm võ học. Mở tab Võ công để nâng chiêu.");
+    addLog(`Nhận ${levels} điểm võ học và ${levels * 5} điểm tiềm năng.`);
+    if (player.level === MAX_LEVEL) addLog("Đã đạt cấp 160! Mở Nhân vật → Trùng sinh để nhận chỉ số vĩnh viễn.");
     if (player.level >= 3 && player.skillRanks.skill2 === 0) {
       player.skillRanks.skill2 = 1;
       addLog(`Đã mở ${playerSect(player).skills[1]} — nhấn phím 2.`);
@@ -1610,12 +1608,16 @@ function rewardExperience(amount: number): void {
       );
     }
   }
+  return amount;
 }
 
 function killEnemy(enemy: Enemy): void {
   if (!game || enemy.dead) return;
   if (game.goldenEncounter && enemy.id.startsWith("golden-")) { killGoldenBoss(enemy); return; }
   enemy.dead = true;
+  game.player.journey.kills++;
+  if (enemy.kind === "elite") game.player.journey.elites++;
+  if (enemy.kind === "boss") game.player.journey.bosses++;
   game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
   if (game.combat.corpses.length > 16) game.combat.corpses.shift();
   const idleFight = game.mapMode === "world" && playerIdleActive();
@@ -1635,7 +1637,7 @@ function killEnemy(enemy: Enemy): void {
       : enemy.kind === "elite"
         ? 150
         : 42 + enemy.level * 8;
-  rewardExperience(xp);
+  const awardedXp = rewardExperience(xp);
   if (enemy.id.startsWith("bandit-") && game.mapMode === "world") {
     player.questKills += 1;
     checkMainQuest();
@@ -1653,7 +1655,7 @@ function killEnemy(enemy: Enemy): void {
       checkMainQuest();
     }
   } else {
-    addLog(`${enemy.name} bị đánh bại. +${xp} XP.`);
+    addLog(`${enemy.name} bị đánh bại. +${formatNumber(awardedXp)} XP.`);
   }
   const chance =
     enemy.kind === "boss" ? 1 : enemy.kind === "elite" ? 0.92 : 0.32;
@@ -1714,7 +1716,7 @@ function killEnemy(enemy: Enemy): void {
     game.campfires = game.campfires.filter(fire => fire.expiresAt > Date.now());
     game.campfires.push(createCampfire(`camp-${enemy.id}-${Date.now()}`, huntArea(), enemy.x, enemy.y, enemy.level, Date.now()));
     game.campfires = game.campfires.slice(-MAX_CAMPFIRES);
-    addLog(`Hạ tinh anh! Lửa trại cháy 90 giây. Ở trong vòng sáng nhận ${campfireXp(enemy.level)} XP mỗi 3 giây.`);
+    addLog(`Hạ tinh anh! Lửa trại cháy 90 giây. Ở trong vòng sáng nhận ${campfireXp(enemy.level) * player.preferences.xpMultiplier} XP mỗi 3 giây.`);
   }
   if (huntEligible && recordNormalKill(game.player.eliteHunt, game.enemies.some(other => !other.dead && other.wildElite))) spawnWildElite(enemy);
   if (huntEligible || enemy.kind === "elite") persistGame();
@@ -1924,7 +1926,7 @@ function refreshHuntUi(): void {
   if (!game) return;
   const fire = nearestCampfire(), hunt = game.player.eliteHunt;
   const elite = game.enemies.some(enemy => !enemy.dead && enemy.wildElite);
-  const message = fire ? `${nearCampfire(fire, game.player) ? "Đang hưởng" : "Lửa trại"}: +${campfireXp(fire.level)} XP/3s · còn ${countdown(fire.expiresAt - Date.now())}` : elite ? "Tinh anh đã xuất hiện · Hạ quái để nhóm lửa trại." : hunt.normalKills < ELITE_MIN_KILLS ? `Quái thường ${hunt.normalKills}/${ELITE_MIN_KILLS} · Tích lũy cơ hội gặp tinh anh` : `Đã hạ ${hunt.normalKills} quái · Cơ hội lượt tới ${Math.round(eliteChance(hunt.normalKills + 1) * 100)}%`;
+  const message = fire ? `${nearCampfire(fire, game.player) ? "Đang hưởng" : "Lửa trại"}: +${game.player.level === MAX_LEVEL ? 0 : campfireXp(fire.level) * game.player.preferences.xpMultiplier} XP/3s · còn ${countdown(fire.expiresAt - Date.now())}` : elite ? "Tinh anh đã xuất hiện · Hạ quái để nhóm lửa trại." : hunt.normalKills < ELITE_MIN_KILLS ? `Quái thường ${hunt.normalKills}/${ELITE_MIN_KILLS} · Tích lũy cơ hội gặp tinh anh` : `Đã hạ ${hunt.normalKills} quái · Cơ hội lượt tới ${Math.round(eliteChance(hunt.normalKills + 1) * 100)}%`;
   document.getElementById("elite-hunt-status")!.textContent = message;
   document.querySelector<HTMLButtonElement>("#campfire-btn")!.disabled = !fire;
 }
@@ -1955,6 +1957,7 @@ function enhanceItem(index: number, equippedSlot?: ItemSlot): void {
 
 function persistGame(): boolean {
   if (!game || game.mapMode !== "world") return false;
+  updateTitles();
   const snapshot = {
     version: 2,
     savedAt: Date.now(),
@@ -2058,9 +2061,9 @@ function loadGame(): void {
       );
       if (reward.minutes && !game.player.idle.inTown) {
         game.player.gold += reward.gold;
-        rewardExperience(reward.xp);
+        const awarded = rewardExperience(reward.xp);
         addLog(
-          `Luyện công vắng mặt ${reward.minutes} phút: +${reward.xp} XP · +${reward.gold} bạc (tối đa 4 giờ).`,
+          `Luyện công vắng mặt ${reward.minutes} phút: +${formatNumber(awarded)} XP · +${reward.gold} bạc (tối đa 4 giờ).`,
         );
       }
       prepareIdleWave();
@@ -3219,6 +3222,8 @@ function drawPlayer(player: Player, now: number): void {
   ctx.save();
   ctx.translate(player.x, player.y);
   drawCultivationAura(ctx, cultivation, now);
+  const title = wornTitle(player.journey);
+  if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
   drawBar(
@@ -3254,6 +3259,13 @@ function drawPlayer(player: Player, now: number): void {
   ctx.stroke();
   ctx.fillStyle = cultivation.realm.color;
   drawOutlinedText(cultivation.label, labelX, labelY);
+  if (title && player.preferences.titleVisible) {
+    ctx.font = "600 9px sans-serif";
+    const width = ctx.measureText(`${title.glyph} ${title.name}`).width;
+    const x = clamp(player.x, game!.cameraX + width / 2 + 6, game!.cameraX + VIEW_WIDTH - width / 2 - 6);
+    ctx.fillStyle = title.color;
+    drawOutlinedText(`${title.glyph} ${title.name}`, x, Math.max(labelY - 23, game!.cameraY + 18));
+  }
   ctx.textAlign = "left";
 }
 
@@ -3290,6 +3302,7 @@ function refreshUi(force = false): void {
   }
   if (!force && performance.now() - lastUiUpdate < 120) return;
   lastUiUpdate = performance.now();
+  updateTitles();
   const player = game.player;
   const sect = playerSect(player);
   const target = currentTarget();
@@ -3305,10 +3318,10 @@ function refreshUi(force = false): void {
   setText("#character-name", player.name);
   refreshIdleUi();
   setText("#character-sect", `${sect.name} · ${sect.title}`);
-  setText("#level-label", `Cấp ${player.level}`);
+  setText("#level-label", `Cấp ${player.level}/${MAX_LEVEL} · Trùng sinh ${player.journey.rebirths}`);
   setText(
     "#xp-label",
-    `${formatNumber(player.xp)} / ${formatNumber(xpToNext(player.level))} XP`,
+    player.level === MAX_LEVEL ? "MAX · Có thể trùng sinh" : `${formatNumber(player.xp)} / ${formatNumber(xpToNext(player.level))} XP${player.preferences.xpMultiplier > 1 ? ` · x${player.preferences.xpMultiplier}` : ""}`,
   );
   setText(
     "#hp-label",
@@ -3394,7 +3407,7 @@ function refreshUi(force = false): void {
       shortcut.outerHTML = spriteMarkup(sect.id, "character-shortcut");
   }
   const bars: Record<string, string> = {
-    "#xp-bar": `${(player.xp / xpToNext(player.level)) * 100}%`,
+    "#xp-bar": `${player.level === MAX_LEVEL ? 100 : Math.min(100, (player.xp / xpToNext(player.level)) * 100)}%`,
     "#hp-bar": `${(player.hp / player.maxHp) * 100}%`,
     "#mp-bar": `${(player.mp / player.maxMp) * 100}%`,
   };
@@ -3877,6 +3890,7 @@ function killGoldenBoss(enemy: Enemy): void {
     leaveGoldenBoss("Khung giờ đã đóng hoặc phần thưởng đã được nhận."); return;
   }
   enemy.dead = true; enemy.respawnAt = Infinity;
+  game.player.journey.kills++; game.player.journey.bosses++;
   game.telegraphs = [];
   game.autoBattle = false;
   game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
@@ -4016,6 +4030,16 @@ function refreshIdleUi(): void {
       : "Có quà chờ nhận",
   );
   const cultivation = cultivationForPower(currentCombatPower());
+  const title = wornTitle(player.journey);
+  text("worn-title-label", title?.name ?? "Chưa đeo danh hiệu");
+  document.getElementById("worn-title-label")!.style.color = title?.color ?? "";
+  text("title-count", `Đã mở ${player.journey.unlockedTitles.length}/${TITLES.length} · Chỉ cộng danh hiệu đang đeo`);
+  text("rebirth-label", `Trùng sinh ${player.journey.rebirths} lần`);
+  text("rebirth-status", player.level === MAX_LEVEL ? "Đã đủ cấp · Về cấp 1, nhận chỉ số vĩnh viễn" : `Cần cấp ${MAX_LEVEL} · Hiện tại ${player.level}`);
+  text("xp-buff-status", `Đang dùng x${player.preferences.xpMultiplier} XP${player.level === MAX_LEVEL ? " · Cấp đã tối đa" : ""}`);
+  document.querySelector<HTMLSelectElement>("#xp-multiplier")!.disabled = game.mapMode !== "world";
+  document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.disabled = game!.mapMode !== "world");
+  document.querySelector(".mobile-map-card")!.classList.toggle("hidden", !player.preferences.minimap);
   refreshHuntUi();
   text("combat-power", formatNumber(cultivation.power));
   text("header-combat-power", `⚔ ${formatNumber(cultivation.power)}`);
@@ -4099,6 +4123,8 @@ function hydrateSettings(): void {
   document.querySelector<HTMLSelectElement>("#game-speed")!.value = String(
     game.player.idle.speed,
   );
+  document.querySelector<HTMLSelectElement>("#xp-multiplier")!.value = String(game.player.preferences.xpMultiplier);
+  document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.checked = game!.player.preferences[input.dataset.preference as keyof GamePreferences] === true);
   document
     .querySelectorAll<HTMLInputElement>("[data-setting]")
     .forEach((input) => {
@@ -4107,7 +4133,88 @@ function hydrateSettings(): void {
       );
     });
 }
-function openUtility(title: string, content: string): void {
+function updateTitles(): void {
+  if (!game) return;
+  const unlocked = unlockTitles(game.player);
+  if (unlocked.length) addLog(`Mở danh hiệu: ${unlocked.map(title => title.name).join(", ")}. Xem tại Nhân vật → Danh hiệu.`);
+}
+function bonusText(bonus: Partial<GearStats>): string {
+  return (Object.keys(STAT_LABELS) as GearStat[]).filter(key => bonus[key]).map(key => `+${formatNumber(bonus[key]!)}${key === "crit" ? "%" : ""} ${STAT_LABELS[key]}`).join(" · ");
+}
+let previewTitleId = "";
+function openTitles(preview = game?.player.journey.activeTitle ?? ""): void {
+  if (!game) return;
+  const scrollTop = document.querySelector(".title-list")?.scrollTop ?? 0;
+  updateTitles();
+  previewTitleId = TITLES.some(title => title.id === preview) ? preview : "novice";
+  const shown = TITLES.find(title => title.id === previewTitleId)!;
+  openUtility("Danh hiệu giang hồ", `<div class="title-preview" style="--title-color:${shown.color}"><canvas id="title-effect-preview" width="220" height="90" aria-label="${shown.effect}"></canvas><b>${shown.glyph} ${shown.name}</b><small>${shown.effect} · ${bonusText(shown.bonuses)}</small></div><p class="dim">Đeo một danh hiệu để nhận chỉ số và hiệu ứng. Danh hiệu đã mở được giữ sau trùng sinh. Có thể tắt tên/hiệu ứng trong Cài đặt.</p><button id="remove-title" class="mini-button" ${!game.player.journey.activeTitle || game.mapMode !== "world" ? "disabled" : ""}>Tháo danh hiệu</button><div class="title-list">${TITLES.map(title => {
+    const owned = game!.player.journey.unlockedTitles.includes(title.id), active = game!.player.journey.activeTitle === title.id;
+    const current = Math.min(title.target, titleProgress(title, game!.player));
+    return `<div class="title-card ${active ? "worn" : ""}" style="--title-color:${title.color}"><button class="title-name" data-preview-title="${title.id}" aria-pressed="${previewTitleId === title.id}"><span>${title.glyph}</span><b>${title.name}</b></button><small>${title.requirement} · ${owned ? "Đã mở" : `${formatNumber(current)}/${title.target}`}</small><p>${bonusText(title.bonuses)}</p><small>${title.effect}</small><button class="mini-button" data-wear-title="${title.id}" ${!owned || active || game!.mapMode !== "world" ? "disabled" : ""}>${active ? "Đang đeo" : owned ? "Đeo danh hiệu" : "Chưa mở"}</button></div>`;
+  }).join("")}</div>${game.mapMode !== "world" ? '<p class="dim">Rời phụ bản trước khi đổi danh hiệu.</p>' : ""}`, "titles");
+  document.querySelector(".title-list")!.scrollTop = scrollTop;
+}
+function wearTitle(id: string): void {
+  if (!game || game.mapMode !== "world") return;
+  updateTitles();
+  if (id && !game.player.journey.unlockedTitles.includes(id)) return;
+  game.player.journey.activeTitle = id;
+  syncStats(); persistGame(); refreshUi(true); openTitles(id);
+}
+function rebirthBlocked(): string {
+  if (!game) return "Hãy chọn môn phái trước.";
+  if (game.mapMode !== "world") return "Rời phụ bản trước khi trùng sinh.";
+  if (game.goldenEncounter) return "Rời boss Hoàng Kim trước khi trùng sinh.";
+  if (game.player.level !== MAX_LEVEL) return `Cần đạt cấp ${MAX_LEVEL}.`;
+  if (game.player.journey.rebirths >= 1e6) return "Đã đạt giới hạn trùng sinh.";
+  return "";
+}
+function openRebirth(): void {
+  if (!game) return;
+  const count = game.player.journey.rebirths, before = rebirthBonuses(count), after = rebirthBonuses(count + 1), reason = rebirthBlocked();
+  openUtility("Trùng sinh", `<p>Đã trùng sinh <b>${count}</b> lần · Cấp hiện tại <b>${game.player.level}/${MAX_LEVEL}</b>.</p><p class="dim">Trùng sinh về cấp 1 và XP 0, trở lại thành tại ải 1. Chỉ số theo cấp được tính lại từ cấp 1; nhận thêm chỉ số vĩnh viễn bên dưới. Giữ trang bị/cường hóa, đồ chờ nhận, bạc, đá, võ học, điểm tiềm năng, danh hiệu và các ải đã mở. Võ công vẫn cần cấp 3/5 để dùng lại.</p><table class="enhancement-table"><thead><tr><th>Vĩnh viễn</th><th>Hiện tại</th><th>Sau lần ${count + 1}</th><th>Thêm</th></tr></thead><tbody>${(Object.keys(REBIRTH_BONUS) as GearStat[]).filter(key => REBIRTH_BONUS[key]).map(key => `<tr><td>${STAT_LABELS[key]}</td><td>+${formatNumber(before[key])}</td><td>+${formatNumber(after[key])}</td><td>+${REBIRTH_BONUS[key]}</td></tr>`).join("")}</tbody></table><p class="dim">Tự sao lưu trước khi thực hiện. Trang bị dưới đất được thu hồi về túi/Đồ chờ nhận. XP dư ở cấp tối đa không được tích sang lần sau.</p>${reason ? `<p class="dim" id="rebirth-blocked">${reason}</p>` : ""}<div class="btnrow"><button id="confirm-rebirth" data-rebirth-count="${count}" class="outline-button" ${reason ? "disabled" : ""}>Xác nhận trùng sinh lần ${count + 1}</button><button id="cancel-rebirth" class="mini-button">Hủy</button></div>`);
+}
+function confirmRebirth(expected: number): void {
+  if (!game) return;
+  const reason = rebirthBlocked();
+  if (reason) return showToast(reason);
+  if (game.player.journey.rebirths !== expected) return openRebirth();
+  if (!persistGame()) return;
+  try {
+    const previous = localStorage.getItem(SAVE_KEY);
+    if (!previous) throw new Error("backup-missing");
+    localStorage.setItem(`${SAVE_KEY}-backup`, previous);
+  } catch { showToast("Không tạo được bản sao lưu. Trùng sinh chưa được thực hiện."); return; }
+  collectIdleLoot(true);
+  const sect = playerSect(game.player);
+  if (!rebirthCharacter(game.player, { attack: sect.baseAttack, defense: sect.baseDefense })) return;
+  const player = game.player;
+  player.idle.stage = 1; player.idle.wave = 1; player.idle.inTown = true; player.idle.enabled = true;
+  player.rage = 0; player.shield = 0; player.shieldUntil = 0; player.attackCooldown = 0;
+  player.cooldowns = { skill1: 0, skill2: 0, ultimate: 0 }; player.potionCooldown = 0;
+  player.x = PLAYER_START.x; player.y = PLAYER_START.y;
+  game.autoBattle = false; game.targetId = null; game.moveTarget = null;
+  game.enemies = []; game.worldEnemies = []; game.loot = []; game.worldLoot = []; game.campfires = [];
+  game.effects = []; game.zones = []; game.telegraphs = []; game.floatingTexts = []; game.combat = freshCombat();
+  idleNextWave = 0; pendingSaleId = null; resetJoystick(); keys.clear();
+  updateTitles(); syncStats(true);
+  if (!persistGame()) { loadGame(); showToast("Không lưu được trùng sinh. Đã trở lại tiến trình trước đó."); return; }
+  closeUtility(); showIdlePage("char"); hydrateSettings();
+  addLog(`Trùng sinh lần ${player.journey.rebirths} thành công! ${bonusText(REBIRTH_BONUS)} vĩnh viễn.`);
+  refreshUi(true);
+}
+function drawTitlePreview(now: number): void {
+  const preview = document.querySelector<HTMLCanvasElement>("#title-effect-preview");
+  const title = TITLES.find(title => title.id === previewTitleId);
+  if (!preview || !title || document.getElementById("utility-overlay")!.classList.contains("hidden")) return;
+  const context = preview.getContext("2d")!;
+  context.clearRect(0, 0, preview.width, preview.height); context.save(); context.translate(110, 53);
+  drawTitleEffect(context, title, now);
+  context.fillStyle = title.color; context.font = "24px Georgia"; context.textAlign = "center"; context.fillText(title.glyph, 0, 0); context.restore();
+}
+function openUtility(title: string, content: string, layout: "default" | "titles" = "default"): void {
+  document.querySelector(".utility-dialog")!.classList.toggle("titles-dialog", layout === "titles");
   document.getElementById("utility-title")!.textContent = title;
   document.getElementById("utility-content")!.innerHTML = content;
   document.getElementById("utility-overlay")!.classList.remove("hidden");
@@ -4230,6 +4337,11 @@ function validateSave(value: unknown): {
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
   player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
+  player.preferences = normalizePreferences(player.preferences);
+  const history = normalizeIdle(player.idle);
+  const clears = player.dungeonClears;
+  player.journey = normalizeJourney(player.journey, { level: player.level, kills: Math.max(history.totalKills, player.questKills || 0), bosses: Math.max(history.bossKills, (player.bossDefeated ? 1 : 0) + (clears?.tomb ?? 0) + (clears?.bamboo ?? 0) + player.goldenClears.length) });
+  if (player.level === MAX_LEVEL) player.xp = 0;
   if (!validCampfires(data.campfires) || !validWildElite(data.wildElite)) throw new Error("save-invalid");
 
   player.facingX = Number.isFinite(player.facingX)
@@ -4415,6 +4527,8 @@ function playCombatSound(frequency: number): void {
   oscillator.stop(audioContext.currentTime + 0.07);
 }
 function bindIdleUi(): void {
+  document.getElementById("titles-btn")!.addEventListener("click", () => openTitles());
+  document.getElementById("rebirth-btn")!.addEventListener("click", openRebirth);
   document
     .getElementById("realm-guide-btn")!
     .addEventListener("click", openRealmGuide);
@@ -4571,6 +4685,14 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const preview = target.closest<HTMLButtonElement>("[data-preview-title]");
+      if (preview) openTitles(preview.dataset.previewTitle);
+      const wear = target.closest<HTMLButtonElement>("[data-wear-title]");
+      if (wear) wearTitle(wear.dataset.wearTitle!);
+      if (target.closest("#remove-title")) wearTitle("");
+      const rebirth = target.closest<HTMLButtonElement>("#confirm-rebirth");
+      if (rebirth) confirmRebirth(Number(rebirth.dataset.rebirthCount));
+      if (target.closest("#cancel-rebirth")) closeUtility();
       const enhanceConfirm = target.closest<HTMLButtonElement>("[data-confirm-enhance]");
       if (enhanceConfirm) confirmEnhancement(enhanceConfirm.dataset.confirmEnhance!, Number(enhanceConfirm.dataset.enhanceRank));
       if (target.closest("#preview-discard")) previewDiscard();
@@ -4676,6 +4798,21 @@ function bindIdleUi(): void {
     game.player.idle.speed = value === 1.5 || value === 2.5 ? value : 1;
     persistGame();
   });
+  document.getElementById("xp-multiplier")!.addEventListener("change", event => {
+    if (!game) return;
+    if (game.mapMode !== "world") { hydrateSettings(); return showToast("Rời phụ bản trước khi đổi cài đặt."); }
+    const value = Number((event.target as HTMLSelectElement).value);
+    game.player.preferences.xpMultiplier = XP_MULTIPLIERS.includes(value as GamePreferences["xpMultiplier"]) ? value as GamePreferences["xpMultiplier"] : 1;
+    persistGame(); refreshUi(true);
+    showToast(`Đã bật x${game.player.preferences.xpMultiplier} kinh nghiệm.`);
+  });
+  document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.addEventListener("change", () => {
+    if (!game) return;
+    if (game.mapMode !== "world") { hydrateSettings(); return showToast("Rời phụ bản trước khi đổi cài đặt."); }
+    const key = input.dataset.preference;
+    if (key === "damageNumbers" || key === "titleVisible" || key === "titleEffects" || key === "minimap") game.player.preferences[key] = input.checked;
+    persistGame(); refreshUi(true);
+  }));
   document
     .querySelectorAll<HTMLInputElement>("[data-setting]")
     .forEach((input) =>
@@ -5175,6 +5312,7 @@ function frame(now: number): void {
   if (now - lastDrawTime >= RENDER_INTERVAL_MS) {
     drawWorld(now);
     drawSectPreview(now);
+    drawTitlePreview(now);
     lastDrawTime = now - ((now - lastDrawTime) % RENDER_INTERVAL_MS);
   }
   refreshUi();

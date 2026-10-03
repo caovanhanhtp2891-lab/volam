@@ -17,7 +17,7 @@ Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát tr
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.6.0 · Tinh anh và lửa trại** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.7.0 · Trùng sinh và danh hiệu** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -42,9 +42,34 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 - Hạ tinh anh, kể cả tinh anh có sẵn trong phụ bản, tạo **lửa trại 90 giây**, phạm vi **120 đơn vị**, thưởng **`6 + cấp tinh anh × 2` XP mỗi 3 giây**. Chỉ nhận khi nhân vật ở gần và đúng bản đồ; nhiều lửa không cộng chồng. Bấm lửa trên sân hoặc **Đến lửa trại** trong Giang hồ để dừng auto và đi tới; bấm **Tự động** để đánh tiếp.
 - Tối đa 3 lửa đồng thời, vẽ trực tiếp bằng Canvas; không thêm ảnh vào atlas 28 KB. Lửa trên cùng ải giữ qua các đợt, nhưng không cấp XP khi về thành, đổi bản đồ, vào boss hoặc đứng xa. Lửa phụ bản chỉ thuộc lượt đang chạy. Lửa trên world/luyện ải giữ thời hạn khi reload; không gia hạn và không nhận bù XP lúc đóng tab, tải lại hoặc chạy nền.
 
+## Cài đặt, trùng sinh và danh hiệu · v0.7.0
+
+- **Khác → Buff kinh nghiệm** chọn **x1, x5, x10, x100 hoặc x1000**; lưu riêng từng nhân vật. Mọi nguồn đi qua cùng phép tính XP: quái, nhiệm vụ, boss Hoàng Kim, thưởng phụ bản, lửa trại và vắng mặt. XP vắng mặt dùng hệ số trong bản lưu, không nhân bạc/đá/đồ. Lên nhiều cấp nhận đủ điểm võ học/tiềm năng; cấp tối đa **160**, XP dư bị bỏ và không chuyển sang lượt trùng sinh.
+- **Khác → Hiển thị** bật/tắt số sát thương, minimap, tên danh hiệu và hiệu ứng danh hiệu. Ẩn tên/hiệu ứng không tháo danh hiệu hoặc mất chỉ số. Tùy chọn lưu theo từng ô nhân vật; đổi khi đã rời phụ bản để không mất cài đặt do checkpoint của lượt chưa lưu.
+- **Nhân vật → Trùng sinh** xem trước rồi xác nhận khi đạt cấp 160 và đã rời phụ bản/boss Hoàng Kim. Mỗi lần về cấp 1/XP 0, trở lại thành tại ải 1 và nhận vĩnh viễn **+80 công, +50 phòng, +600 HP, +120 MP, +4 tốc**. Chỉ số theo cấp được tính lại từ cấp 1; điểm tiềm năng, võ học đã nâng, đồ/cường hóa, bạc/đá, vật phẩm chờ nhận, thành tích/danh hiệu và các ải đã mở đều giữ. Các chiêu vẫn cần cấp 3/5 để dùng lại. Đồ dưới đất được thu hồi, kể cả vào hàng chờ khi túi đầy.
+- Trùng sinh tạo bản sao lưu trước, kiểm tra lại cấp/số lần khi xác nhận, chặn nhấn lặp; không thực hiện nếu không tạo được backup. Bonus tính từ số lần trùng sinh, không cộng lại vào dữ liệu gốc mỗi lần sync/reload. Không làm mới lượt thưởng ngày hoặc lượt boss Hoàng Kim.
+- **Nhân vật → Danh hiệu** có 12 danh hiệu, xem trước hiệu ứng, tiến độ mở, đeo/tháo. Chỉ danh hiệu đang đeo cộng chỉ số thật và lực chiến; các danh hiệu đã mở không cộng chồng. Thành tích hạ quái/tinh anh/boss và cấp cao nhất giữ qua trùng sinh. Save cũ nhận cài đặt x1, 0 trùng sinh, không tự đeo danh hiệu; mở các điều kiện đã biết từ tiến trình cũ.
+
+| Danh hiệu | Điều kiện mở | Chỉ số khi đeo | Hiệu ứng vector |
+| --- | --- | --- | --- |
+| Sơ Nhập Giang Hồ | Gia nhập môn phái | +20 HP | Lá xanh |
+| Bách Chiến Hiệp Khách | Hạ 100 quái | +15 công, +2 tốc | Bốn mũi kiếm |
+| Tinh Anh Liệp Thủ | Hạ 5 tinh anh | +20 công, +10 phòng | Tinh thể hổ phách |
+| Trảm Ma Đại Hiệp | Hạ 10 boss | +35 công, +200 HP | Vương miện đỏ |
+| Phá Trận Cao Thủ | Vượt cả hai phụ bản | +20 phòng, +60 MP | Trận phù lam tím |
+| Hoàng Kim Liệp Thủ | Hạ boss Hoàng Kim | +40 công, +3% chí mạng | Kim tiền vàng |
+| Bách Luyện Thành Cương | Sở hữu đồ +5 | +30 phòng, +150 HP | Tia lửa |
+| Thần Binh Chi Chủ | Sở hữu đồ +10 | +60 công, +4% chí mạng | Song kiếm tím |
+| Võ Lâm Cao Thủ | Từng đạt cấp 50 | +25 công, +15 phòng, +30 MP | Tinh tú xanh |
+| Nhất Đại Tông Sư | Từng đạt cấp 160 | +80 công, +400 HP | Mặt trời kim sắc |
+| Niết Bàn Tái Sinh | Trùng sinh lần đầu | +300 HP, +80 MP, +5 tốc | Sen hồng |
+| Luân Hồi Chí Tôn | Trùng sinh 5 lần | +120 công, +80 phòng, +600 HP, +5% chí mạng | Hai quỹ đạo |
+
+Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng danh hiệu trên nhân vật; atlas vẫn 28 KB. Những cơ chế này thuộc bản local lưu trên trình duyệt; authority và thời gian server tiếp tục thuộc P3/P5 của PLAN.
+
 ## Cảnh giới theo lực chiến
 
-Lực chiến = phần nguyên của **Công × 3 + Phòng × 2 + HP tối đa × 0,15**, cộng phần nguyên của tổng điểm phụ từ trang bị: **MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Bao gồm trang bị đã mặc/cường hóa và tiềm năng; hiển thị cạnh tên nhân vật trên thanh đầu. Chí mạng chiến đấu = 12% cơ bản + trang bị, giới hạn 40%; hệ số điểm lực chiến vẫn tính toàn bộ dòng trang bị để so sánh bộ đồ. Cảnh giới dùng chính con số này; thay đồ hoặc phân phối lại tiềm năng sẽ cập nhật tên và vòng sáng ngay. HP đang mất khi chiến đấu không làm tụt cảnh giới. Tiến trình cũ không cần thêm trường lưu hoặc tạo lại nhân vật.
+Lực chiến = phần nguyên của **Công × 3 + Phòng × 2 + HP tối đa × 0,15**, cộng phần nguyên của tổng điểm phụ từ trang bị, trùng sinh và danh hiệu đang đeo: **MP cộng thêm × 0,1 + chí mạng cộng thêm × 8 + tốc độ cộng thêm × 2**. Bao gồm trang bị đã mặc/cường hóa, tiềm năng, trùng sinh và danh hiệu đang đeo; hiển thị cạnh tên nhân vật trên thanh đầu. Chí mạng chiến đấu = 12% cơ bản + trang bị + danh hiệu đang đeo, giới hạn 40%; hệ số điểm lực chiến vẫn tính toàn bộ dòng trang bị để so sánh bộ đồ. Cảnh giới dùng chính con số này; thay đồ hoặc phân phối lại tiềm năng sẽ cập nhật tên và vòng sáng ngay. HP đang mất khi chiến đấu không làm tụt cảnh giới. Tiến trình cũ không cần thêm trường lưu hoặc tạo lại nhân vật.
 
 | Bậc | Cảnh giới        | Lực chiến từ |
 | --- | ---------------- | -----------: |
@@ -198,6 +223,14 @@ node tests/enhancement-elite-browser.cjs
 Bộ này kiểm tra xem trước/chi phí/tỷ lệ, thất bại/thiếu đồ/+10, cộng chỉ số khi mặc và reload; diệt quái thường gọi tinh anh thật, tải tiếp trận, diệt tinh anh tạo lửa, XP gần/xa/hết hạn, không thưởng offline và sáu kích thước màn hình.
 
 Browser test kiểm tra mua/bán, bình hồi phục, migrate save, kích thước mobile, hai phụ bản/đợt/boss, nhận thưởng lặp, túi đầy, tải lại, chết và timeout. Bài kiểm tra clear phụ bản dùng fixture nhân vật mạnh để kiểm chứng luồng nhanh; không thay thế playtest cân bằng ở cấp tối thiểu.
+
+Kiểm tra XP, trùng sinh và danh hiệu bằng cùng các biến môi trường:
+
+```bash
+node --experimental-strip-types tests/character-progression-browser.cjs
+```
+
+Bộ này kiểm tra XP thật từ quái/lửa trại/vắng mặt ở cả 5 hệ số, nhiệm vụ, thưởng phụ bản và boss Hoàng Kim; max cấp/điểm/XP dư, xem trước/hủy/trùng sinh hai lần, backup lỗi, nhấn lặp và giữ đồ/ải. Kiểm tra chỉ số khi đeo/tháo danh hiệu, lưu/tải, 12 hiệu ứng có ảnh khác nhau, công tắc hiển thị và sáu viewport. Fixture mạnh kiểm tra luồng, không thay thế cân bằng.
 
 Giao diện chiếm một viewport, hỗ trợ màn hình dọc và điện thoại xoay ngang: sân đấu ở trên, menu ở dưới, minimap theo vị trí thật, joystick, Auto và nút kỹ năng tròn. Các tab thông tin cuộn nội bộ, không kéo cả trang. Nút thu gọn/mở rộng cho phép tập trung vào sân đấu. Sát thương thường xuất hiện bằng số nổi và nhật ký, không bật toast liên tục che menu.
 
