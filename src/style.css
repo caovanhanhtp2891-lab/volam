@@ -805,6 +805,76 @@ h3 small {
   background: #14231b;
   font-family: Georgia, serif;
 }
+.cultivation-card {
+  --realm-color: #9bdd98;
+  border-color: var(--realm-color);
+  background: linear-gradient(120deg, #1c302b, #13201d);
+}
+.cultivation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cultivation-heading strong {
+  display: block;
+  color: var(--realm-color);
+  font-size: 18px;
+  margin: 4px 0;
+}
+.cultivation-heading small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}
+.cultivation-heading span {
+  color: #eee5c8;
+  font-size: 11px;
+}
+.cultivation-heading button {
+  flex-shrink: 0;
+}
+.realm-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #08140f;
+}
+.realm-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--realm-color);
+  transition: width 0.2s ease;
+}
+.cultivation-card p {
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 6px 0;
+  color: var(--realm-color);
+}
+.cultivation-card > small {
+  font-size: 9px;
+}
+.realm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.realm-table th,
+.realm-table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid #37473b;
+  text-align: left;
+}
+.realm-table td:last-child,
+.realm-table th:last-child {
+  text-align: right;
+}
+.realm-table .current-realm {
+  background: #ffffff10;
+  outline: 1px solid #ddc87c;
+}
 .equipment-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

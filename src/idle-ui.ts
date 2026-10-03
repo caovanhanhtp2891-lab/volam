@@ -35,6 +35,7 @@ export function idleShell(): string {
       </section>
       <section class="character-panel tab-page" data-page="char">
         <div class="card character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small><p>Lực chiến <strong id="combat-power">0</strong></p></div><span id="character-element" class="element-badge">金</span></div>
+        <div id="cultivation-card" class="card cultivation-card"><div class="cultivation-heading"><div><small id="realm-plane">Phàm giới · Bậc 1/19</small><strong id="realm-name">Luyện Thể</strong><span id="realm-phase">Tầng 1</span></div><button id="realm-guide-btn" class="mini-button">19 cảnh giới</button></div><div id="realm-meter" class="realm-meter" role="progressbar" aria-label="Tiến tới cảnh giới tiếp theo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="realm-progress"></span></div><p id="realm-next"></p><small class="dim">Tăng lực chiến bằng cấp độ, tiềm năng và trang bị đang mặc.</small></div>
         <div id="equipment-grid" class="equipment-grid"></div><p class="dim">Chạm trang bị để cường hóa. Đồ tốt hơn có thể mặc trong Hành trang.</p>
         <h3>Tiềm năng <small id="attribute-points">0 điểm</small></h3><div id="attribute-list" class="card"></div>
         <h3>Chỉ số nhân vật</h3><div id="stat-grid" class="stat-grid"></div>

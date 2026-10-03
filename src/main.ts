@@ -44,6 +44,8 @@ import {
   skillMarkup,
 } from "./battle-vfx";
 import { APP_VERSION } from "./release";
+import { REALMS, combatPower, cultivationForPower } from "./cultivation";
+import { drawCultivationAura } from "./cultivation-art";
 import {
   BAG_CAPACITY,
   DUNGEONS,
@@ -940,6 +942,14 @@ function effectiveDefense(): number {
         equipmentDefense() +
         game.player.idle.attributes.dexterity
     : 0;
+}
+
+function currentCombatPower(): number {
+  return combatPower(
+    effectiveAttack(),
+    effectiveDefense(),
+    game?.player.maxHp ?? 0,
+  );
 }
 
 function skillScale(skill: SkillKey, base: number): number {
@@ -3247,8 +3257,10 @@ function drawHeroSprite(
 
 function drawPlayer(player: Player, now: number): void {
   const sect = playerSect(player);
+  const cultivation = cultivationForPower(currentCombatPower());
   ctx.save();
   ctx.translate(player.x, player.y);
+  drawCultivationAura(ctx, cultivation, now);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
   drawBar(
@@ -3267,6 +3279,23 @@ function drawPlayer(player: Player, now: number): void {
     player.x,
     player.y - 112,
   );
+  ctx.font = "700 15px 'DM Sans', sans-serif";
+  const labelWidth = ctx.measureText(cultivation.label).width + 16;
+  const labelX = clamp(
+    player.x,
+    game!.cameraX + labelWidth / 2 + 6,
+    game!.cameraX + VIEW_WIDTH - labelWidth / 2 - 6,
+  );
+  const labelY = Math.max(player.y - 135, game!.cameraY + 45);
+  ctx.fillStyle = "rgba(9,19,22,.85)";
+  ctx.beginPath();
+  ctx.roundRect(labelX - labelWidth / 2, labelY - 16, labelWidth, 23, 6);
+  ctx.fill();
+  ctx.strokeStyle = cultivation.realm.color;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = cultivation.realm.color;
+  drawOutlinedText(cultivation.label, labelX, labelY);
   ctx.textAlign = "left";
 }
 
@@ -3953,11 +3982,33 @@ function refreshIdleUi(): void {
       ? "Đã nhận quà hôm nay"
       : "Có quà chờ nhận",
   );
+  const cultivation = cultivationForPower(currentCombatPower());
+  text("combat-power", formatNumber(cultivation.power));
+  text("realm-name", cultivation.realm.name);
+  text("realm-phase", cultivation.phase);
   text(
-    "combat-power",
-    formatNumber(
-      effectiveAttack() * 3 + effectiveDefense() * 2 + player.maxHp * 0.15,
-    ),
+    "realm-plane",
+    `${cultivation.rank < 10 ? "Phàm giới" : "Tiên giới"} · Bậc ${cultivation.rank + 1}/19`,
+  );
+  text(
+    "realm-next",
+    cultivation.nextPower === null
+      ? "Đã đạt Đạo Tổ · Đại viên mãn"
+      : `Còn ${formatNumber(cultivation.nextPower - cultivation.power)} lực chiến → ${cultivation.nextLabel}`,
+  );
+  const realmCard = document.getElementById("cultivation-card")!;
+  realmCard.style.setProperty("--realm-color", cultivation.realm.color);
+  const realmProgress = document.getElementById("realm-progress")!;
+  realmProgress.style.width = `${cultivation.progress * 100}%`;
+  document
+    .getElementById("realm-meter")!
+    .setAttribute(
+      "aria-valuenow",
+      String(Math.floor(cultivation.progress * 100)),
+    );
+  canvas.setAttribute(
+    "aria-label",
+    `Sân đấu Giang Hồ Dị Truyện. ${player.name}: ${cultivation.label}, lực chiến ${formatNumber(cultivation.power)}.`,
   );
   text("character-element", element.name);
   document.getElementById("character-element")!.style.color = element.color;
@@ -4027,6 +4078,14 @@ function openUtility(title: string, content: string): void {
 }
 function closeUtility(): void {
   document.getElementById("utility-overlay")!.classList.add("hidden");
+}
+function openRealmGuide(): void {
+  if (!game) return;
+  const current = cultivationForPower(currentCombatPower());
+  openUtility(
+    "Cảnh giới tu tiên",
+    `<p class="dim">Cảnh giới tự thay đổi theo lực chiến hiện tại. Luyện Thể và Luyện Khí có 9 tầng; từ Trúc Cơ có Sơ kỳ, Trung kỳ, Hậu kỳ, Đỉnh phong và Đại viên mãn. Đạt Chân Tiên là bước vào Tiên giới.</p><table class="realm-table"><thead><tr><th>Bậc</th><th>Cảnh giới</th><th>Lực chiến từ</th></tr></thead><tbody>${REALMS.map((realm, rank) => `<tr class="${rank === current.rank ? "current-realm" : ""}" ${rank === current.rank ? 'aria-current="true"' : ""}><td>${rank + 1}</td><td style="color:${realm.color}">${realm.name}</td><td>${formatNumber(realm.minPower)}</td></tr>`).join("")}</tbody></table>`,
+  );
 }
 function showItemDetail(item: Item): void {
   if (!game) return;
@@ -4312,6 +4371,9 @@ function playCombatSound(frequency: number): void {
   oscillator.stop(audioContext.currentTime + 0.07);
 }
 function bindIdleUi(): void {
+  document
+    .getElementById("realm-guide-btn")!
+    .addEventListener("click", openRealmGuide);
   document
     .getElementById("loot-notices")!
     .addEventListener("click", (event) => {

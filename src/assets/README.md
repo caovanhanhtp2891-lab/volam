@@ -23,4 +23,6 @@ Hiệu ứng dùng hình học Canvas: vệt chém, đạn theo ngũ hành, vòn
 
 `src/equipment-art.ts` dùng chung 11 hình trang bị cho SVG nội tuyến trong túi/nhân vật/màn so sánh và Path2D đã lưu cho Canvas dưới đất. Viền màu, ngọc và ánh sáng thể hiện phẩm chất. `src/battle-vfx.ts` cũng cung cấp SVG cho nút võ công. Các hình này là đường nét trong mã nguồn, không có file ảnh mới hoặc thư viện đồ họa bổ sung. Vũ khí và áo phản ánh màu trang bị; đồ Hiếm/Cực phẩm tạo vòng sáng theo màu món có phẩm chất cao nhất.
 
+`src/cultivation-art.ts` vẽ vòng cảnh giới trên mặt đất trước thân nhân vật: tối đa 5 vòng, 12 cánh/phù văn, 12 hạt xoay và 10 hạt bay lên. Vòng xoay theo thời gian, không di chuyển theo nhịp nhún của cơ thể; màu và độ phức tạp tăng theo 19 bậc. Dùng lại quầng sáng đã lưu, không tải thêm ảnh hoặc sinh danh sách particle không giới hạn. Tên cảnh giới có nền tối/viền màu trên đầu và giữ trong chiều ngang của sân đấu.
+
 Bộ ảnh chi tiết trước đây (khoảng 2,06 MB) được thay thế; có thể khôi phục từ commit `c2e3511` trong lịch sử Git. Asset mới giảm dữ liệu ảnh tải khoảng **99,1%**. URL ảnh vẫn được Vite xử lý cho đường dẫn GitHub Pages `/volam/`.
