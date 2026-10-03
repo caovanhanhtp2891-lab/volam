@@ -46,7 +46,7 @@ test("projectiles follow the same curved flight from caster to victim in both ef
       drawSkillFlight(c, { x: 10, y: 40 }, { x: 270, y: 90 }, p, sect.id, "skill1", 900, "simple");
       const position = calls.find(([name]) => name === "translate");
       assert.ok(Math.abs(position[1] - (10 + 260 * p)) < .001);
-      assert.ok(Math.abs(position[2] - (40 + 50 * p - Math.sin(p * Math.PI) * 18)) < .001);
+      assert.ok(Math.abs(position[2] - (40 + 50 * p - Math.sin(p * Math.PI) * ({"con-lon":0,"thuy-yen":4,"vo-dang":3,"duong-mon":7}[sect.id] ?? 18))) < .001);
       assert.ok(calls.length < 180);
     }
   }

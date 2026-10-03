@@ -1,12 +1,13 @@
 import { drawAnimatedHero, type HeroAppearance } from "./combat-art";
 import { freshMotion } from "./combat";
-import { drawHorse, type MountAppearance } from "./mount-art";
+import { type MountAppearance } from "./mount-art";
 import { drawGearAura } from "./gear-effects";
 import { drawCultivationAura } from "./cultivation-art";
 import type { Cultivation } from "./cultivation";
 import type { FactionId } from "./idle";
 import { SECT_BY_FACTION } from "./sects";
 import { characterArtKey } from "./character-art";
+import { drawMountedCharacter } from "./mounted-character-art";
 
 let pedestal: HTMLCanvasElement | undefined;
 function portraitPedestal(): HTMLCanvasElement {
@@ -66,7 +67,10 @@ export function drawCharacterPreview(
   },
   now: number,
 ): void {
-  canvas.dataset.characterArt = characterArtKey(SECT_BY_FACTION[character.factionId], character.sex);
+  canvas.dataset.characterArt = characterArtKey(
+    SECT_BY_FACTION[character.factionId],
+    character.sex,
+  );
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -80,17 +84,15 @@ export function drawCharacterPreview(
   drawGearAura(ctx, character.appearance, now, character.simpleEffects);
   ctx.restore();
   if (character.horse) {
-    ctx.translate(0, 15);
-    ctx.scale(3, 3);
+    ctx.translate(0, 18);
+    ctx.scale(2.7, 2.7);
     const motion = freshMotion();
     motion.stride = now / 250;
-    drawHorse(ctx, character.horse, motion, now);
-    ctx.translate(0, -20);
-    ctx.scale(0.8, 0.8);
-    drawAnimatedHero(
+    drawMountedCharacter(
       ctx,
       character.factionId,
       character.sex,
+      character.horse,
       motion,
       now,
       character.appearance,

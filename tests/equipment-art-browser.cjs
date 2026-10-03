@@ -55,22 +55,17 @@ async function gallery(page) {
     });
     await context.addInitScript(() => {
       window.__equipmentDraws = { world: 0, portrait: 0, gradients: 0 };
-      const draw = CanvasRenderingContext2D.prototype.drawImage,
+      const stroke = CanvasRenderingContext2D.prototype.stroke,
         gradient = CanvasRenderingContext2D.prototype.createLinearGradient;
-      CanvasRenderingContext2D.prototype.drawImage = function (
-        source,
-        ...args
-      ) {
-        if (
-          source instanceof HTMLCanvasElement &&
-          source.width === 128 &&
-          source.height === 128
-        ) {
+      CanvasRenderingContext2D.prototype.stroke = function (...args) {
+        // The fingers drawn over the weapon grip belong to the wielded rig,
+        // whereas bag items use cached 128px inventory icons.
+        if (this.strokeStyle === "#d4ae8b" && this.lineWidth === 1.5) {
           if (this.canvas.id === "game-canvas") window.__equipmentDraws.world++;
           if (this.canvas.id === "character-preview")
             window.__equipmentDraws.portrait++;
         }
-        return draw.call(this, source, ...args);
+        return stroke.apply(this, args);
       };
       CanvasRenderingContext2D.prototype.createLinearGradient = function (
         ...args
@@ -93,7 +88,7 @@ async function gallery(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.13.0",
+      "0.14.0",
     );
     await page.locator("#hero-name-input").fill("Bảo Khố Kiếm Sĩ");
     await page.locator('[data-faction="wudang"]').click();
@@ -113,7 +108,10 @@ async function gallery(page) {
     );
     for (const rarity of ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"]) {
       await page.locator("#gear-gallery-rarity").selectOption(rarity);
-      assert.equal(await page.locator(".gear-sample .gear-body").count(), weaponCount);
+      assert.equal(
+        await page.locator(".gear-sample .gear-body").count(),
+        weaponCount,
+      );
     }
     for (const enhance of [0, 3, 7, 10]) {
       await page.locator("#gear-gallery-enhance").selectOption(String(enhance));
@@ -131,9 +129,23 @@ async function gallery(page) {
         await page.locator(".gear-sample .gear-orbit").count(),
         enhance >= 7 ? weaponCount : 0,
       );
-      assert.equal(await page.locator(".gear-sample .gear-halo").count(), enhance >= 7 ? weaponCount : 0);
-      assert.equal(await page.locator(".gear-sample [data-painted-item]").count(), weaponCount);
-      if (enhance < 7) assert.equal(await page.locator(".gear-sample .gear-quality-crest").first().evaluate(el => getComputedStyle(el).animationName), "none", "gold quality has no animated awakening below +7");
+      assert.equal(
+        await page.locator(".gear-sample .gear-halo").count(),
+        enhance >= 7 ? weaponCount : 0,
+      );
+      assert.equal(
+        await page.locator(".gear-sample [data-painted-item]").count(),
+        weaponCount,
+      );
+      if (enhance < 7)
+        assert.equal(
+          await page
+            .locator(".gear-sample .gear-quality-crest")
+            .first()
+            .evaluate((el) => getComputedStyle(el).animationName),
+          "none",
+          "gold quality has no animated awakening below +7",
+        );
     }
     await page.locator("#gear-gallery-element").selectOption("hoa");
     assert.ok(
@@ -201,9 +213,15 @@ async function gallery(page) {
     }
     const bought = (await read(page)).player;
     assert.equal(bought.gold, initialGold - weaponCount * 200);
-    assert.equal(new Set(bought.inventory.map((item) => item.id)).size, weaponCount);
+    assert.equal(
+      new Set(bought.inventory.map((item) => item.id)).size,
+      weaponCount,
+    );
     await page.locator("#set-shop-slot").selectOption("ring2");
-    assert.equal(await page.locator("#set-shop-variant option").count(), variantsForSlot("ring2").length);
+    assert.equal(
+      await page.locator("#set-shop-variant option").count(),
+      variantsForSlot("ring2").length,
+    );
     await page.locator("#set-shop-variant").selectOption("twinring");
     await page.locator("#buy-set-piece").click();
     assert.equal((await read(page)).player.inventory.at(-1).slot, "ring2");
@@ -287,7 +305,7 @@ async function gallery(page) {
     await page.waitForTimeout(350);
     assert.ok(await page.evaluate(() => window.__equipmentDraws.world > 0));
     console.log(
-      "PASS actual weapon artwork is drawn in both character and arena; animated frames reuse cached materials without creating new gradients",
+      "PASS held weapon grip is drawn in both character and arena; animated frames reuse cached materials without creating new gradients",
     );
     await page.locator('[data-idle-tab="more"]').click();
     await page.locator("#skill-effects-quality").selectOption("simple");
@@ -362,8 +380,9 @@ async function gallery(page) {
     await page.locator("#utility-close").click();
     const templates = (await read(page)).player.equipment.weapon;
     await seed(page, (s) => {
-      s.player.inventory = Object.entries(GEAR_VARIANTS).slice(0, 60).map(
-        ([variant, meta], i) => ({
+      s.player.inventory = Object.entries(GEAR_VARIANTS)
+        .slice(0, 60)
+        .map(([variant, meta], i) => ({
           ...templates,
           id: "all-" + variant,
           slot: meta.slot,
@@ -374,8 +393,7 @@ async function gallery(page) {
           enhance: [0, 3, 7, 10][i % 4],
           setId: undefined,
           element: ["kim", "moc", "thuy", "hoa", "tho"][i % 5],
-        }),
-      );
+        }));
     });
     await bag(page);
     await page.waitForTimeout(2600);

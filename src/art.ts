@@ -104,3 +104,28 @@ function drawFromAtlas(
   context.restore();
   return true;
 }
+
+// Seated pose stops at the pelvis; the standing boots are never drawn on a mount.
+export function drawRidingTorso(
+  context: CanvasRenderingContext2D,
+  id: SectId,
+  sex: CharacterSex,
+  pelvis: number,
+  width = 56,
+  height = 76,
+): boolean {
+  if (!characterAtlas.complete || !characterAtlas.naturalWidth) return false;
+  const [x, y, w, h] = characterFrame(id, sex);
+  context.drawImage(
+    characterAtlas,
+    x * characterAtlas.naturalWidth,
+    y * characterAtlas.naturalHeight,
+    w * characterAtlas.naturalWidth,
+    h * pelvis * characterAtlas.naturalHeight,
+    -width * 0.54,
+    -height * pelvis,
+    width,
+    height * pelvis,
+  );
+  return true;
+}

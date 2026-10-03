@@ -62,20 +62,20 @@ async function move(page) {
     });
     await context.addInitScript(() => {
       window.__horseDraws = { world: 0, preview: 0 };
-      const original = CanvasRenderingContext2D.prototype.ellipse;
-      CanvasRenderingContext2D.prototype.ellipse = function (
-        x,
-        y,
-        rx,
-        ry,
+      const original = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function (
+        source,
         ...args
       ) {
-        if (x === -1 && y === -12 && rx === 29 && ry === 13) {
+        if (
+          source instanceof HTMLImageElement &&
+          source.src.includes("riding-horses")
+        ) {
           if (this.canvas.id === "game-canvas") window.__horseDraws.world++;
           if (this.canvas.id === "character-preview")
             window.__horseDraws.preview++;
         }
-        return original.call(this, x, y, rx, ry, ...args);
+        return original.call(this, source, ...args);
       };
     });
     const page = await context.newPage();
@@ -87,7 +87,7 @@ async function move(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.13.0",
+      "0.14.0",
     );
     await page.locator("#hero-name-input").fill("Kim Phong Kỵ Sĩ");
     await page.locator('[data-faction="shaolin"]').click();
@@ -301,8 +301,9 @@ async function move(page) {
       );
       await page.locator("#utility-close").click();
     }
-    const variants = Object.entries(GEAR_VARIANTS).slice(0, 60).map(
-      ([variant, meta], i) => ({
+    const variants = Object.entries(GEAR_VARIANTS)
+      .slice(0, 60)
+      .map(([variant, meta], i) => ({
         ...gear(meta.slot),
         id: `art-${i}`,
         variant,
@@ -311,8 +312,7 @@ async function move(page) {
         level: [1, 50, 100, 160][i % 4],
         rarity: ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"][i % 5],
         enhance: [0, 3, 7, 10][i % 4],
-      }),
-    );
+      }));
     await seed(page, (s) => {
       s.player.inventory = variants;
     });

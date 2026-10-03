@@ -47,7 +47,10 @@ import { equipmentMarkup, equipmentTier, equipmentEffectLabel } from "./equipmen
 import { drawEquipmentDropAura } from "./equipment-vfx";
 import { GEAR_VARIANTS, GEAR_SETS, SET_IDS, EQUIPMENT_SLOTS, SET_THRESHOLDS, variantOf, setStatuses, setForElement, rollGearIdentity, validGearIdentity, variantsForSlot, type GearVariant, type GearIdentity, type SetId } from "./gear-catalog";
 import { BASIC_HORSE_PRICE, mountSpeedBonus, ridingSpeed, normalizeMounted } from "./mount";
-import { drawHorse, type MountAppearance } from "./mount-art";
+import type { MountAppearance } from "./mount-art";
+import { drawMountedCharacter } from "./mounted-character-art";
+import { actorCastOffset } from "./actor-rig";
+import { skillUsesFlight, flightSpeed } from "./skill-flight";
 import { drawGearAura } from "./gear-effects";
 import { RARITIES, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
@@ -1836,13 +1839,17 @@ function launchProjectile(
   area = 0,
 ): void {
   if (!game) return;
-  const from = { x: game.player.x, y: game.player.y - 24 };
+  const offset = actorCastOffset(
+    playerSect(game.player).id, game.player.sex,
+    game.combat.motion.facingX, game.player.mounted,
+  );
+  const from = { x: game.player.x + offset.x, y: game.player.y + offset.y };
   game.combat.projectiles.push({
     sect: playerSect(game.player).id,
     from,
     target,
     startedAt: nowMs() + 110,
-    duration: flightDuration(from, target),
+    duration: flightDuration(from, { x: target.x, y: target.y - 24 }, flightSpeed(playerSect(game.player).id)),
     multiplier,
     area,
     source,
@@ -1947,15 +1954,22 @@ function castSkill(key: SkillKey, automatic = false): void {
   const healing = definition.healOnHit && definition.heal
     ? { ratio: definition.heal + Math.max(0, player.skillRanks[key] - 1) * .025, used: false }
     : undefined;
+  let previousFlight: Projectile | undefined;
   for (const [index, enemy] of selection.targets.entries()) {
     const falloff = definition.shape === "chain" ? .8 ** index : 1;
     if (definition.damage > 0) for (let hit = 0; hit < (definition.hits ?? 1); hit++) {
-      if (definition.anchor === "target" && definition.range > 160 && !definition.dash) {
+      if (skillUsesFlight(definition)) {
         launchProjectile(enemy, multiplier * falloff, definition.name);
         const projectile = game.combat.projectiles[game.combat.projectiles.length - 1];
         projectile.definition = definition; projectile.skill = key;
         projectile.visualLeader = index === 0 && hit === 0;
-        if (definition.shape === "chain" && index > 0) projectile.visualFrom = { x: selection.targets[index - 1].x, y: selection.targets[index - 1].y - 30 };
+        if (definition.shape === "chain" && index > 0 && previousFlight) {
+          const previous = selection.targets[index - 1];
+          projectile.visualFrom = { x: previous.x, y: previous.y - 24 };
+          projectile.duration = flightDuration(projectile.visualFrom, { x: enemy.x, y: enemy.y - 24 }, flightSpeed(sect.id));
+          projectile.startedAt = previousFlight.startedAt + previousFlight.duration;
+        }
+        previousFlight = projectile;
         projectile.startedAt += hit * 70;
       } else {
         game.combat.strikes.push({ target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : 150) + hit * 70, definition, range: definition.range, healing });
@@ -1973,11 +1987,12 @@ function castSkill(key: SkillKey, automatic = false): void {
   }
   const visualRadius = definition.shape === "line" ? definition.range : definition.shape === "target" || definition.shape === "chain" ? 45 : definition.radius;
   const visual = { ...selection.center, radius: Math.min(280, visualRadius), color: SKILL_PALETTES[sect.id].color, sect: sect.id, kind: definition.motif, skill: key, angle: selection.angle, duration: key === "ultimate" ? 850 : 600 };
-  const ranged = definition.anchor === "target" && definition.range > 160 && !definition.dash && definition.damage > 0;
+  const ranged = skillUsesFlight(definition);
   const reach = automatic ? undefined : { x: player.x, y: player.y, definition };
-  addSkillEffect({ ...visual, reach, x: player.x, y: player.y - 24, radius: 30, phase: "cast", duration: ranged ? 300 : 170 });
+  const hand = actorCastOffset(sect.id, player.sex, game.combat.motion.facingX, player.mounted);
+  addSkillEffect({ ...visual, reach, x: player.x + (ranged ? hand.x : 0), y: player.y + (ranged ? hand.y : -24), radius: 30, phase: "cast", duration: ranged ? 300 : 170 });
   if (!ranged) addSkillEffect({ ...visual, phase: "release", delay: 110 });
-  if (definition.zone) {
+  if (definition.zone && !ranged) {
     game.zones.push({ ...visual, ...selection.center, radius: definition.radius, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
     if (game.zones.length > 6) game.zones.shift();
   }
@@ -2656,12 +2671,24 @@ function updateCombat(now: number): void {
     }
     const target = projectile.target;
     if (!target.dead) {
-      if (projectile.visualLeader && projectile.definition && projectile.skill) {
+      if (projectile.visualLeader && projectile.definition && projectile.skill && projectile.definition.shape === "area") {
         addSkillEffect({ x: target.x, y: target.y - 24,
-          radius: projectile.definition.shape === "area" ? projectile.definition.radius : 42,
+          radius: projectile.definition.radius,
           color: SKILL_PALETTES[projectile.sect].color, sect: projectile.sect,
           kind: projectile.definition.motif, skill: projectile.skill, phase: "release",
           duration: projectile.skill === "ultimate" ? 700 : 450 });
+      }
+      if (projectile.visualLeader && projectile.definition?.zone && projectile.skill) {
+        const definition = projectile.definition;
+        game.zones.push({
+          x: target.x, y: target.y, radius: definition.radius,
+          color: SKILL_PALETTES[projectile.sect].color, sect: projectile.sect,
+          kind: definition.motif, skill: projectile.skill, startedAt: now,
+          duration: definition.zone! * 1000, nextTick: now + 1000,
+          multiplier: skillScale(projectile.skill, .4), slow: definition.slow ?? 1,
+          source: definition.name,
+        });
+        if (game.zones.length > 6) game.zones.shift();
       }
       if (projectile.definition) applySkillStatus(target, projectile.definition, projectile.multiplier, now);
       if (projectile.area)
@@ -3317,7 +3344,7 @@ function drawLoot(loot: GroundLoot, now: number): void {
 function drawProjectile(projectile: Projectile, now: number): void {
   if (now < projectile.startedAt) return;
   const t = clamp((now - projectile.startedAt) / projectile.duration, 0, 1);
-  const to = { x: projectile.target.x, y: projectile.target.y - 30 };
+  const to = { x: projectile.target.x, y: projectile.target.y - 24 };
   const from = projectile.visualFrom ?? projectile.from;
   drawSkillFlight(ctx, from, to, t, projectile.sect, projectile.skill, now, game?.player.preferences.skillEffects);
 }
@@ -3604,19 +3631,9 @@ function drawHeroSprite(
     ctx.scale(0.9, 0.9);
     drawAnimatedHero(ctx, "wudang", "male", motion, now);
   } else if (game) {
-    if (game.player.mounted) {
-      const horse = currentMountAppearance();
-      if (horse) drawHorse(ctx, horse, game.combat.motion, now);
-      ctx.translate(0, -20); ctx.scale(.8, .8);
-    }
-    drawAnimatedHero(
-      ctx,
-      game.player.factionId,
-      game.player.sex,
-      game.combat.motion,
-      now,
-      currentHeroAppearance(),
-    );
+    const horse = game.player.mounted ? currentMountAppearance() : undefined;
+    if (horse) drawMountedCharacter(ctx, game.player.factionId, game.player.sex, horse, game.combat.motion, now, currentHeroAppearance());
+    else drawAnimatedHero(ctx, game.player.factionId, game.player.sex, game.combat.motion, now, { ...currentHeroAppearance(), riding: false });
   }
   if (
     !remote &&
@@ -3644,7 +3661,7 @@ function drawPlayer(player: Player, now: number): void {
   if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
   ctx.restore();
-  const ridingOffset = player.mounted ? 22 : 0;
+  const ridingOffset = player.mounted ? 36 : 0;
   drawBar(
     player.x - 25,
     player.y - (HERO_SIZE.height - 7) - ridingOffset,
@@ -5589,18 +5606,25 @@ function drawSkillArtPreview(now: number): void {
   for (let x = 0; x < 360; x += 30) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 210); c.stroke(); }
   for (let y = 0; y < 210; y += 30) { c.beginPath(); c.moveTo(0, y); c.lineTo(360, y); c.stroke(); }
   const p = (now % 1600) / 1600, palette = SKILL_PALETTES[sect.id];
-  const ranged = skill.anchor === "target" && skill.range > 160 && !skill.dash && skill.damage > 0;
+  const ranged = skillUsesFlight(skill);
   const actor = { x: 90, y: 128 }, victim = { x: ranged ? 263 : 90 + Math.min(106, Math.max(55, skill.radius * .5)), y: 128 };
   const quality = game.player.preferences.skillEffects;
   const phase = p < .15 ? "cast" : p < .55 ? "release" : "impact";
   preview.dataset.phase = phase;
   drawSkillReach(c, skill, actor.x, actor.y + 20, 0, palette.color, .45);
   const dash = skill.dash ? Math.min(1, Math.max(0, (p - .15) / .35)) * (victim.x - actor.x - 30) : 0;
-  drawSprite(c, sect.id, actor.x + dash, actor.y + 24, HERO_SIZE.width, HERO_SIZE.height, false, game.player.sex);
+  c.save(); c.translate(actor.x + dash, actor.y + 12);
+  const motion = freshMotion();
+  motion.action = skill.dash ? "dash" : "cast";
+  motion.actionAt = now - p * 1600; motion.actionDuration = 650;
+  drawAnimatedHero(c, game.player.factionId, game.player.sex, motion, now, { ...currentHeroAppearance(), riding: false });
+  c.restore();
   if (skill.damage > 0) drawSprite(c, "bandit", victim.x, victim.y + 24, 44, 58);
   const base = { color: sect.color, sect: sect.id, kind: skill.motif, skill: artPreviewSkill, angle: 0, quality };
-  if (p < .2) drawSectEffect(c, { ...base, ...actor, radius: 28, phase: "cast" }, p / .2);
-  if (ranged && p >= .15 && p < .55) drawSkillFlight(c, actor, victim, (p - .15) / .4, sect.id, artPreviewSkill, now, quality);
+  const hand = actorCastOffset(sect.id, game.player.sex, 1);
+  const origin = { x: actor.x + hand.x, y: actor.y + 12 + hand.y };
+  if (p < .2) drawSectEffect(c, { ...base, ...(ranged ? origin : actor), radius: 28, phase: "cast" }, p / .2);
+  if (ranged && p >= .15 && p < .55) drawSkillFlight(c, origin, victim, (p - .15) / .4, sect.id, artPreviewSkill, now, quality);
   if (!ranged && p >= .2 && p < .55) {
     drawSectEffect(c, { ...base, x: actor.x + dash, y: actor.y, radius: skill.shape === "line" ? 130 : Math.min(110, Math.max(60, skill.radius * .7)), phase: "release" }, (p - .2) / .35);
   }

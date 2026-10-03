@@ -2,6 +2,8 @@ import type { EffectMotif, SectId, SkillKey, SkillDefinition } from "./sects.ts"
 import { SKILL_PALETTES, SECT_SIGILS, type SkillPalette } from "./skill-art.ts";
 import { drawSetCrest } from "./set-art.ts";
 import { drawGlow } from "./battle-vfx.ts";
+import { skillFlightPoint } from "./skill-flight.ts";
+import { drawIceMissile, drawIceExplosion } from "./ice-effects.ts";
 export { skillIconMarkup } from "./skill-art.ts";
 
 export type SkillQuality = "full" | "simple";
@@ -107,6 +109,7 @@ export function drawSkillImpact(c: CanvasRenderingContext2D, effect: SectEffect,
   const p = Math.max(0, Math.min(1, progress));
   if (!effect.sect || p <= 0 || p >= 1) return;
   const palette = SKILL_PALETTES[effect.sect], full = effect.quality !== "simple";
+  if (effect.sect === "thuy-yen") return drawIceExplosion(c, effect.x, effect.y, effect.radius, p, !full);
   const r = Math.max(8, Math.min(62, effect.radius)) * (.35 + .65 * Math.sqrt(p));
   const count = full ? effect.skill === "ultimate" ? 8 : 6 : 3;
   c.save(); c.translate(effect.x, effect.y); c.rotate(effect.angle ?? 0);
@@ -144,12 +147,6 @@ export function drawSkillImpact(c: CanvasRenderingContext2D, effect: SectEffect,
       const a = i * TAU / count, d = r * (.5 + p * .4);
       c.beginPath(); c.arc(Math.cos(a) * d, Math.sin(a) * d, 2 + (1 - p) * 2, 0, TAU);
       c.fillStyle = i % 2 ? palette.accent : palette.color; c.fill();
-    }
-  } else if (effect.sect === "thuy-yen") {
-    for (let i = 0; i < count; i++) {
-      c.save(); c.rotate(i * TAU / count); c.translate(r * .35, 0); c.beginPath();
-      c.moveTo(r * .65, 0); c.lineTo(0, -r * .12); c.lineTo(-r * .12, 0); c.lineTo(0, r * .12); c.closePath();
-      c.fillStyle = palette.color + "90"; c.fill(); ink(c, palette, 1.4); c.restore();
     }
   } else if (effect.sect === "nga-mi") {
     c.save(); c.rotate(p * .8); lotus(c, r * .72, full ? 6 : 3, p, palette); c.restore();
@@ -396,7 +393,7 @@ export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, 
 
 export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, progress: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
   const t = Math.max(0, Math.min(1, progress)), palette = SKILL_PALETTES[sect];
-  const point = (p: number) => ({ x: from.x + (to.x - from.x) * p, y: from.y + (to.y - from.y) * p - Math.sin(p * Math.PI) * 18 });
+  const point = (p: number) => skillFlightPoint(from, to, p, sect);
   const at = point(t), tangent = point(Math.max(0, t - .025));
   c.save(); c.lineCap = "round"; c.lineJoin = "round";
   c.beginPath();
@@ -413,6 +410,7 @@ export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; 
 export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
   const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 18 : 12;
   c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
+  if (sect === "thuy-yen") { drawIceMissile(c, r, now, !full); c.restore(); return; }
   if (full) drawGlow(c, -2, 0, r * 1.5, palette.color, .45);
   c.beginPath(); segment(c, -r * 2.7, 0, 0, 0); ink(c, palette, key ? 3 : 2);
   if (full) { c.beginPath(); segment(c, -r * 2, -4, -r * .7, -3); segment(c, -r * 2.3, 4, -r * .8, 3); ink(c, palette, 1.2, true); }
@@ -429,10 +427,6 @@ export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: nu
   } else if (sect === "thien-nhan") {
     c.save(); c.rotate(Math.PI / 2); flame(c, r * 1.5, (now % 400) / 400, palette); c.restore();
     c.rotate(now / 150); for (let i = 0; i < 2; i++) { c.rotate(Math.PI); c.beginPath(); c.arc(0, 0, r, -.9, 1); ink(c, palette, 4); }
-  } else if (sect === "thuy-yen") {
-    c.beginPath(); c.moveTo(r * 1.4, 0); c.lineTo(0, -r * .55); c.lineTo(-r, 0); c.lineTo(0, r * .55); c.closePath();
-    c.fillStyle = palette.color + "90"; c.fill(); ink(c, palette, 1.8);
-    c.beginPath(); segment(c, -r, 0, r * 1.4, 0); segment(c, 0, -r * .55, r * .4, 0); segment(c, 0, r * .55, r * .4, 0); ink(c, palette, 1);
   } else if (sect === "thien-vuong") {
     c.beginPath(); segment(c, -r * 1.8, 0, r, 0); ink(c, palette, 3);
     c.beginPath(); c.moveTo(r * 1.5, 0); c.lineTo(r * .6, -5); c.lineTo(r * .9, 0); c.lineTo(r * .6, 5); c.closePath(); c.fillStyle = palette.light; c.fill();

@@ -2,11 +2,19 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Băng vũ & Kỵ mã · v0.14.0
+
+Thúy Yên phóng cụm băng có mặt tinh thể và vệt lạnh; khi tới địch mới trừ HP, làm chậm/đóng băng và nổ thành mảnh băng cùng vết nứt dưới chân. Phi Tuyết Liên Thiên hình quạt và Lưỡng Nghi Kiếm của Võ Đang cũng có đường bay thật. Lôi điện Côn Lôn nối lần lượt giữa các mục tiêu; hỏa/độc trận tầm xa bắt đầu tại lần chạm đầu. Đạn xuất phát ở tay cầm vũ khí, kể cả trên ngựa.
+
+20 hình nam/nữ đã bỏ vũ khí vẽ sẵn. Vũ khí đang mặc được vẽ với cán, chuôi và ngón tay đúng điểm cầm riêng của mỗi phái, thay cho icon túi phóng lên người. Sáu dáng ngựa mới có yên/cương, thân và chân rõ; người cưỡi dùng thân trên, chân gập, giày và dây cương, cùng nhịp nhún với ngựa. Bấm **H** hoặc **Lên/Xuống ngựa** khi đã mặc ngựa; xem chiêu ở **Võ công → Xem hiệu ứng**. Renderer cưỡi dùng chung cho sân và Nhân vật. Chưa có animation bốn hướng riêng.
+
+Kiểm tra đường bay trước sát thương, trạng thái tại lúc chạm và 20 tư thế nam/nữ bằng `tests/flight-riding-browser.cjs`; dữ liệu điểm cầm, dáng chân và mảnh băng bằng `tests/actor-flight.test.mjs`.
+
 ## Hiệu ứng ra chiêu, trúng địch và hình vật phẩm
 
 30 chiêu có chuỗi **tụ lực → ra chiêu/đạn bay → trúng địch**. Dấu trúng đòn của 10 phái khác nhau: kim cang chấn Thiếu Lâm, thương xuyên Thiên Vương, phi châm/vệt độc Đường Môn, độc xà Ngũ Độc, sen Nga Mi, băng tinh Thúy Yên, long trảo Cái Bang, hỏa diệm Thiên Nhẫn, kiếm khí Võ Đang và lôi điện Côn Lôn. Đòn thường cũng dùng hình của phái. Dấu trúng xuất hiện tại mỗi quái thực sự nhận sát thương, gồm mục tiêu phụ; đạn hủy khi mục tiêu đã chết. Chiêu hộ thể/hồi phục không hiện dấu trúng giả lên địch. **Võ công → Xem hiệu ứng** dùng cùng renderer với mục tiêu tập luyện, không tiêu hao MP/nộ.
 
-**84 mẫu trang bị vẽ mới** và bình HP/MP có chi tiết kim loại, vải, ngọc và đá quý. Túi, cửa hàng, so sánh, trang bị rơi và vũ khí trong sân/chân dung dùng cùng bộ hình. Bạc, đá tinh luyện, lệnh bài và rương thưởng có biểu tượng riêng. Năm phẩm chất giữ màu viền bạc/lục/lam/tím/vàng; **+0–+6 chưa có vòng sáng**, **+7 mở vòng linh khí**, **+10 thêm phù văn/vòng phụ**. Phẩm chất Hoàng Kim không tự mở vòng khi chưa cường hóa cao. Vòng bộ trang bị cần món đang mặc từ +7; hiệu ứng cảnh giới/danh hiệu vẫn theo tiến trình tương ứng.
+**84 mẫu trang bị vẽ mới** và bình HP/MP có chi tiết kim loại, vải, ngọc và đá quý. Túi, cửa hàng, so sánh và trang bị rơi dùng cùng bộ hình; vũ khí cầm trong sân/chân dung dùng hình tỷ lệ riêng theo kiểu món. Bạc, đá tinh luyện, lệnh bài và rương thưởng có biểu tượng riêng. Năm phẩm chất giữ màu viền bạc/lục/lam/tím/vàng; **+0–+6 chưa có vòng sáng**, **+7 mở vòng linh khí**, **+10 thêm phù văn/vòng phụ**. Phẩm chất Hoàng Kim không tự mở vòng khi chưa cường hóa cao. Vòng bộ trang bị cần món đang mặc từ +7; hiệu ứng cảnh giới/danh hiệu vẫn theo tiến trình tương ứng.
 
 Ba atlas trang bị/vật phẩm WebP tổng ~1,82 MB, tách khỏi atlas nhân vật. Icon Canvas cache tối đa 160; hiệu ứng không tạo gradient mỗi frame. Chế độ Gọn giảm tia/hạt; giao diện hỗ trợ reduced motion. Kiểm tra bằng `pnpm build`, unit test và `tests/skill-art-browser.cjs`, `tests/sects-browser.cjs`, `tests/equipment-art-browser.cjs`, `tests/browser-smoke.cjs`.
 
@@ -26,7 +34,7 @@ Ba atlas trang bị/vật phẩm WebP tổng ~1,82 MB, tách khỏi atlas nhân 
 | Thừa Tướng | 8 | 3.000 |
 | Hoàng Đế | 9 | 4.300 |
 
-**20 mẫu nhân vật cổ trang** cho nam/nữ của 10 môn phái, lấy cảm hứng từ phong cách Võ Lâm Truyền Kỳ. Màn chọn phái, nhân vật trong trận và màn Nhân vật dùng chung hình; avatar cắt khuôn mặt từ đúng mẫu phái/giới tính đó. Đổi giới tính trong Cài đặt cập nhật mọi nơi. Sprite cao 56 × 76, giữ collider bán kính 12 và bước chân theo quãng đường thật. Atlas nhân vật WebP ~664 KB; atlas NPC/quái cũ vẫn ~28 KB. Trang bị thêm hoa văn nhỏ và linh khí để giữ rõ trang phục môn phái.
+**20 mẫu nhân vật cổ trang** cho nam/nữ của 10 môn phái, lấy cảm hứng từ phong cách Võ Lâm Truyền Kỳ. Màn chọn phái, nhân vật trong trận và màn Nhân vật dùng chung hình; avatar cắt khuôn mặt từ đúng mẫu phái/giới tính đó. Đổi giới tính trong Cài đặt cập nhật mọi nơi. Sprite cao 56 × 76, giữ collider bán kính 12 và bước chân theo quãng đường thật. Atlas thân người WebP ~621 KB và atlas sáu dáng ngựa ~329 KB; atlas NPC/quái cũ vẫn ~28 KB. Trang bị thêm hoa văn nhỏ và linh khí để giữ rõ trang phục môn phái.
 
 Kiểm thử tiến trình công thành, 7 ấn, thay/tháo/lưu tải/trùng sinh, hết giờ/thất bại, hình chung cho 20 mẫu và giao diện di động:
 
