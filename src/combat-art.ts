@@ -3,12 +3,18 @@ import type { FactionId } from "./idle";
 import { SECTS, SECT_BY_FACTION, HERO_SIZE } from "./sects";
 import { drawSprite } from "./art";
 import { drawGlow } from "./battle-vfx";
-import { drawEquipmentIcon } from "./equipment-art";
+import { drawEquipmentIcon, weaponCenter } from "./equipment-art";
 import type { GearAura } from "./gear-effects";
 import type { GearVariant } from "./gear-catalog";
+import { drawEquipmentRadiance, type EquipmentVisual } from "./equipment-vfx";
+import {
+  drawWearableDetails,
+  type WearableAppearance,
+} from "./worn-equipment-art";
 export { drawEquipmentIcon } from "./equipment-art";
-export interface HeroAppearance extends GearAura {
+export interface HeroAppearance extends GearAura, WearableAppearance {
   weaponVariant?: GearVariant;
+  weapon?: EquipmentVisual;
   simpleEffects?: boolean;
   weaponColor: string;
   armorColor: string;
@@ -75,17 +81,42 @@ export function drawAnimatedHero(
     ctx.lineTo(18, -24);
     ctx.stroke();
   }
-  // Equipment stays visible without recoloring the school's distinctive robe.
+  drawWearableDetails(ctx, appearance, now);
   if (appearance.weaponVariant) {
     ctx.save();
-    ctx.translate(17, -12);
-    ctx.rotate(-0.35 + swing * 0.6);
-    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, 21, {
+    ctx.translate(17 * (motion.facingX < 0 ? -1 : 1), -12);
+    ctx.rotate((-0.35 + swing * 1.15) * (motion.facingX < 0 ? -1 : 1));
+    if (motion.facingX < 0) ctx.scale(-1, 1);
+    const center = weaponCenter(appearance.weaponVariant, 31);
+    ctx.translate(...center);
+    const weapon = appearance.weapon ?? {
+      color: appearance.weaponColor,
+      enhance: appearance.enhancement,
+    };
+    drawEquipmentRadiance(ctx, weapon, now, 16, appearance.simpleEffects);
+    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, 31, {
+      ...weapon,
       variant: appearance.weaponVariant,
     });
+    if (
+      swing > 0.1 &&
+      !appearance.simpleEffects &&
+      appearance.enhancement >= 3
+    ) {
+      ctx.strokeStyle = appearance.weaponColor;
+      ctx.lineWidth = appearance.enhancement >= 7 ? 2 : 1;
+      ctx.globalAlpha *= swing * 0.7;
+      ctx.beginPath();
+      ctx.arc(-8, 7, 25, -1.6, -0.1);
+      ctx.stroke();
+    }
     ctx.restore();
   }
-  if (appearance.enhancement >= 3 && !appearance.simpleEffects) {
+  if (
+    !appearance.weaponVariant &&
+    appearance.enhancement >= 3 &&
+    !appearance.simpleEffects
+  ) {
     drawGlow(
       ctx,
       16,

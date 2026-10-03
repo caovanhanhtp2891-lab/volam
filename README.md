@@ -57,7 +57,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.11.0 · Bộ ngũ hành & Tuấn mã** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.12.0 · Bảo khố & Linh quang** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -107,9 +107,18 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 
 Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng danh hiệu trên nhân vật; atlas vẫn 28 KB. Những cơ chế này thuộc bản local lưu trên trình duyệt; authority và thời gian server tiếp tục thuộc P3/P5 của PLAN.
 
+## Hình trang bị và linh quang · v0.12.0
+
+- Mỗi món có các lớp vật liệu, men màu, nét chạm khắc, viền sáng và đá ngọc ở đúng vị trí. Sáu vật liệu gồm thép, vàng, ngọc, lụa, da và gỗ. Viền bạc/lục/lam/tím/vàng thể hiện phẩm chất; Hoàng Kim có khung kim long và ấn văn.
+- **+3:** dòng sáng chạy theo hình món; **+7:** linh khí xoay; **+10:** thêm tinh tú. Ngũ hành đổi màu đá và linh khí. Tay nhân vật cầm đúng một trong 14 hình vũ khí, đảo hướng và vung khi đánh; giáp có vai/miếng hộ tâm hoặc nét thêu, mũ có trâm/giác quan, giày có viền, pháp bảo phát sáng khi đủ phẩm chất/cường hóa. Món Hiếm trở lên rơi có cột sáng và hạt riêng, Hoàng Kim có trận nhỏ dưới đất.
+- **Nhân vật → Mẫu đồ** hoặc **Túi đồ → Mẫu trang bị** mở Bảo khố. Chọn vị trí, phẩm chất, +0/+3/+7/+10 và ngũ hành để xem mẫu. **Chọn mua** mở Tiệm với đúng kiểu và bộ; món mua thực tế vẫn Tốt, +0, giá theo cấp. Mẫu minh họa không cấp trang bị hoặc thay đổi bạc/chỉ số.
+- Hình trong sân được cache tối đa 160 icon 128×128; không tạo gradient vật liệu mỗi khung hình. Linh khí mỗi món tối đa 6 hạt, đồ rơi tối đa 5 hạt. Cài đặt **Gọn** và tùy chọn giảm chuyển động của trình duyệt dừng animation trong bảng đồ; Gọn còn giảm hạt và cột sáng trong sân.
+
+Kiểm tra hình ảnh: `node --experimental-strip-types tests/equipment-art-browser.cjs` với các biến Playwright bên dưới. Kiểm thử mua đủ 14 kiểu vũ khí, nhẫn thứ hai, ngựa mới, mặc/lưu/tải; xem đủ 60 mẫu, chế độ Gọn/giảm chuyển động, cache khi vẽ và sáu kích thước màn hình. Unit test: `node --experimental-strip-types --test --test-isolation=none tests/*.test.mjs`.
+
 ## Bộ ngũ hành và cưỡi ngựa · v0.11.0
 
-- Trang bị mới có **28 chủng loại**: sáu vũ khí (kiếm, đao, thương, trượng, nỏ, quạt), ba giáp, ba mũ, hai loại cho từng nhóm giày/đai/dây chuyền/nhẫn/hộ uyển/ngọc bội, bốn ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ. Từ +3 có vệt ánh sáng, +7 có hiệu ứng sáng mạnh hơn; hình và huy hiệu ngũ hành dùng chung trên đất, trong túi, so sánh và trên nhân vật.
+- Trang bị có **60 chủng loại** từ v0.12.0: 14 vũ khí, 6 giáp, 7 mũ, 4 giày, 4 đai, 4 dây chuyền, 5 nhẫn, 4 hộ uyển, 6 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
 - Năm bộ **Kim Phong / Thanh Trúc / Hàn Nguyệt / Xích Diệm / Huyền Nham** ứng với Kim/Mộc/Thủy/Hỏa/Thổ. Đồ Hoàng Kim mới luôn thuộc một bộ; đồ khác có cơ hội thuộc bộ. Đồ rơi ưu tiên hệ môn phái 60% khi chọn hệ. Save cũ giữ nguyên chỉ số, không tự thêm dòng phụ, hệ hoặc bộ.
 - **2 món:** +6 công, +4 phòng; **4 món:** thêm +90 HP, +24 MP; **6 món:** thêm chỉ số đặc trưng của hệ. **Đủ 11 vị trí**, gồm hai nhẫn và ngựa, mở thuộc tính ẩn bên dưới và trận sáng riêng. Công/phòng/HP/MP của bộ nhân với bậc món thấp nhất; cùng hệ môn phái tăng các thuộc tính bộ 20%, làm tròn lên. Bộ chỉ đếm các ô đang mặc; ngựa vẫn tính vào bộ khi đi bộ. Phối nhiều bộ nhận những mốc riêng đã đủ, không nhận thuộc tính ẩn của bộ thiếu món.
 
@@ -122,7 +131,7 @@ Hiệu ứng dưới chân dùng vài nét Canvas, tối đa một hiệu ứng 
 | Huyền Nham · Thổ | Bất Động Sơn: +30 phòng, +250 HP |
 
 - **Nhân vật → Ngũ hành** hoặc **Túi đồ → Bộ ngũ hành** xem mốc đang bật/tắt, số vị trí đã sở hữu và mặc các món của một bộ từ túi. So sánh lực chiến và Mặc đồ mạnh nhất tính cả thuộc tính bộ; thao tác mặc vẫn giữ đồ cũ trong túi. Vứt đồ theo lọc giữ mảnh bộ; có thể bán từng món bằng luồng xác nhận cũ.
-- **Tiệm → Chọn mảnh bộ** mua đúng bộ và vị trí còn thiếu: phẩm chất Tốt, cấp bằng cấp nhân vật, hai dòng phụ ngẫu nhiên, giá `120 + cấp × 8` bạc. Mua vào túi, không tự thay trang bị; túi đầy/thiếu bạc/đang trong phụ bản không mua được.
+- **Tiệm → Chọn mảnh bộ** mua đúng bộ, vị trí và **kiểu món** còn thiếu: phẩm chất Tốt, cấp bằng cấp nhân vật, hai dòng phụ ngẫu nhiên, giá `120 + cấp × 8` bạc. Mua vào túi, không tự thay trang bị; túi đầy/thiếu bạc/đang trong phụ bản không mua được.
 - **Tiệm → Mua Tuấn Mã** giá 200 bạc hoặc nhặt ngựa từ quái. Mặc vào ô Ngựa, bấm **Lên/Xuống ngựa** trong Nhân vật, nút **♞** trên sân hoặc **H**. Không có ngựa thì nút đưa tới Tiệm. Ngựa có dáng chạy, quay hướng, yên/giáp và ánh sáng theo phẩm chất/cường hóa, hiện cả trên sân và chân dung. Vẫn đánh thường/thi triển khi cưỡi; chờ hết chiêu lướt để lên xuống.
 - Tốc độ cưỡi tăng `30 + bậc phẩm chất × 5 + bậc trang bị` phần trăm (Tuấn Mã cơ bản +36%, cao nhất +66%). Đi bộ trở lại tốc độ gốc; thao tác không cộng dồn và không tăng lực chiến/cảnh giới chỉ vì lên ngựa. Trạng thái cưỡi lưu cùng từng nhân vật; save cũ đi bộ, không có ngựa đang mặc thì tự về đi bộ.
 

@@ -40,8 +40,9 @@ import {
   type HeroAppearance,
 } from "./combat-art";
 import { drawCharacterPreview } from "./character-preview";
-import { equipmentMarkup, equipmentTier } from "./equipment-art";
-import { GEAR_VARIANTS, GEAR_SETS, SET_IDS, EQUIPMENT_SLOTS, SET_THRESHOLDS, variantOf, setStatuses, rollGearIdentity, validGearIdentity, type GearIdentity, type SetId } from "./gear-catalog";
+import { equipmentMarkup, equipmentTier, equipmentEffectLabel } from "./equipment-art";
+import { drawEquipmentDropAura } from "./equipment-vfx";
+import { GEAR_VARIANTS, GEAR_SETS, SET_IDS, EQUIPMENT_SLOTS, SET_THRESHOLDS, variantOf, setStatuses, rollGearIdentity, validGearIdentity, variantsForSlot, type GearVariant, type GearIdentity, type SetId } from "./gear-catalog";
 import { BASIC_HORSE_PRICE, mountSpeedBonus, ridingSpeed, normalizeMounted } from "./mount";
 import { drawHorse, type MountAppearance } from "./mount-art";
 import { drawGearAura } from "./gear-effects";
@@ -362,6 +363,11 @@ let characterRenderKey = "";
 let setRenderKey = "";
 let setShopId: SetId = "kim-phong";
 let setShopSlot: ItemSlot = "weapon";
+let selectedShopVariant: GearVariant | undefined;
+let gallerySlot: ItemSlot = "weapon";
+let galleryRarity: Rarity = "Hoàng Kim";
+let galleryEnhance = 7;
+let galleryElement: Element = "kim";
 let regionRenderKey = "";
 let audioContext: AudioContext | null = null;
 
@@ -1008,7 +1014,8 @@ function refreshSetUi(): void {
         .join("")
     : '<p class="dim">Chưa mặc trang bị bộ. Tìm đồ rơi có tên bộ hoặc mua mảnh bộ ở Tiệm.</p>';
 }
-function setShopVariant(id: SetId, slot: ItemSlot) {
+function setShopVariant(id: SetId, slot: ItemSlot): GearVariant {
+  if (selectedShopVariant && variantsForSlot(slot).includes(selectedShopVariant)) return selectedShopVariant;
   if (slot === "weapon")
     return (
       {
@@ -1031,9 +1038,17 @@ function setShopVariant(id: SetId, slot: ItemSlot) {
     )[id];
   return variantOf({ slot });
 }
+function openEquipmentGallery(): void {
+  if (!game) return;
+  const variants = variantsForSlot(gallerySlot);
+  openUtility("Bảo khố · 60 mẫu trang bị", `<p class="dim">Xem hình và hiệu ứng trước khi tìm đồ. Đây là mẫu minh họa; chọn mua sẽ tới Tiệm với phẩm chất Tốt, chưa cường hóa.</p><div class="gear-gallery-filters"><label>Vị trí<select id="gear-gallery-slot">${EQUIPMENT_SLOTS.filter(slot => slot !== "ring2").map(slot => `<option value="${slot}" ${slot === gallerySlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label>Phẩm chất<select id="gear-gallery-rarity">${RARITIES.map(rarity => `<option ${rarity === galleryRarity ? "selected" : ""}>${rarity}</option>`).join("")}</select></label><label>Cường hóa<select id="gear-gallery-enhance">${[0,3,7,10].map(enhance => `<option value="${enhance}" ${enhance === galleryEnhance ? "selected" : ""}>+${enhance}</option>`).join("")}</select></label><label>Ngũ hành<select id="gear-gallery-element">${Object.entries(ELEMENTS).map(([element, data]) => `<option value="${element}" ${element === galleryElement ? "selected" : ""}>${data.name}</option>`).join("")}</select></label></div><p class="gear-effect-label">${equipmentEffectLabel(galleryRarity, galleryEnhance)} · Bậc ${Math.ceil(game.player.level / 10)}</p><div class="gear-gallery">${variants.map(variant => {
+    const sample: Item = { id: "art-sample", slot: gallerySlot, name: GEAR_VARIANTS[variant].name, variant, rarity: galleryRarity, element: galleryElement, level: game!.player.level, enhance: galleryEnhance, power: 0, color: itemColor(galleryRarity), icon: "◆" };
+    return `<article class="gear-sample" style="--rarity-color:${sample.color}">${itemArt(sample)}<b>${sample.name}</b><button class="mini-button" data-buy-gear-kind="${variant}">Chọn mua</button></article>`;
+  }).join("")}</div>`);
+}
 function openSetShop(id?: SetId): void {
   if (!game) return;
-  if (id && SET_IDS.includes(id)) setShopId = id;
+  if (id && SET_IDS.includes(id) && id !== setShopId) { setShopId = id; selectedShopVariant = undefined; }
   const set = GEAR_SETS[setShopId],
     player = game.player,
     price = 120 + player.level * 8;
@@ -1057,7 +1072,7 @@ function openSetShop(id?: SetId): void {
     player.gold < price;
   openUtility(
     "Thương nhân · Mảnh bộ",
-    `<label class="form-row">Bộ <select id="set-shop-id">${SET_IDS.map((id) => `<option value="${id}" ${id === setShopId ? "selected" : ""}>${GEAR_SETS[id].name} · ${ELEMENTS[GEAR_SETS[id].element].name}</option>`).join("")}</select></label><label class="form-row">Vị trí <select id="set-shop-slot">${EQUIPMENT_SLOTS.map((slot) => `<option value="${slot}" ${slot === setShopSlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><div class="item-detail">${itemArt(preview, "detail-gear-art")}<b>${preview.name}</b>${gearIdentityMarkup(preview)}<p>Tốt · Cấp ${player.level} · ${equipmentGrade(player.level)} · Hai dòng phụ ngẫu nhiên.</p></div><p class="dim">Mua vào túi, tự chọn mặc. Ghép được với đồ rơi cùng bộ. Đang có ${formatNumber(player.gold)} bạc · ${player.inventory.length}/${BAG_CAPACITY} ô.</p><button class="outline-button" id="buy-set-piece" ${blocked ? "disabled" : ""}>${game.mapMode !== "world" ? "Rời phụ bản để mua" : player.inventory.length >= BAG_CAPACITY ? "Túi đã đầy" : `Mua mảnh bộ · ${price} bạc`}</button>`,
+    `<label class="form-row">Bộ <select id="set-shop-id">${SET_IDS.map((id) => `<option value="${id}" ${id === setShopId ? "selected" : ""}>${GEAR_SETS[id].name} · ${ELEMENTS[GEAR_SETS[id].element].name}</option>`).join("")}</select></label><label class="form-row">Vị trí <select id="set-shop-slot">${EQUIPMENT_SLOTS.map((slot) => `<option value="${slot}" ${slot === setShopSlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label class="form-row">Kiểu món <select id="set-shop-variant">${variantsForSlot(setShopSlot).map(variant => `<option value="${variant}" ${variant === preview.variant ? "selected" : ""}>${GEAR_VARIANTS[variant].name}</option>`).join("")}</select></label><div class="item-detail">${itemArt(preview, "detail-gear-art")}<b>${preview.name}</b>${gearIdentityMarkup(preview)}<p>Tốt · Cấp ${player.level} · ${equipmentGrade(player.level)} · Hai dòng phụ ngẫu nhiên. Kiểu món thay đổi hình dáng; chỉ số vẫn theo vị trí, cấp và phẩm chất.</p></div><p class="dim">Mua vào túi, tự chọn mặc. Ghép được với đồ rơi cùng bộ. Đang có ${formatNumber(player.gold)} bạc · ${player.inventory.length}/${BAG_CAPACITY} ô.</p><button class="outline-button" id="buy-set-piece" ${blocked ? "disabled" : ""}>${game.mapMode !== "world" ? "Rời phụ bản để mua" : player.inventory.length >= BAG_CAPACITY ? "Túi đã đầy" : `Mua mảnh bộ · ${price} bạc`}</button>`,
   );
 }
 function buySetPiece(): void {
@@ -3137,28 +3152,7 @@ function drawLoot(loot: GroundLoot, now: number): void {
   ctx.ellipse(0, 5, 13 - height / 10, 4, 0, 0, Math.PI * 2);
   ctx.fill();
   if (loot.item) {
-    const rare = equipmentTier(loot.item.rarity) >= 2;
-    drawGlow(ctx, 0, 0, 30, color, 0.45);
-    ctx.fillStyle = hexToRgba(color, 0.25);
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 18 + Math.sin(now / 220) * 2, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (rare && progress === 1) {
-      ctx.fillStyle = hexToRgba(color, 0.32);
-      ctx.beginPath();
-      ctx.moveTo(-12, 0);
-      ctx.lineTo(-4, -115);
-      ctx.lineTo(4, -115);
-      ctx.lineTo(12, 0);
-      ctx.fill();
-      for (let i = 0; i < 3; i++) {
-        const t = (now / 1100 + i / 3) % 1;
-        ctx.globalAlpha = 1 - t;
-        ctx.fillStyle = color;
-        ctx.fillRect(Math.sin(i * 3 + now / 400) * 8, -t * 50, 2, 2);
-      }
-      ctx.globalAlpha = 1;
-    }
+    drawEquipmentDropAura(ctx, loot.item, now, progress === 1, game?.player.preferences.skillEffects === "simple");
     ctx.save();
     ctx.translate(0, -height - 5);
     ctx.rotate((1 - progress) * 2.2);
@@ -3443,7 +3437,12 @@ function currentHeroAppearance(): HeroAppearance {
   return {
     element: set ? GEAR_SETS[set.id].element : equipment.weapon?.element,
     pieces: set?.pieces ?? 0,
-    weaponVariant: equipment.weapon?.variant,
+    weaponVariant: equipment.weapon ? variantOf(equipment.weapon) : undefined,
+    weapon: equipment.weapon,
+    armor: equipment.armor,
+    helmet: equipment.helmet,
+    boots: equipment.boots,
+    pendant: equipment.pendant,
     simpleEffects: game?.player.preferences.skillEffects === "simple",
     weaponColor: equipment.weapon?.color ?? "#ffe5a3",
     armorColor:
@@ -3589,6 +3588,8 @@ function refreshUi(force = false): void {
   }
   if (!force && performance.now() - lastUiUpdate < 120) return;
   lastUiUpdate = performance.now();
+  const shell = document.querySelector<HTMLElement>(".app-shell")!;
+  if (shell.dataset.effects !== game.player.preferences.skillEffects) shell.dataset.effects = game.player.preferences.skillEffects;
   updateTitles();
   const player = game.player;
   const sect = playerSect(player);
@@ -3893,7 +3894,7 @@ function renderInventory(): void {
       ${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="shop-card"><strong>${POTIONS[kind].name} · ${POTIONS[kind].price} bạc</strong><p>Hồi 40% ${POTIONS[kind].label} tối đa · Đang có ${player.potions[kind]}/${MAX_POTIONS}</p><div class="item-actions">${[1, 5].map((quantity) => `<button class="mini-button" data-buy-potion="${kind}" data-quantity="${quantity}" ${!shopOpen || player.gold < POTIONS[kind].price * quantity || player.potions[kind] + quantity > MAX_POTIONS ? "disabled" : ""}>Mua ${quantity} · ${POTIONS[kind].price * quantity} bạc</button>`).join("")}</div></div>`).join("")}
       <p class="panel-notice">Hai loại bình dùng chung hồi chiêu 8 giây. Q: bình HP · R: bình MP. HP/MP đầy sẽ không mất bình.</p>
       <div class="shop-card mount-shop">${equipmentMarkup("horse", itemColor("Tốt"), "Tốt")}<div><strong>Tuấn Mã Hành Cước · ${BASIC_HORSE_PRICE} bạc</strong><p>Mặc vào ô Ngựa rồi Lên/Xuống ngựa bằng H. Tốc độ cưỡi +36%.</p><button class="mini-button" id="buy-basic-horse" ${!shopOpen || player.gold < BASIC_HORSE_PRICE || player.inventory.length >= BAG_CAPACITY ? "disabled" : ""}>Mua Tuấn Mã</button></div></div>
-      <div class="shop-card"><strong>Trang bị bộ ngũ hành</strong><p>Chọn một trong 5 bộ và đúng vị trí còn thiếu. Phẩm chất Tốt, cấp theo nhân vật.</p><button class="mini-button" data-set-shop ${!shopOpen ? "disabled" : ""}>Chọn mảnh bộ · Từ ${120 + player.level * 8} bạc</button></div>
+      <div class="shop-card"><strong>Trang bị bộ ngũ hành</strong><p>60 chủng loại: chọn bộ, vị trí và kiểu món. Phẩm chất Tốt, cấp theo nhân vật.</p><button class="mini-button" data-open-gear-gallery>Xem mẫu hình &amp; hiệu ứng</button><button class="mini-button" data-set-shop ${!shopOpen ? "disabled" : ""}>Chọn mảnh bộ · Từ ${120 + player.level * 8} bạc</button></div>
       <button class="outline-button" data-open-bag>Bán trang bị thừa trong Túi đồ</button>
     `;
     return;
@@ -3976,7 +3977,7 @@ function renderInventory(): void {
     .join("");
   inventoryContent.innerHTML = `
     <div class="bag-summary"><span>◆ <b>${formatNumber(player.gold)}</b> bạc</span><span>✦ <b>${formatNumber(player.refiningStones)}</b> đá</span><strong>${player.inventory.length}/${BAG_CAPACITY} ô</strong></div>
-    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-open-sets>Bộ ngũ hành</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
+    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-open-sets>Bộ ngũ hành</button><button class="mini-button" data-open-gear-gallery>Mẫu trang bị</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
       return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${itemArt(item)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
@@ -4597,7 +4598,7 @@ function showItemDetail(item: Item): void {
   const attribute = "lực chiến";
   openUtility(
     item.name,
-    `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p>${gearIdentityMarkup(item)}${gearStatsMarkup(item, current)}${item.setId ? `<button class="mini-button" data-open-set="${item.setId}">Bộ ${GEAR_SETS[item.setId].name} · ${setStatuses(Object.values(game.player.equipment)).find(set => set.id === item.setId)?.pieces ?? 0}/11 đang mặc</button>` : ""}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${item.enhance >= 10 ? "Đã cường hóa tối đa +10" : `Cường hóa · ${45 + item.enhance * 35} bạc + 1 đá`}</button>` : ""}`,
+    `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p><small class="gear-effect-label">${equipmentEffectLabel(item.rarity, item.enhance)}</small>${gearIdentityMarkup(item)}${gearStatsMarkup(item, current)}${item.setId ? `<button class="mini-button" data-open-set="${item.setId}">Bộ ${GEAR_SETS[item.setId].name} · ${setStatuses(Object.values(game.player.equipment)).find(set => set.id === item.setId)?.pieces ?? 0}/11 đang mặc</button>` : ""}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${item.enhance >= 10 ? "Đã cường hóa tối đa +10" : `Cường hóa · ${45 + item.enhance * 35} bạc + 1 đá`}</button>` : ""}`,
   );
 }
 function openDailyRewards(): void {
@@ -4904,6 +4905,7 @@ function bindIdleUi(): void {
     const set = target.closest<HTMLElement>("[data-open-set]");
     if (set) openGearSets(set.dataset.openSet as SetId);
     if (target.closest("[data-open-sets]")) openGearSets();
+    if (target.closest("[data-open-gear-gallery]")) openEquipmentGallery();
     const shop = target.closest<HTMLElement>("[data-set-shop]");
     if (shop) openSetShop(shop.dataset.setShop as SetId | undefined);
     if (target.closest("#buy-basic-horse")) buyBasicHorse();
@@ -5065,8 +5067,13 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("change", (event) => {
       const control = event.target as HTMLSelectElement;
-      if (control.id === "set-shop-id" && SET_IDS.includes(control.value as SetId)) { setShopId = control.value as SetId; openSetShop(); }
-      if (control.id === "set-shop-slot" && (EQUIPMENT_SLOTS as readonly string[]).includes(control.value)) { setShopSlot = control.value as ItemSlot; openSetShop(); }
+      if (control.id === "set-shop-id" && SET_IDS.includes(control.value as SetId)) { setShopId = control.value as SetId; selectedShopVariant = undefined; openSetShop(); }
+      if (control.id === "set-shop-slot" && (EQUIPMENT_SLOTS as readonly string[]).includes(control.value)) { setShopSlot = control.value as ItemSlot; selectedShopVariant = undefined; openSetShop(); }
+      if (control.id === "set-shop-variant" && variantsForSlot(setShopSlot).includes(control.value as GearVariant)) { selectedShopVariant = control.value as GearVariant; openSetShop(); }
+      if (control.id === "gear-gallery-slot" && (EQUIPMENT_SLOTS as readonly string[]).includes(control.value)) { gallerySlot = control.value as ItemSlot; openEquipmentGallery(); }
+      if (control.id === "gear-gallery-rarity" && RARITIES.includes(control.value as Rarity)) { galleryRarity = control.value as Rarity; openEquipmentGallery(); }
+      if (control.id === "gear-gallery-enhance" && [0,3,7,10].includes(Number(control.value))) { galleryEnhance = Number(control.value); openEquipmentGallery(); }
+      if (control.id === "gear-gallery-element" && Object.hasOwn(ELEMENTS, control.value)) { galleryElement = control.value as Element; openEquipmentGallery(); }
       if ((event.target as HTMLElement).matches("#discard-rarity,#discard-level,#discard-weaker")) {
         discardPreview = null;
         const preview = document.getElementById("discard-preview");
@@ -5078,6 +5085,13 @@ function bindIdleUi(): void {
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
       if (target.closest("#buy-set-piece")) buySetPiece();
+      const kind = target.closest<HTMLElement>("[data-buy-gear-kind]");
+      if (kind && Object.hasOwn(GEAR_VARIANTS, kind.dataset.buyGearKind!)) {
+        selectedShopVariant = kind.dataset.buyGearKind as GearVariant;
+        setShopSlot = GEAR_VARIANTS[selectedShopVariant].slot;
+        setShopId = SET_IDS.find(id => GEAR_SETS[id].element === galleryElement)!;
+        openSetShop();
+      }
       const wearSet = target.closest<HTMLElement>("[data-wear-set]");
       if (wearSet && game) {
         const id = wearSet.dataset.wearSet as SetId;

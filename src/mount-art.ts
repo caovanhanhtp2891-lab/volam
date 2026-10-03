@@ -20,7 +20,11 @@ export function drawHorse(
         ? "#a54531"
         : horse.variant === "warhorse"
           ? "#596d7c"
-          : "#a67544";
+          : horse.variant === "night"
+            ? "#33394d"
+            : horse.variant === "dapple"
+              ? "#a3a69b"
+              : "#a67544";
   const mane = horse.variant === "white" ? "#9babb8" : "#342b2a",
     gait = Math.sin(motion.stride * 0.9) * motion.moving;
   ctx.save();
@@ -62,6 +66,19 @@ export function drawHorse(
   ctx.ellipse(-1, -12, 29, 13, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  if (horse.variant === "dapple") {
+    ctx.fillStyle = "#dbe0d2";
+    for (const [x, y] of [
+      [-18, -15],
+      [-9, -6],
+      [8, -14],
+      [14, -7],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(x, y, 3, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.beginPath();
   ctx.moveTo(15, -15);
   ctx.quadraticCurveTo(17, -43, 31, -44);

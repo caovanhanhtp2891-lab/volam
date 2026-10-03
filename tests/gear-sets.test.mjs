@@ -127,8 +127,8 @@ test("old gear receives no invented elements or set bonuses and identity validat
     true,
   );
 });
-test("all 28 equipment variants have compatible distinct artwork, grades and enchantment markers", () => {
-  assert.equal(Object.keys(GEAR_VARIANTS).length, 28);
+test("all 60 equipment variants have compatible distinct artwork, grades and enchantment markers", () => {
+  assert.equal(Object.keys(GEAR_VARIANTS).length, 60);
   for (const [variant, info] of Object.entries(GEAR_VARIANTS)) {
     const gear = { ...piece(info.slot), variant, level: 160, enhance: 10 };
     assert.ok(VARIANT_SHAPES[variant]);
@@ -144,7 +144,7 @@ test("all 28 equipment variants have compatible distinct artwork, grades and enc
   }
   assert.equal(
     new Set(variantsForSlot("weapon").map((v) => VARIANT_SHAPES[v])).size,
-    6,
+    14,
   );
   assert.equal(
     validGearIdentity({ ...piece("ring2"), variant: "jadering" }),

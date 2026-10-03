@@ -1,0 +1,176 @@
+import type { EquipmentData } from "./equipment";
+import { rarityTier } from "./equipment.ts";
+import type { Element } from "./idle";
+import { GEAR_SETS, setForElement } from "./gear-catalog.ts";
+import { drawGlow } from "./battle-vfx.ts";
+export interface EquipmentVisual {
+  color: string;
+  rarity?: EquipmentData["rarity"];
+  enhance?: number;
+  element?: Element;
+}
+export function equipmentVisualState(
+  item: Partial<EquipmentData>,
+  simple = false,
+) {
+  const tier = rarityTier(item.rarity),
+    enhance = Math.max(0, Math.min(10, item.enhance ?? 0));
+  return {
+    tier,
+    enhance,
+    band: enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
+    motes: simple
+      ? 0
+      : enhance >= 10
+        ? 6
+        : enhance >= 7
+          ? 4
+          : tier >= 3
+            ? 2
+            : 0,
+    beam: [0, 36, 70, 98, 125][tier],
+  };
+}
+export function drawElementMote(
+  ctx: CanvasRenderingContext2D,
+  element: Element | undefined,
+  size: number,
+): void {
+  ctx.beginPath();
+  if (element === "hoa") {
+    ctx.moveTo(0, -size * 1.5);
+    ctx.quadraticCurveTo(size * 1.4, 0, 0, size);
+    ctx.quadraticCurveTo(-size, 0, 0, -size * 1.5);
+  } else if (element === "moc") {
+    ctx.moveTo(0, -size);
+    ctx.quadraticCurveTo(size * 1.6, 0, 0, size);
+    ctx.quadraticCurveTo(-size, 0, 0, -size);
+  } else if (element === "thuy") {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+    }
+    ctx.stroke();
+    return;
+  } else if (element === "tho") {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+    }
+    ctx.closePath();
+  } else {
+    ctx.moveTo(0, -size * 1.4);
+    ctx.lineTo(size * 0.55, 0);
+    ctx.lineTo(0, size * 1.4);
+    ctx.lineTo(-size * 0.55, 0);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.stroke();
+}
+export function drawEquipmentRadiance(
+  ctx: CanvasRenderingContext2D,
+  item: EquipmentVisual,
+  now: number,
+  radius = 18,
+  simple = false,
+): void {
+  const state = equipmentVisualState(item, simple);
+  if (!state.tier && !state.band) return;
+  const color = item.element
+    ? GEAR_SETS[setForElement(item.element)].color
+    : item.color;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 0.8;
+  if (!simple)
+    drawGlow(
+      ctx,
+      0,
+      0,
+      radius * (1.15 + 0.1 * state.band),
+      color,
+      0.15 + state.band * 0.08,
+    );
+  if (state.band) {
+    ctx.globalAlpha *= 0.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, now / 1400, now / 1400 + Math.PI * 1.4);
+    ctx.stroke();
+    if (state.band >= 2) {
+      ctx.beginPath();
+      ctx.arc(0, 0, radius + 3, -now / 1800, -now / 1800 + Math.PI);
+      ctx.stroke();
+    }
+  }
+  for (let i = 0; i < state.motes; i++) {
+    const angle =
+      now / (state.band === 3 ? 750 : 1400) + (i * Math.PI * 2) / state.motes;
+    ctx.save();
+    ctx.translate(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.75);
+    ctx.rotate(angle);
+    ctx.globalAlpha = 0.65 + Math.sin(now / 280 + i) * 0.2;
+    drawElementMote(ctx, item.element, state.band === 3 ? 2.6 : 1.7);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+export function drawEquipmentDropAura(
+  ctx: CanvasRenderingContext2D,
+  item: EquipmentVisual,
+  now: number,
+  landed: boolean,
+  simple = false,
+): void {
+  const state = equipmentVisualState(item, simple),
+    color = item.color;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  if (!simple)
+    drawGlow(ctx, 0, 0, 23 + state.tier * 4, color, 0.2 + state.tier * 0.05);
+  ctx.globalAlpha *= 0.45;
+  ctx.lineWidth = state.tier >= 3 ? 1.5 : 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 6, 16 + state.tier * 2, 5 + state.tier, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  if (landed && state.tier >= 2) {
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 12 + state.tier * 2, 3 + state.tier, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    if (!simple) {
+      ctx.globalAlpha = 0.12 + Math.sin(now / 320) * 0.025;
+      ctx.beginPath();
+      ctx.moveTo(-10 - state.tier, 0);
+      ctx.lineTo(-3, -state.beam);
+      ctx.lineTo(3, -state.beam);
+      ctx.lineTo(10 + state.tier, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(-1, -state.beam, 2, state.beam);
+      for (let i = 0; i < Math.min(6, state.tier + 1); i++) {
+        const t = (now / 1700 + i / (state.tier + 1)) % 1;
+        ctx.save();
+        ctx.globalAlpha = (1 - t) * 0.8;
+        ctx.translate(Math.sin(now / 700 + i * 2) * 10, -t * state.beam * 0.65);
+        drawElementMote(ctx, item.element, state.tier === 4 ? 2.3 : 1.5);
+        ctx.restore();
+      }
+    }
+    if (state.tier === 4) {
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = "#ffe7a6";
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4 + now / 2400;
+        ctx.moveTo(Math.cos(a) * 20, 6 + Math.sin(a) * 8);
+        ctx.lineTo(Math.cos(a) * 25, 6 + Math.sin(a) * 10);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}

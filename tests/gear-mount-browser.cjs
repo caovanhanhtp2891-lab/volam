@@ -87,7 +87,7 @@ async function move(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.11.0",
+      "0.12.0",
     );
     await page.locator("#hero-name-input").fill("Kim Phong Kỵ Sĩ");
     await page.locator('[data-faction="shaolin"]').click();
@@ -317,15 +317,15 @@ async function move(page) {
       s.player.inventory = variants;
     });
     await page.locator('[data-idle-tab="inv"]').click();
-    assert.equal(await page.locator(".bag-slot [data-variant]").count(), 28);
-    assert.equal(await page.locator(".bag-slot .gear-element").count(), 28);
+    assert.equal(await page.locator(".bag-slot [data-variant]").count(), 60);
+    assert.equal(await page.locator(".bag-slot .gear-element").count(), 60);
     assert.ok((await page.locator(".bag-slot .gear-enchant").count()) > 0);
     await page.waitForTimeout(2600);
     await page.screenshot({
       path: path.join(captureDir, "gear-variants-mobile.png"),
     });
     console.log(
-      "PASS all five sets and 28 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
+      "PASS all five sets and 60 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
     );
 
     await seed(page, (s) => {

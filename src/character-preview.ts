@@ -2,7 +2,9 @@ import { drawAnimatedHero, type HeroAppearance } from "./combat-art";
 import { freshMotion } from "./combat";
 import { drawHorse, type MountAppearance } from "./mount-art";
 import { drawGearAura } from "./gear-effects";
-import { drawEquipmentIcon } from "./equipment-art";
+import { drawEquipmentIcon, weaponCenter } from "./equipment-art";
+import { drawEquipmentRadiance } from "./equipment-vfx";
+import { drawWearableDetails } from "./worn-equipment-art";
 import { drawGlow } from "./battle-vfx";
 import { drawCultivationAura } from "./cultivation-art";
 import type { Cultivation } from "./cultivation";
@@ -163,6 +165,7 @@ function drawPortraitBody(
   ctx.fillRect(4, -151, 2, 2);
   ctx.fillStyle = "#a46e57";
   ctx.fillRect(-3, -143, 6, 1);
+  drawWearableDetails(ctx, appearance, now, true);
   ctx.save();
   ctx.translate(25, -77);
   ctx.rotate(0.38);
@@ -172,11 +175,29 @@ function drawPortraitBody(
     spear = appearance.weaponVariant
       ? appearance.weaponVariant === "spear"
       : factionId === "tianwang";
-  if (
-    appearance.weaponVariant === "fan" ||
-    appearance.weaponVariant === "crossbow"
-  ) {
-    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, 48, {
+  if (appearance.weaponVariant) {
+    const size = ["spear", "halberd", "staff"].includes(
+      appearance.weaponVariant,
+    )
+      ? 110
+      : ["fan", "chakram"].includes(appearance.weaponVariant)
+        ? 70
+        : 90;
+    ctx.rotate(-0.35);
+    ctx.translate(...weaponCenter(appearance.weaponVariant, size));
+    const weapon = appearance.weapon ?? {
+      color: appearance.weaponColor,
+      enhance: appearance.enhancement,
+    };
+    drawEquipmentRadiance(
+      ctx,
+      weapon,
+      now,
+      size * 0.34,
+      appearance.simpleEffects,
+    );
+    drawEquipmentIcon(ctx, "weapon", appearance.weaponColor, size, {
+      ...weapon,
       variant: appearance.weaponVariant,
     });
     ctx.restore();
