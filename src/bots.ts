@@ -7,6 +7,8 @@ import {
 import type { FactionId } from "./idle";
 import type { GearVariant } from "./gear-catalog";
 import type { SectId } from "./sects.ts";
+import { combatPower } from "./cultivation.ts";
+import { toCore } from "./combat-scale.ts";
 
 export const BOT_TEMPLATES = [
   {
@@ -128,18 +130,34 @@ export function validBotSettings(value: unknown): boolean {
         typeof value === "object" &&
         typeof (value as BotSettings).enabled === "boolean" &&
         typeof (value as BotSettings).assist === "boolean" &&
-        ((value as BotSettings).pvp === undefined || typeof (value as BotSettings).pvp === "boolean"),
+        ((value as BotSettings).pvp === undefined ||
+          typeof (value as BotSettings).pvp === "boolean"),
     )
   );
 }
 export function normalizeBotSettings(value?: unknown): BotSettings {
-  return value && validBotSettings(value) ? { ...freshBotSettings(), ...(value as BotSettings) } : freshBotSettings();
+  return value && validBotSettings(value)
+    ? { ...freshBotSettings(), ...(value as BotSettings) }
+    : freshBotSettings();
 }
 export const BOT_ENCOUNTER_CHANCE = 0.12;
-export interface BotEncounter { near: boolean; nextRollAt: number }
+export interface BotEncounter {
+  near: boolean;
+  nextRollAt: number;
+}
 // Roll once on entering an encounter, never once per animation frame.
-export function botEncounter(state: BotEncounter, distance: number, now: number, safe: boolean, random = Math.random): boolean {
-  if (safe) { state.near = false; state.nextRollAt = Math.max(state.nextRollAt, now + 10000); return false; }
+export function botEncounter(
+  state: BotEncounter,
+  distance: number,
+  now: number,
+  safe: boolean,
+  random = Math.random,
+): boolean {
+  if (safe) {
+    state.near = false;
+    state.nextRollAt = Math.max(state.nextRollAt, now + 10000);
+    return false;
+  }
   if (distance > 280) state.near = false;
   if (distance > 190 || state.near) return false;
   state.near = true;
@@ -147,14 +165,28 @@ export function botEncounter(state: BotEncounter, distance: number, now: number,
   state.nextRollAt = now + 45000;
   return random() < BOT_ENCOUNTER_CHANCE;
 }
-export function randomPatrolGoal(bounds: { width: number; height: number }, blocked: (x: number, y: number) => boolean, fallback: Point, random = Math.random): Point {
+export function randomPatrolGoal(
+  bounds: { width: number; height: number },
+  blocked: (x: number, y: number) => boolean,
+  fallback: Point,
+  random = Math.random,
+): Point {
   for (let i = 0; i < 12; i++) {
-    const p = { x: 120 + random() * (bounds.width - 240), y: 160 + random() * (bounds.height - 320) };
+    const p = {
+      x: 120 + random() * (bounds.width - 240),
+      y: 160 + random() * (bounds.height - 320),
+    };
     if (!blocked(p.x, p.y)) return p;
   }
   return { ...fallback };
 }
 export interface BotActor extends Point {
+  mounted: boolean;
+  mountVariant: GearVariant;
+  strong: boolean;
+  combatPower: number;
+  powerRatio: number;
+  anchorPower: number;
   patrolGoal?: Point;
   patrolUntil: number;
   encounter: BotEncounter;
@@ -195,6 +227,14 @@ export function createBot(
   const tank = profile.role === "tank";
   const maxHp = Math.max(1000, Math.floor(stats.hp * (tank ? 0.8 : 0.55)));
   return {
+    mounted: true,
+    mountVariant: (
+      ["bay", "white", "warhorse", "ember", "dapple", "night"] as const
+    )[index % 6],
+    strong: false,
+    combatPower: 0,
+    powerRatio: 1,
+    anchorPower: 0,
     id: `bot-${profile.id}-${index}`,
     profile,
     level,
@@ -207,7 +247,7 @@ export function createBot(
       Math.floor(stats.attack * (profile.role === "healer" ? 0.2 : 0.32)),
     ),
     defense: Math.floor(stats.defense * (tank ? 0.75 : 0.4)),
-    speed: 145,
+    speed: 205,
     cooldown: index * 0.12,
     skillCooldown: 0.8 + index * 0.3,
     respawnAt: 0,
@@ -229,6 +269,49 @@ export function createBot(
     chilledUntil: 0,
     frozenUntil: 0,
   };
+}
+export const STRONG_BOT_CHANCE = 0.08;
+export function scaleRoamingBot(
+  bot: BotActor,
+  stats: { attack: number; hp: number; defense: number },
+  playerPower: number,
+): void {
+  const hpFraction = bot.maxHp > 0 ? bot.hp / bot.maxHp : 1;
+  const tank = bot.profile.role === "tank",
+    healer = bot.profile.role === "healer";
+  const attack = Math.max(1, stats.attack * (tank || healer ? 0.85 : 1));
+  const defense = Math.max(0, stats.defense * (tank ? 1.2 : 1));
+  const hp = Math.max(1, stats.hp * (tank ? 1.3 : healer ? 1.15 : 1));
+  const base = Math.max(
+    1,
+    combatPower(toCore(attack), toCore(defense), toCore(hp)),
+  );
+  const scale = (Math.max(1, playerPower) * bot.powerRatio) / base;
+  bot.attack = Math.max(1, Math.round(attack * scale));
+  bot.defense = Math.max(0, Math.round(defense * scale));
+  bot.maxHp = Math.max(1, Math.round(hp * scale));
+  bot.hp = Math.max(0, Math.round(bot.maxHp * hpFraction));
+  bot.combatPower = combatPower(
+    toCore(bot.attack),
+    toCore(bot.defense),
+    toCore(bot.maxHp),
+  );
+  bot.anchorPower = playerPower;
+}
+export function createRoamingBot(
+  profile: BotTemplate,
+  index: number,
+  level: number,
+  origin: Point,
+  stats: { attack: number; hp: number; defense: number },
+  playerPower: number,
+  random = Math.random,
+): BotActor {
+  const bot = createBot(profile, index, level, origin, stats);
+  bot.strong = random() < STRONG_BOT_CHANCE;
+  bot.powerRatio = bot.strong ? 1.4 + random() * 0.4 : 0.9 + random() * 0.2;
+  scaleRoamingBot(bot, stats, playerPower);
+  return bot;
 }
 export interface BotTarget extends Point {
   id: string;

@@ -5,6 +5,9 @@ import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
 import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
+import { installFixedViewport } from "./fixed-viewport";
+import { queueWorldKill, currentWorldAnnouncement, worldKillText, type WorldAnnouncement } from "./world-announcements";
+installFixedViewport();
 import { addGems, gemName, validGemBag, normalizeGemBag, validSockets, setSocket, type GemBag, type GemSpec } from "./gems";
 import { GEM_REALMS, isGemRealm, gemRealmReward, canStoreGemReward, type GemRealmId } from "./gem-realms";
 import { enhancementLinesMarkup, socketSummaryMarkup, gemBagMarkup, socketsMarkup, gemRealmsMarkup, bonusText as gemBonusText } from "./gem-ui";
@@ -20,7 +23,7 @@ import { createCompanionActor, moveCompanion, companionStrike, type CompanionAct
 import { freshLuckyProgress, validLuckyProgress, normalizeLuckyProgress, playLuckyEvent, type LuckyGame, type LuckyProgress } from "./lucky-events";
 import { luckyMarkup, updateLuckyPresentation } from "./lucky-ui";
 import { freshLootSettings, normalizeLootSettings, validLootSettings, acceptsLoot, autoDiscardItems, type LootSettings } from "./loot-settings";
-import { BOT_TEMPLATES, createBot, chooseBotTarget, moveBot, freshBotSettings, normalizeBotSettings, botEncounter, randomPatrolGoal, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
+import { BOT_TEMPLATES, createBot, createRoamingBot, scaleRoamingBot, chooseBotTarget, moveBot, freshBotSettings, normalizeBotSettings, botEncounter, randomPatrolGoal, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
 import { freshSiegeCapture, tickSiegeCapture, SIEGE_CAPTURE_SECONDS, type SiegeCapture, freshSiegeProgress, validSiegeProgress, normalizeSiegeProgress, beginSiege, settleSiege, siegeBlocked, siegeTravelGoal, SIEGE_PHASES, type SiegeProgress, type SiegeOutcome } from "./siege";
 import { createSiegeArt, drawSiegeStructure } from "./siege-art";
 import { idleShell } from "./idle-ui";
@@ -224,6 +227,9 @@ interface Enemy {
   ranged?: boolean;
   home?: { x: number; y: number };
   botProfile?: BotTemplate;
+  botMount?: GearVariant;
+  botPower?: number;
+  botStrong?: boolean;
   structure?: "gate" | "banner";
   wildElite?: boolean;
   element?: Element;
@@ -1932,6 +1938,9 @@ function playLucky(gameId: LuckyGame): void {
       refiningStones: p.refiningStones,
       potions: { ...p.potions },
       lucky: normalizeLuckyProgress(p.lucky),
+      inventory: [...p.inventory],
+      pendingItems: [...p.pendingItems],
+      gems: { ...p.gems },
     };
   const stake = Number(
     document.querySelector<HTMLInputElement>("#event-stake")?.value ?? 50,
@@ -1943,6 +1952,14 @@ function playLucky(gameId: LuckyGame): void {
     return showToast(
       "Kiểm tra số bạc, cửa cược và chờ lượt trước mở thưởng xong.",
     );
+  if (receipt.reward?.kind === "equipment") {
+    const item = createItem(p.level, receipt.reward.rarity);
+    item.id = `wheel-${p.lucky.nextRound - 1}-${receipt.at}`;
+    storeRewardItems(p, [item]);
+  } else if (receipt.reward?.kind === "gem" && !addGems(p.gems, [receipt.reward.gem])) {
+    Object.assign(p, backup);
+    return showToast("Túi ngọc đã đầy. Chưa trừ bạc; hãy khảm bớt ngọc trước khi quay.");
+  }
   if (!persistGame()) {
     Object.assign(p, backup);
     return;
@@ -1963,7 +1980,7 @@ function openBots(): void {
     blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
   openUtility(
     "Đồng hành giang hồ · BOT",
-    `<p class="dim">Bot là nhân vật do game điều khiển. Trong luyện công, bật Trợ chiến để tổ đội cùng đánh quái và chia phần thưởng cho nhân vật. BOT thường tuần tra ngẫu nhiên khắp map. Khi đến gần dưới 190, có 12% cơ hội bật Đồ sát; mỗi lần gặp chỉ xét một lần, cách nhau ít nhất 45 giây. Trong thành và tổ đội Trợ chiến luôn an toàn. Đồ sát kết thúc sau 45 giây, không làm mất trang bị. Công thành luôn có đội bot riêng.</p><div class="btnrow"><button class="mini-button" data-bot-setting="enabled" ${blocked ? "disabled" : ""}>Bot trong map: ${settings.enabled ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="assist" ${blocked ? "disabled" : ""}>Trợ chiến: ${settings.assist ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="pvp" ${blocked ? "disabled" : ""}>Đồ sát ngẫu nhiên: ${settings.pvp ? "Bật" : "Tắt"}</button></div><div class="bot-roster">${BOT_TEMPLATES.map((profile) => `<article style="--bot-color:${profile.color}">${characterPortraitMarkup(SECT_BY_FACTION[profile.faction], profile.sex)}<div><b>${profile.name} <small>BOT</small></b><span>${factionOf(profile.faction).name} · ${botRoleLabel(profile.role)}</span><small>${GEAR_VARIANTS[profile.weapon].name}</small></div></article>`).join("")}</div><button class="outline-button" data-open-siege>Gọi đội công thành</button>`,
+    `<p class="dim">Bot là nhân vật do game điều khiển. Trong luyện công, bật Trợ chiến để tổ đội cùng đánh quái và chia phần thưởng cho nhân vật. BOT thường tuần tra ngẫu nhiên khắp map. Khi đến gần dưới 190, có 12% cơ hội bật Đồ sát; mỗi lần gặp chỉ xét một lần, cách nhau ít nhất 45 giây. BOT cưỡi ngựa, lực chiến thường bằng 90–110% nhân vật; 8% xuất hiện cao thủ mạnh 140–180%. Tiêu diệt đồ sát hoặc bị đồ sát hạ sẽ phát loa Thế giới dưới thanh XP, phía trên minimap. Trong thành và tổ đội Trợ chiến luôn an toàn. Đồ sát kết thúc sau 45 giây, không làm mất trang bị. Công thành luôn có đội bot riêng.</p><div class="btnrow"><button class="mini-button" data-bot-setting="enabled" ${blocked ? "disabled" : ""}>Bot trong map: ${settings.enabled ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="assist" ${blocked ? "disabled" : ""}>Trợ chiến: ${settings.assist ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="pvp" ${blocked ? "disabled" : ""}>Đồ sát ngẫu nhiên: ${settings.pvp ? "Bật" : "Tắt"}</button></div><div class="bot-roster">${BOT_TEMPLATES.map((profile) => `<article style="--bot-color:${profile.color}">${characterPortraitMarkup(SECT_BY_FACTION[profile.faction], profile.sex)}<div><b>${profile.name} <small>BOT</small></b><span>${factionOf(profile.faction).name} · ${botRoleLabel(profile.role)}</span><small>${GEAR_VARIANTS[profile.weapon].name}</small></div></article>`).join("")}</div><button class="outline-button" data-open-siege>Gọi đội công thành</button>`,
   );
 }
 function openRequestedSiege(): void {
@@ -2152,6 +2169,9 @@ function botAppearance(profile: BotTemplate): HeroAppearance {
     weapon: { color: profile.color, rarity: "Tốt", enhance: 0 },
   };
 }
+function botMountAppearance(variant: GearVariant, strong = false): MountAppearance {
+  return { variant, color: strong ? "#ffb458" : "#aad9db", tier: strong ? 4 : 1, enhancement: 0, rarity: strong ? "Hoàng Kim" : "Tốt", simpleEffects: game?.player.preferences.skillEffects === "simple" };
+}
 function drawBot(bot: BotActor, now: number): void {
   if (bot.hp <= 0) return;
   ctx.save();
@@ -2161,14 +2181,8 @@ function drawBot(bot: BotActor, now: number): void {
   ctx.beginPath();
   ctx.ellipse(0, 5, 21, 8, 0, 0, Math.PI * 2);
   ctx.stroke();
-  drawAnimatedHero(
-    ctx,
-    bot.profile.faction,
-    bot.profile.sex,
-    bot.motion,
-    now,
-    botAppearance(bot.profile),
-  );
+  if (bot.mounted) drawMountedCharacter(ctx, bot.profile.faction, bot.profile.sex, botMountAppearance(bot.mountVariant, bot.strong), bot.motion, now, botAppearance(bot.profile));
+  else drawAnimatedHero(ctx, bot.profile.faction, bot.profile.sex, bot.motion, now, botAppearance(bot.profile));
   drawEnemyStatus(
     ctx,
     { ...bot, radius: 19, dead: false },
@@ -2176,11 +2190,12 @@ function drawBot(bot: BotActor, now: number): void {
     game?.player.preferences.skillEffects === "simple",
   );
   ctx.restore();
-  drawBar(bot.x - 24, bot.y - 72, 48, 4, bot.hp / bot.maxHp, HEALTH_COLORS[playerHealthRelation(false, Boolean(game?.territoryEncounter?.siege || game?.player.botSettings.assist))]);
+  drawBar(bot.x - 24, bot.y - (bot.mounted ? 113 : 72), 48, 4, bot.hp / bot.maxHp, HEALTH_COLORS[playerHealthRelation(false, Boolean(game?.territoryEncounter?.siege || game?.player.botSettings.assist))]);
   ctx.textAlign = "center";
   ctx.font = "600 10px sans-serif";
   ctx.fillStyle = bot.profile.color;
-  drawOutlinedText(`${bot.profile.name} · BOT`, bot.x, bot.y - 78);
+  drawOutlinedText(`${bot.profile.name} · BOT`, bot.x, bot.y - (bot.mounted ? 123 : 78));
+  if (bot.combatPower) { ctx.fillStyle = bot.strong ? "#ffb458" : "#e3e9dd"; ctx.font = "600 10px sans-serif"; drawOutlinedText(`${bot.strong ? "CAO THỦ · " : ""}LC ${formatNumber(bot.combatPower)}`, bot.x, bot.y - (bot.mounted ? 135 : 91)); }
   ctx.textAlign = "left";
 }
 function botImpact(
@@ -2232,7 +2247,7 @@ function queueBotAttack(
     actionAt: now,
     actionDuration: duration + 260,
   });
-  const hand = actorCastOffset(school.id, profile.sex, motion.facingX);
+  const hand = actorCastOffset(school.id, profile.sex, motion.facingX, "mounted" in source ? source.mounted : Boolean(source.botMount));
   game.botHits.push({
     sourceId: source.id,
     targetId: "id" in target ? target.id : "player",
@@ -2254,6 +2269,7 @@ function tickBots(dt: number, now: number): void {
   const visible =
     Boolean(siege) ||
     (settings.enabled && game.mapMode === "world" && !game.goldenEncounter);
+  const roamingPower = visible && !siege && !settings.assist ? currentCombatPower() : 0;
   const context = siege
     ? `siege-${siege.id}`
     : visible
@@ -2269,11 +2285,11 @@ function tickBots(dt: number, now: number): void {
       ? indices
           .slice(0, count)
           .map((i, n) =>
-            createBot(BOT_TEMPLATES[i], n, game!.player.level, game!.player, {
+            (siege || settings.assist ? createBot : createRoamingBot)(BOT_TEMPLATES[i], n, game!.player.level, game!.player, {
               attack: effectiveAttack(),
               hp: game!.player.maxHp,
               defense: effectiveDefense(),
-            }),
+            }, roamingPower),
           )
       : [];
   }
@@ -2281,19 +2297,24 @@ function tickBots(dt: number, now: number): void {
   for (const [i, bot] of game.bots.entries()) {
     if (bot.hp <= 0) {
       if (now < bot.respawnAt) continue;
-      const fresh = createBot(bot.profile, i, game.player.level, game.player, {
+      const fresh = (siege || settings.assist ? createBot : createRoamingBot)(bot.profile, i, game.player.level, game.player, {
         attack: effectiveAttack(),
         hp: game.player.maxHp,
         defense: effectiveDefense(),
-      });
+      }, roamingPower);
       Object.assign(bot, fresh);
+    }
+    if (!siege && !settings.assist && Math.abs(roamingPower - bot.anchorPower) > Math.max(1, bot.anchorPower * .05)) {
+      scaleRoamingBot(bot, { attack: effectiveAttack(), hp: game.player.maxHp, defense: effectiveDefense() }, roamingPower);
+      bot.level = game.player.level;
     }
     if (!siege && botEncounter(bot.encounter, distance(bot, game.player), now,
       game.player.idle.inTown || settings.assist || !settings.pvp || now < botSafeUntil) && !game.enemies.some(e => e.rogueUntil && !e.dead)) {
       const rogue = createEnemy(`rogue-${bot.id}-${Math.floor(now)}`, `${bot.profile.name} · ĐỒ SÁT`, "normal", bot.x, bot.y, bot.level, "#ff6474");
       rogue.botProfile = bot.profile; rogue.rogueUntil = now + 45000;
-      rogue.hp = rogue.maxHp = bot.maxHp; rogue.attack = Math.floor(effectiveAttack() * .45);
-      rogue.defense = bot.defense; rogue.speed = 160;
+      rogue.hp = bot.hp; rogue.maxHp = bot.maxHp; rogue.attack = bot.attack;
+      rogue.botMount = bot.mounted ? bot.mountVariant : undefined; rogue.botPower = bot.combatPower; rogue.botStrong = bot.strong;
+      rogue.defense = bot.defense; rogue.speed = bot.speed;
       game.enemies.push(rogue); bot.hp = 0; bot.respawnAt = now + 60000;
       if (game.autoBattle && !game.targetId) game.targetId = rogue.id;
       addLog(`${bot.profile.name} bật Đồ sát! Có thể đánh trả hoặc chạy xa. Đồ sát tự hết sau 45 giây.`);
@@ -2492,7 +2513,7 @@ function updateBotHits(now: number): void {
       if (!enemy.hp) killEnemy(enemy);
     } else if (hit.targetId === "player") {
       const enemies = game.enemies;
-      damagePlayer(hit.damage, `${hit.profile.name} · BOT`);
+      damagePlayer(hit.damage, `${hit.profile.name} · BOT`, "rogueUntil" in source && source.rogueUntil ? hit.profile.name : undefined);
       if (game !== current || game.enemies !== enemies) return;
     } else {
       const bot = target as BotActor,
@@ -3363,6 +3384,7 @@ function killEnemy(enemy: Enemy): void {
   if (enemy.rogueUntil) {
     enemy.respawnAt = Infinity;
     game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
+    announceWorldKill(game.player.name, `${enemy.botProfile?.name ?? enemy.name} · BOT`);
     addLog(`Đã đánh bại ${enemy.name}. BOT rời trận, không rơi đồ.`);
     return;
   }
@@ -3453,16 +3475,17 @@ function killEnemy(enemy: Enemy): void {
   }
   if (game.loot.length > 120) {
     const overflow = game.loot.splice(0, game.loot.length - 100);
+    const accepted = overflow.filter(loot => !loot.item || !player.idle.autoLoot || game!.mapMode !== "world" || Boolean(game!.goldenEncounter) || acceptsLoot(loot.item, player.lootSettings));
     storeRewardItems(
       player,
-      overflow.flatMap((loot) => (loot.item ? [loot.item] : [])),
+      accepted.flatMap((loot) => (loot.item ? [loot.item] : [])),
     );
     for (const loot of overflow) {
       player.gold += loot.gold;
       player.refiningStones += loot.stones;
     }
     addLog(
-      "Đồ rơi cũ đã được thu hồi vào hành trang/Đồ chờ nhận để sân đấu không quá đầy.",
+      `Đã thu hồi đồ rơi cũ đạt bộ lọc vào túi/Đồ chờ nhận${overflow.length > accepted.length ? `; bỏ ${overflow.length - accepted.length} món dưới bộ lọc` : ""}.`,
     );
     persistGame();
   }
@@ -3476,7 +3499,7 @@ function killEnemy(enemy: Enemy): void {
   if (huntEligible || enemy.kind === "elite") persistGame();
 }
 
-function damagePlayer(amount: number, source: string): void {
+function damagePlayer(amount: number, source: string, pkKiller?: string): void {
   if (!game) return;
   const player = game.player;
   const stats = combinedStats();
@@ -3503,6 +3526,7 @@ function damagePlayer(amount: number, source: string): void {
   );
   if (remaining > 0) addLog(`${source} gây ${remaining} sát thương.`);
   if (player.hp <= 0) {
+    if (pkKiller) announceWorldKill(`${pkKiller} · BOT`, player.name);
     const inDungeon = game.mapMode === "dungeon";
     player.x = PLAYER_START.x;
     player.y = PLAYER_START.y;
@@ -3569,6 +3593,7 @@ function pickupNearby(): void {
     picked += 1;
   }
   if (picked > 0) {
+    discardAutomaticLoot();
     persistGame();
     refreshUi(true);
   }
@@ -4073,12 +4098,16 @@ function update(dt: number, now: number): void {
     leaveGoldenBoss("Khung giờ boss đã kết thúc.");
     return;
   }
-  if ((game.goldenEncounter || exploring()) && player.idle.autoLoot) collectIdleLoot();
+  if (player.idle.autoLoot) collectIdleLoot();
   tickBots(dt, now);
   updateSiegeCapture(dt);
   if (game.mapMode === "world" && !game.goldenEncounter && now - lastLootMaintenance >= 1000) {
     lastLootMaintenance = now;
-    if (discardAutomaticLoot()) { persistGame(); refreshUi(true); }
+    const inventory = [...game.player.inventory];
+    if (discardAutomaticLoot()) {
+      if (!persistGame()) game.player.inventory = inventory;
+      refreshUi(true);
+    }
   }
   tickCompanion(dt, now);
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
@@ -4842,7 +4871,8 @@ function drawEnemySprite(enemy: Enemy, now: number): void {
   if (enemy.structure) { drawSiegeStructure(ctx, enemy.structure, enemy.hp / enemy.maxHp, now); return; }
   if (enemy.botProfile) {
     const p = enemy.botProfile, motion = game?.combat.enemyMotions.get(enemy.id) ?? freshMotion();
-    drawAnimatedHero(ctx, p.faction, p.sex, motion, now, botAppearance(p)); return;
+    if (enemy.botMount) drawMountedCharacter(ctx, p.faction, p.sex, botMountAppearance(enemy.botMount, enemy.botStrong), motion, now, botAppearance(p));
+    else drawAnimatedHero(ctx, p.faction, p.sex, motion, now, botAppearance(p)); return;
   }
   if (enemy.monsterId && drawMonster(ctx, enemy.monsterId, game?.combat.enemyMotions.get(enemy.id) ?? freshMotion(), now, enemy.kind === "elite")) return;
   const scale = enemy.radius / 19;
@@ -5035,7 +5065,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.restore();
   const barWidth =
     enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
-  const labelY = enemy.y - (enemy.structure ? enemy.structure === "gate" ? 105 : 125 : enemy.botProfile ? 88 : enemy.companionId ? 124 : enemy.monsterId ? monsterSize(enemy.monsterId, enemy.kind === "elite").height + 4 : enemy.radius * 2.6 + 12);
+  const labelY = enemy.y - (enemy.structure ? enemy.structure === "gate" ? 105 : 125 : enemy.botProfile ? enemy.botMount ? 135 : 88 : enemy.companionId ? 124 : enemy.monsterId ? monsterSize(enemy.monsterId, enemy.kind === "elite").height + 4 : enemy.radius * 2.6 + 12);
   drawBar(
     enemy.x - barWidth / 2,
     labelY,
@@ -5048,6 +5078,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.font = `${enemy.kind === "boss" ? 700 : 600} ${enemy.kind === "boss" ? 13 : 11}px 'DM Sans', sans-serif`;
   ctx.textAlign = "center";
   drawOutlinedText(`${enemy.name} · Cấp ${enemy.level}`, enemy.x, labelY - 7);
+  if (enemy.botPower) { ctx.fillStyle = enemy.botStrong ? "#ffb458" : "#ff9c9c"; ctx.font = "600 10px sans-serif"; drawOutlinedText(`${enemy.botStrong ? "CAO THỦ · " : ""}LC ${formatNumber(enemy.botPower)}`, enemy.x, labelY - 21); }
   ctx.textAlign = "left";
 }
 
@@ -5762,6 +5793,9 @@ function discardAutomaticLoot(): number {
 }
 function collectIdleLoot(force = false, recover = force): void {
   if (!game || !game.loot.length) return;
+  // Normal map transitions obey automatic pickup filters. Encounter rewards and
+  // explicit recovery with automatic pickup disabled still preserve all items.
+  recover = recover && (Boolean(game.goldenEncounter) || game.mapMode !== "world" || !game.player.idle.autoLoot);
   const ready = game.loot.filter(
     (loot) => (force || nowMs() - (loot.bornAt ?? 0) >= 1600) && (recover || !loot.item || acceptsLoot(loot.item, game!.player.lootSettings) || loot.gold > 0 || loot.stones > 0),
   );
@@ -5801,14 +5835,15 @@ function gearStatsMarkup(item: Item, current?: Item): string {
 let discardPreview: { filter: DiscardFilter; ids: Set<string> } | null = null;
 function openDiscardFilter(): void {
   if (!game) return;
+  if (game.mapMode !== "world") return showToast("Rời trận hiện tại trước khi vứt đồ.");
   discardPreview = null;
-  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ bộ, đồ từ Hoàng Kim trở lên, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
+  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đã cường hóa/khảm ngọc và Đồ chờ nhận. Chọn bậc và phẩm chất rồi xem danh sách trước khi xác nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Bậc trang bị tối đa<select id="discard-level">${Array.from({length:16}, (_,i) => `<option value="${(i+1)*10}" ${i+1 === Math.ceil(game!.player.level/10) ? "selected" : ""}>Bậc ${i+1} · cấp ${i*10+1}–${i*10+10}</option>`).join("")}</select></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label><label class="discard-check"><input id="discard-protected" type="checkbox" checked> Giữ đồ bộ và đồ Vàng/Cam/Đỏ</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
 }
 function previewDiscard(): void {
   if (!game) return;
   const maxLevel = Number(document.querySelector<HTMLInputElement>("#discard-level")!.value);
   if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > 160) return showToast("Cấp trang bị phải từ 1 đến 160.");
-  const filter = { maxRarity: Number(document.querySelector<HTMLSelectElement>("#discard-rarity")!.value), maxLevel, weakerOnly: document.querySelector<HTMLInputElement>("#discard-weaker")!.checked };
+  const filter = { maxRarity: Number(document.querySelector<HTMLSelectElement>("#discard-rarity")!.value), maxLevel, weakerOnly: document.querySelector<HTMLInputElement>("#discard-weaker")!.checked, protectSpecial: document.querySelector<HTMLInputElement>("#discard-protected")!.checked };
   const items = discardCandidates(game.player, filter);
   discardPreview = { filter, ids: new Set(items.map(item => item.id)) };
   document.getElementById("discard-preview")!.innerHTML = `<p><b>${items.length} món sẽ bị vứt</b> · Không nhận bạc.</p><ul class="discard-list">${items.map(item => `<li style="color:${item.color}">${escapeHtml(item.name)} · ${item.rarity} · Cấp ${item.level}</li>`).join("")}</ul><div class="btnrow"><button class="outline-button danger-text" id="confirm-discard" ${items.length ? "" : "disabled"}>Xác nhận vứt ${items.length} món</button><button class="outline-button" id="cancel-discard">Hủy</button></div>`;
@@ -5816,10 +5851,12 @@ function previewDiscard(): void {
 function confirmDiscard(): void {
   if (!game || !discardPreview) return;
   const ids = new Set(discardCandidates(game.player, discardPreview.filter).filter(item => discardPreview!.ids.has(item.id)).map(item => item.id));
+  const inventory = [...game.player.inventory];
   game.player.inventory = game.player.inventory.filter(item => !ids.has(item.id));
+  if (!persistGame()) { game.player.inventory = inventory; return; }
   discardPreview = null; pendingSaleId = null; closeUtility();
   addLog(`Đã vứt ${ids.size} món theo bộ lọc.`);
-  persistGame(); refreshUi(true);
+  refreshUi(true);
 }
 function openGoldenBoss(): void {
   if (!game) return;
@@ -6874,7 +6911,7 @@ function bindIdleUi(): void {
       if (control.id === "gear-gallery-enhance" && [0,3,7,10,30,60,90,100].includes(Number(control.value))) { galleryEnhance = Number(control.value); openEquipmentGallery(); }
       if (control.id === "gear-gallery-element" && Object.hasOwn(ELEMENTS, control.value)) { galleryElement = control.value as Element; gallerySet = ""; openEquipmentGallery(); }
       if (control.id === "gear-gallery-set" && (control.value === "" || SET_IDS.includes(control.value as SetId))) { gallerySet = control.value as SetId | ""; if (gallerySet) galleryElement = GEAR_SETS[gallerySet].element; openEquipmentGallery(); }
-      if ((event.target as HTMLElement).matches("#discard-rarity,#discard-level,#discard-weaker")) {
+      if ((event.target as HTMLElement).matches("#discard-rarity,#discard-level,#discard-weaker,#discard-protected")) {
         discardPreview = null;
         const preview = document.getElementById("discard-preview");
         if (preview) preview.textContent = "Bộ lọc đã thay đổi. Bấm Xem đồ sẽ vứt để kiểm tra lại.";
@@ -7673,7 +7710,26 @@ try {
   /* Character selection remains available. */
 }
 
+const worldAnnouncements: WorldAnnouncement[] = [];
+function announceWorldKill(killer: string, victim: string): void {
+  const message = queueWorldKill(worldAnnouncements, killer, victim, nowMs());
+  addLog(worldKillText(message));
+  refreshWorldAnnouncement(nowMs());
+}
+function refreshWorldAnnouncement(now: number): void {
+  const strip = document.getElementById("world-announcement")!;
+  const message = currentWorldAnnouncement(worldAnnouncements, now);
+  strip.classList.toggle("hidden", !message);
+  if (!message || strip.dataset.message === `${message.at}-${message.id}`) return;
+  strip.dataset.message = `${message.at}-${message.id}`;
+  const track = document.createElement("span");
+  track.className = "world-announcement-track";
+  track.textContent = worldKillText(message);
+  track.style.setProperty("--speaker-entry", `${strip.querySelector<HTMLElement>(".world-announcement-window")!.clientWidth * .45}px`);
+  strip.querySelector(".world-announcement-window")!.replaceChildren(track);
+}
 function frame(now: number): void {
+  refreshWorldAnnouncement(now);
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   update(dt * (game?.player.idle.speed ?? 1), now);

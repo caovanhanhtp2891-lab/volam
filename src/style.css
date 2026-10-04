@@ -37,6 +37,12 @@ select,
 textarea {
   font: inherit;
 }
+/* Safari zooms focused form controls smaller than 16px. Keep every editable
+   field readable without changing the game viewport or blocking scrolling. */
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  font-size: 16px !important;
+}
+html, body { touch-action: pan-x pan-y; }
 button {
   color: inherit;
   cursor: pointer;
@@ -2763,9 +2769,9 @@ h2 {
   line-height: 1.15;
   font-weight: 700;
   color: #15201b;
-  transform: translate(-50%, -50%) rotate(calc(var(--sector) * 45deg + 22.5deg))
+  transform: translate(-50%, -50%) rotate(calc(var(--sector) * var(--sector-angle, 45deg) + var(--sector-angle, 45deg) / 2))
     translateY(-80px)
-    rotate(calc(var(--sector) * -45deg - 22.5deg - var(--wheel-angle, 0deg)));
+    rotate(calc(var(--sector) * var(--sector-angle, 45deg) * -1 - var(--sector-angle, 45deg) / 2 - var(--wheel-angle, 0deg)));
   text-align: center;
 }
 .lucky-wheel > b {
@@ -3176,3 +3182,36 @@ h2 {
 .passive-card small { color: #bdd4bf; font-size: 12px; }
 .passive-card p { line-height: 1.7; margin: 6px 0; font-size: 12px; color: #d9e3c7; }
 @media (max-width: 380px) { .gem-card,.gem-realm,.socket-row { gap: 8px; padding: 9px; } .gem-art { width: 46px; height: 46px; } .enhancement-line { font-size: 11px; } }
+
+.world-announcement {
+  position: absolute; top: calc(61px + env(safe-area-inset-top, 0px));
+  left: 7px; right: 7px; height: 29px; z-index: 6;
+  display: flex; align-items: center; gap: 6px; padding: 3px 7px;
+  border: 1px solid #d6b66d; border-radius: 4px;
+  background: linear-gradient(90deg, #322211f5, #101d1aef);
+  color: #ffe39b; text-shadow: 0 1px 2px #000; pointer-events: none;
+}
+.world-announcement > b { font-size: 17px; flex: none; }
+.world-announcement-window { flex: 1; min-width: 0; overflow: hidden; }
+.world-announcement-track {
+  display: inline-block; min-width: 100%; white-space: nowrap;
+  font-size: 13px; font-weight: 700; line-height: 21px;
+  animation: world-speaker-scroll 14s linear forwards;
+}
+@keyframes world-speaker-scroll {
+  from { transform: translateX(var(--speaker-entry, 0px)); }
+  to { transform: translateX(-100%); }
+}
+.app-shell:has(#world-announcement:not(.hidden)) { --map-top: calc(101px + env(safe-area-inset-top, 0px)); }
+.app-shell:has(#world-announcement:not(.hidden)) .canvas-badge { top: calc(95px + env(safe-area-inset-top, 0px)); }
+.app-shell:has(#world-announcement:not(.hidden)) .loot-notices { top: calc(119px + env(safe-area-inset-top, 0px)); }
+@media (prefers-reduced-motion: reduce) {
+  .world-announcement-track { animation: none; white-space: normal; font-size: 12px; }
+  .world-announcement { height: auto; min-height: 29px; }
+}
+.wheel-luck { display: grid; gap: 5px; padding: 12px; margin: 10px 0; border: 1px solid #b89852; border-radius: 5px; background: #332313; }
+.wheel-luck > b { color: #ffde85; font-size: 16px; }
+.wheel-luck > small { color: #d2c3a2; line-height: 1.5; }
+.wheel-odds .rare-wheel-prize { color: var(--prize-color); border-color: var(--prize-color); background: #241a15; }
+.rare-wheel-prize :is(.gear-art, .gem-art) { flex: none; width: 26px; height: 26px; }
+.lucky-wheel > span { font-size: 9px; width: 42px; }

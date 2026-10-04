@@ -305,6 +305,7 @@ export function validBonuses(value: unknown): boolean {
   );
 }
 export interface DiscardFilter {
+  protectSpecial?: boolean;
   maxRarity: number;
   maxLevel: number;
   weakerOnly: boolean;
@@ -315,8 +316,8 @@ export function discardCandidates<T extends EquipmentData>(
 ): T[] {
   return owner.inventory.filter(
     (item) =>
-      !item.setId &&
-      rarityTier(item.rarity) < rarityTier("Hoàng Kim") &&
+      (filter.protectSpecial === false || (!item.setId && rarityTier(item.rarity) < rarityTier("Hoàng Kim"))) &&
+      !Object.values(owner.equipment).some(worn => worn?.id === item.id) &&
       item.enhance === 0 &&
       !item.gems?.some(Boolean) &&
       rarityTier(item.rarity) <= filter.maxRarity &&

@@ -9,7 +9,7 @@ test("old saves keep all pickup qualities with automatic discard off; invalid fi
   assert.deepEqual(normalizeLootSettings(), freshLootSettings());
   assert.equal(freshLootSettings().autoDiscard, false);
   assert.equal(validLootSettings(undefined), true);
-  for (const bad of [null, [], {}, { ...freshLootSettings(), minRarity: 7 }, { ...freshLootSettings(), minGrade: 1.5 }, { ...freshLootSettings(), maxDiscardRarity: 4 }, { ...freshLootSettings(), autoDiscard: "true" }, { ...freshLootSettings(), maxDiscardGrade: 17 }]) assert.equal(validLootSettings(bad), false);
+  for (const bad of [null, [], {}, { ...freshLootSettings(), minRarity: 7 }, { ...freshLootSettings(), minGrade: 1.5 }, { ...freshLootSettings(), maxDiscardRarity: 7 }, { ...freshLootSettings(), autoDiscard: "true" }, { ...freshLootSettings(), maxDiscardGrade: 17 }]) assert.equal(validLootSettings(bad), false);
   const original = freshLootSettings(), copy = normalizeLootSettings(original); copy.minGrade = 4;
   assert.equal(original.minGrade, 1);
 });
@@ -18,7 +18,7 @@ test("pickup filters require both quality and grade, including exact ten-level b
   assert.equal(acceptsLoot(item("low", { rarity: "Hiếm", level: 10 }), p), false);
   assert.equal(acceptsLoot(item("next", { rarity: "Hiếm", level: 11 }), p), true);
   assert.equal(acceptsLoot(item("quality", { rarity: "Tốt", level: 160 }), p), false);
-  for (const extra of [{ setId: "tower" }, { enhance: 1 }, { rarity: "Hoàng Kim" }, { rarity: "Thần Thoại" }]) assert.equal(acceptsLoot(item("keep", extra), { ...p, minRarity: 6, minGrade: 16 }), true);
+  for (const extra of [{ setId: "tower" }, { enhance: 1 }, { rarity: "Hoàng Kim" }, { rarity: "Thần Thoại" }]) assert.equal(acceptsLoot(item("keep", extra), { ...p, minRarity: 6, minGrade: 16 }), false);
 });
 test("automatic discard keeps equipped, special, enhanced, pending and stronger equipment", () => {
   const equipped = item("equipped", { power: 100 });

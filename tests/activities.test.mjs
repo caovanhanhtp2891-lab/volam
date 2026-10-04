@@ -8,6 +8,7 @@ import {
   playLuckyEvent,
   diceOutcome,
   WHEEL_PRIZES,
+  MAX_SILVER,
 } from "../src/lucky-events.ts";
 import {
   beginSiege,
@@ -87,7 +88,7 @@ test("wheel uses weighted ranges, grants each item type, and converts overflow H
   WHEEL_PRIZES.forEach((prize, i) => {
     const w = wallet(),
       p = freshLuckyProgress();
-    const r = playLuckyEvent(w, p, "wheel", 0, "", 0, () => start / 100);
+    const r = playLuckyEvent(w, p, "wheel", 0, "", 0, () => (start + prize.weight / 2) / 100);
     assert.equal(r.numbers[0], i);
     assert.equal(w.gold, 1000 - 50 + prize.silver);
     assert.equal(w.refiningStones, 3 + prize.stones);
@@ -105,7 +106,7 @@ test("wheel uses weighted ranges, grants each item type, and converts overflow H
   assert.equal(
     playLuckyEvent(wallet(), freshLuckyProgress(), "wheel", 0, "", 0, () => 1)
       .numbers[0],
-    7,
+    WHEEL_PRIZES.length - 1,
   );
 });
 test("bad inputs, insufficient silver and invalid RNG never mutate resources or records", () => {
@@ -145,9 +146,9 @@ test("bad inputs, insufficient silver and invalid RNG never mutate resources or 
 test("history has unique decreasing rounds, finite values, bounded wallet and backward-compatible defaults", () => {
   const w = wallet(),
     p = freshLuckyProgress();
-  w.gold = 1e9;
+  w.gold = MAX_SILVER;
   playLuckyEvent(w, p, "lottery", 5000, "00", 0, () => 0);
-  assert.equal(w.gold, 1e9);
+  assert.equal(w.gold, MAX_SILVER);
   for (let i = 1; i < 40; i++)
     playLuckyEvent(w, p, "wheel", 50, "", i * 2200, () => 0);
   assert.equal(p.history.length, 30);
@@ -240,7 +241,7 @@ test("bots walk with actual travel, honor obstacles, stun and slow, and have dis
   bot.slowUntil = 3000;
   bot.slowFactor = 0.25;
   moveBot(bot, { x: 800, y: 500 }, 0.1, 2100, () => false);
-  assert.ok(bot.x - frozen < 4);
+  assert.ok(Math.abs(bot.x - frozen - bot.speed * .1 * .25) < .01);
   const before = { x: bot.x, y: bot.y };
   moveBot(bot, { x: 800, y: 500 }, 0.1, 3100, () => true);
   assert.deepEqual({ x: bot.x, y: bot.y }, before);

@@ -11,6 +11,7 @@ export function idleShell(): string {
       <button class="hero-status" id="hero-status" aria-label="Mở chỉ số nhân vật"><div class="hero-portrait"><div class="avatar-orb" id="avatar-orb">劍</div><b id="idle-level">1</b></div><div class="topmid"><div class="hero-row"><strong id="character-name">Giang Hồ Dị Truyện</strong><span id="header-combat-power" aria-label="Lực chiến">⚔ 0</span></div><span id="idle-stage-label" class="hidden">Võ lâm · Idle</span><div class="meter hp-meter"><span id="hp-bar"></span><small id="hp-label">Sinh lực</small></div><div class="meter mp-meter"><span id="mp-bar"></span><small id="mp-label">Nội lực</small></div><div class="meter xp-meter"><span id="xp-bar"></span><small id="xp-label">Hành tẩu giang hồ</small></div></div></button>
       <div class="header-actions"><div class="gold-header">${resourceMarkup("silver")}<b id="gold-label">0</b></div><button class="icon-button gift-button" id="gift-btn" aria-label="Phần thưởng hằng ngày">${resourceMarkup("chest")}<i></i></button><button class="icon-button" id="settings-shortcut" aria-label="Cài đặt">⚙</button></div>
     </header>
+    <div id="world-announcement" class="world-announcement hidden" role="status" aria-live="polite"><b aria-hidden="true">📣</b><div class="world-announcement-window"></div></div>
     <section class="canvas-frame">
       <canvas id="game-canvas" width="600" height="600" aria-label="Sân đấu Giang Hồ Dị Truyện"></canvas>
       <div class="canvas-badge" id="canvas-badge">HOA SƠN · ẢI 1</div><div class="canvas-tip" id="canvas-tip"></div>

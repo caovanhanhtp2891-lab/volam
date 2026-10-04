@@ -183,7 +183,7 @@ async function win(p, id) {
     await p.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await p.locator("html").getAttribute("data-version"),
-      "0.26.0",
+      "0.27.0",
     );
     await click(p, '[data-faction="gaibang"]');
     await click(p, "#join-sect");
