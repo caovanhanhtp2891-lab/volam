@@ -10,7 +10,7 @@ test("old saves retain primary attack/defense and enhancement without randomizin
 test("all six bonus lines stack across slots and enhancement scales each line exactly once", () => {
   const a = item("all", "ring", { enhance: 10, bonuses: { attack: 10, defense: 5, hp: 100, mp: 50, crit: 5, speed: 10 } });
   const before = JSON.stringify(a);
-  assert.deepEqual(gearStats(a), { ...emptyStats(), attack: 16, defense: 40, hp: 157, mp: 79, crit: 6, speed: 11, armorPen: 2 });
+  assert.deepEqual(gearStats(a), { ...emptyStats(), attack: 16, defense: 40, hp: 157, mp: 79, crit: 6, speed: 11, armorPen: 2, lifeSteal: 1 });
   assert.equal(totalGearStats([a, a]).hp, 314);
   assert.equal(JSON.stringify(a), before);
 });

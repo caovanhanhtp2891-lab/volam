@@ -20,6 +20,7 @@ export function activityHubMarkup(): string {
     <section class="activity-group"><h3>Chinh phục <small>Trang bị · Chiến công</small></h3><div class="activity-grid todo-card">
       ${tile("dungeon", "Phụ bản", "Bí cảnh · Thủ lĩnh · Đồ quý", 'data-idle-open="dungeon"', "#a89aff")}
       ${tile("companion", "Bí cảnh bắt vợ", "10 tầng · Thu phục mỹ nhân", "data-open-bond-realms", "#eda8d2")}
+      ${tile("realm", "Bí cảnh cày ngọc", "7 tầng · Ngọc cấp 1–10", "data-open-gem-realms", "#78e3df")}
       ${tile("tower", "Leo tháp", "100 tầng · Bộ Trấn Thiên", "data-open-tower", "#bb9af5")}
       ${tile("siege", "Công thành chiến", "Phá cổng · Giữ cờ · Đội BOT", "data-open-siege", "#f2b975")}
       ${tile("boss", "Săn boss", "Hoàng Kim · Lịch xuất hiện", "data-open-golden-boss", "#f4c969")}
@@ -27,6 +28,7 @@ export function activityHubMarkup(): string {
     </div></section>
     <section class="activity-group"><h3>Du ngoạn <small>Bản đồ · Đồng hành</small></h3><div class="activity-grid">
       ${tile("map", "Khám phá bản đồ", "16 vùng · Bốn khu mỗi map", "data-open-exploration", "#82d6ba")}
+      ${tile("realm", "Túi ngọc", "Khảm ngọc · Mỗi +10 mở 1 lỗ", "data-open-gem-bag", "#b8a0ff")}
       ${tile("companion", "Tri kỷ", "Mang theo · Chỉ số · Trợ chiến", "data-open-companions", "#b4e6d3")}
       ${tile("bot", "Đồng hành BOT", "Tổ đội · Tuần tra · Đồ sát", "data-open-bots", "#80bedf")}
       ${tile("book", "Sổ quái", "32 loài · Chiêu thức · Đồ rơi", "data-open-bestiary", "#bed087")}

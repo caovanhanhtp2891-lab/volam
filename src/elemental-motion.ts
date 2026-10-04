@@ -51,9 +51,9 @@ export function drawElementalMotion(c: CanvasRenderingContext2D, kind: MotionKin
       c.beginPath(); c.moveTo(x - width, r * .12);
       c.bezierCurveTo(x - width * 2, -height * .25, x + sway - width, -height * .55, x + sway, -height);
       c.bezierCurveTo(x + sway + width * .2, -height * .5, x + width * 2, -height * .15, x + width, r * .12);
-      c.closePath(); c.fillStyle = color + "b5"; c.fill();
+      c.closePath(); c.fillStyle = color + "e5"; c.fill(); c.strokeStyle = "#742d20"; c.lineWidth = .8; c.stroke();
       c.beginPath(); c.moveTo(x - width * .45, r * .12); c.quadraticCurveTo(x - width, -height * .3, x + sway * .4, -height * .55);
-      c.quadraticCurveTo(x + width, -height * .2, x + width * .45, r * .12); c.fillStyle = light + "b0"; c.fill();
+      c.quadraticCurveTo(x + width, -height * .2, x + width * .45, r * .12); c.fillStyle = light + "e0"; c.fill();
     }
   }
   if (kind === "lightning") {

@@ -70,3 +70,11 @@ Bảy phẩm chất giữ viền trắng/lục/lam/tím/vàng/cam/đỏ. Từ la
 `training-regions.webp`: 1536 × 1024, 16 ô 384 × 256 theo thứ tự `REGIONS` (4 cột × 4 hàng), khoảng 703 KB. Hình gốc được tạo mới cho game bằng công cụ sinh ảnh, không lấy ảnh từ game tham khảo. Có nền rừng thông, sơn đạo, cổ mộ, trúc lâm, đạo quán, rừng thu/phong, hoa tím, đồi trà, thiền viện, ghềnh sông, dược viên, sa mạc, biên thành và hai vùng tuyết. Dùng chung cho sân đấu, minimap và thẻ chuyển map. Canvas nền cache tối đa bốn vùng; ảnh tải xong tăng revision để thay nền dự phòng. Thời tiết Canvas tối đa 20 hạt (Gọn: 4), không tạo ảnh/gradient mỗi frame.
 
 `elemental-motion.ts` v0.17 dùng quỹ đạo xác định theo thời gian: lửa đổi ngọn, tàn lửa bay, bọt độc nổi/vệt ăn mòn, tinh thể sáng, lôi điện đổi nhánh, cánh sen và tia kim loại. Mỗi lớp tối đa 14 hạt (Gọn 4); không tạo gradient/filter/blur theo frame. `enemy-status-art.ts` dùng cùng lớp cho thiêu đốt/ăn mòn thật, ngừng khi hết trạng thái hoặc chết. Atlas linh binh mới chứa sáu vũ khí, ba giáp, ba mũ, hai giày, hai đai, hai dây chuyền, hai nhẫn, hai hộ uyển và hai pháp bảo; thứ tự 24 ô nằm trong `item-art.ts`.
+
+## Cảnh vật rõ nét v0.26.0
+
+`scenery-props.webp`: 1448 × 1086, 4 cột × 3 hàng, 12 ô 362 × 362, alpha trong suốt, 1.028.510 byte. Tạo hình mới bằng OpenAI image generation ngày 04/10/2026; chỉ chuyển định dạng sang WebP chất lượng 88, không lấy tài nguyên của game tham khảo. Hình PNG gốc giữ tại `/workspace/generated_images/exec-0743f544-cf34-43de-91c3-560cb46da919.png` trong môi trường làm việc.
+
+Thứ tự ô: thông, trúc, phong đỏ, hoa anh đào; cổ tự, cổng đá, đá rêu, tinh thể; thông tuyết, cổ tự tuyết, di tích sa mạc, cây lá rộng. `scenery-sprites.ts` vẽ nhỏ hơn ảnh nguồn, lấy chân ở đáy ô. `landscape-art.ts` vẽ nền và đường đi ở độ phân giải bản đồ, thêm hạt sỏi/cỏ/đá/nước và riêng khoáng mạch cho map ngọc. Cache nền đổi revision khi atlas tải xong; nền thành cũng cập nhật sau khi tải. Minimap/thẻ vùng dùng lại phong cảnh. Atlas 16 ô cũ còn giữ để tương thích tài nguyên/kiểm tra; không kéo lên nền sân chơi.
+
+Ngọc dùng SVG mặt cắt sắc, màu theo loại và viền/ánh sáng theo phẩm chất trong `gems.ts`; không tải thêm atlas ngọc. `skill-radiance.ts` vẽ xung kích/mảnh vỡ theo thời gian và bọt độc, giới hạn số hạt và giảm chi tiết trong Gọn.

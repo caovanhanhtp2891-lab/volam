@@ -1,3 +1,4 @@
+import { drawPoisonCloud } from "./skill-radiance.ts";
 import { drawElementalMotion } from "./elemental-motion.ts";
 import { enemyStatusVisual, type EnemyStatus } from "./enemy-status.ts";
 export function drawEnemyStatus(
@@ -11,7 +12,9 @@ export function drawEnemyStatus(
     return;
   const r = Math.min(32, Math.max(14, enemy.radius));
   c.save();
-  if (status.burning) drawElementalMotion(c, "fire", r * 1.15, now, "#ff792d", "#fff0a0", simple, true);
+  if (status.burning) {
+    c.save(); c.translate(0, -4); drawElementalMotion(c, "fire", r * 1.75, now, "#ff792d", "#fff4b7", simple, true); c.restore();
+  }
   if (status.corroded) {
     drawElementalMotion(c, "acid", r, now, "#81db45", "#e5ff8d", simple, true);
     c.strokeStyle = "#b1e873"; c.lineWidth = 1.6;
@@ -81,6 +84,7 @@ export function drawEnemyStatus(
   }
   c.globalAlpha = 1;
   if (status.poisoned) {
+    drawPoisonCloud(c, r, now, simple);
     c.fillStyle = "#a4e76c";
     c.strokeStyle = "#406232";
     c.lineWidth = 0.7;
@@ -115,6 +119,11 @@ export function drawEnemyStatus(
       c.fill();
       c.stroke();
     }
+  }
+  const labels = [status.burning ? "CHÁY" : "", status.poisoned ? "ĐỘC" : "", status.corroded ? "ĂN MÒN" : ""].filter(Boolean);
+  if (labels.length) {
+    c.globalAlpha = 1; c.font = "800 10px sans-serif"; c.textAlign = "center"; c.lineWidth = 3; c.strokeStyle = "#111e1a";
+    c.strokeText(labels.join(" · "), 0, 26); c.fillStyle = status.burning ? "#ffd49c" : "#bcf591"; c.fillText(labels.join(" · "), 0, 26);
   }
   c.restore();
 }

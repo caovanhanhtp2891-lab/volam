@@ -1,9 +1,14 @@
+import { drawGemMine } from "./landscape-art";
 import { HEALTH_COLORS, playerHealthRelation } from "./health-bars";
 import { COMBAT_SCALE_VERSION, toCombat, toCore, displayedStat, migrateCombatScale, scaledOutgoingDamage, scaledIncomingDamage } from "./combat-scale";
 import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
 import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
+import { addGems, gemName, validGemBag, normalizeGemBag, validSockets, setSocket, type GemBag, type GemSpec } from "./gems";
+import { GEM_REALMS, isGemRealm, gemRealmReward, canStoreGemReward, type GemRealmId } from "./gem-realms";
+import { enhancementLinesMarkup, socketSummaryMarkup, gemBagMarkup, socketsMarkup, gemRealmsMarkup, bonusText as gemBonusText } from "./gem-ui";
+import { passivesFor, passiveBonuses, validPassives, allocatePassive, MAX_PASSIVE_RANK, type PassiveRanks } from "./passives";
 import { SPECIES, MONSTERS, faunaOf, monsterForStage, type SpeciesId } from "./bestiary";
 import { monsterMarkup, monsterSize, drawMonster } from "./monster-art";
 import { EXPLORATION_WIDTH, EXPLORATION_HEIGHT, freshExploration, validExploration, normalizeExploration, explorationZones, explorationSpawns, canExplore, zoneAt, type ExplorationProgress } from "./exploration";
@@ -114,8 +119,8 @@ import { allocateAttribute, allocateSkill, recommendAttributes, recommendSkills,
 
 type SectId = "kim" | "hoa" | "thuy";
 type Sect = School & { skills: [string, string]; ultimate: string };
-type DungeonId = RegularDungeonId | BondDungeonId;
-const DUNGEONS = { ...REGULAR_DUNGEONS, ...BOND_DUNGEONS };
+type DungeonId = RegularDungeonId | BondDungeonId | GemRealmId;
+const DUNGEONS = { ...REGULAR_DUNGEONS, ...BOND_DUNGEONS, ...GEM_REALMS };
 type ItemSlot =
   | "weapon"
   | "armor"
@@ -143,6 +148,7 @@ interface Item extends GearIdentity {
   icon: string;
   bonuses?: Partial<GearStats>;
   balanceVersion?: number;
+  gems?: (GemSpec | null)[];
 }
 
 interface Player {
@@ -171,6 +177,8 @@ interface Player {
   cooldowns: Record<SkillKey, number>;
   skillPoints: number;
   skillRanks: Record<SkillKey, number>;
+  passiveRanks: PassiveRanks;
+  gems: GemBag;
   inventory: Item[];
   equipment: Partial<Record<ItemSlot, Item>>;
   gold: number;
@@ -596,7 +604,8 @@ const obstacles = [
   { x: 1480, y: 420, w: 150, h: 100, type: "rock" },
 ];
 
-const worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+let worldArtRevision = trainingArtRevision;
+let worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
 const dungeonArts: Partial<Record<DungeonId, HTMLCanvasElement>> = {};
 const dungeonArtRevisions = new Map<DungeonId, number>();
 let territoryArt: HTMLCanvasElement | undefined;
@@ -923,6 +932,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     attackCooldown: 0,
     cooldowns: { skill1: 0, skill2: 0, ultimate: 0 },
     skillPoints: 0,
+    passiveRanks: {}, gems: {},
     skillRanks: { skill1: 1, skill2: 0, ultimate: 0 },
     inventory: [],
     equipment: {
@@ -1273,8 +1283,8 @@ function equipmentAttack(): number { return equipmentBonuses().attack; }
 function equipmentDefense(): number { return equipmentBonuses().defense; }
 function characterBonuses(): GearStats {
   if (!game) return emptyStats();
-  const stats = progressionBonuses(game.player.journey), seal = militaryBonuses(game.player.military), bond = companionBonuses(game.player.companions);
-  for (const key of Object.keys(stats) as GearStat[]) stats[key] += seal[key] + bond[key];
+  const stats = progressionBonuses(game.player.journey), seal = militaryBonuses(game.player.military), bond = companionBonuses(game.player.companions), passive = passiveBonuses(game.player.passiveRanks, playerSect(game.player).id);
+  for (const key of Object.keys(stats) as GearStat[]) stats[key] += seal[key] + bond[key] + passive[key];
   return stats;
 }
 function combinedStats(gear = equipmentBonuses(), bonus = characterBonuses()): GearStats {
@@ -2697,13 +2707,14 @@ function enterDungeon(id: DungeonId): void {
     addLog("Bạn đang ở trong phụ bản.");
     return;
   }
-  if (!(isBondDungeon(id) ? game.player.level >= dungeon.minLevel : canEnterDungeon(id, game.player.level, game.player.dungeonClears))) {
+  if (!(isBondDungeon(id) || isGemRealm(id) ? game.player.level >= dungeon.minLevel : canEnterDungeon(id, game.player.level, game.player.dungeonClears))) {
     addLog(
       `Cần cấp ${dungeon.minLevel}${dungeon.prerequisite ? ` và hoàn thành ${DUNGEONS[dungeon.prerequisite].name}` : ""} để vào ${dungeon.name}.`,
     );
     return;
   }
   if (!persistGame()) return;
+  if (isGemRealm(id) && !canStoreGemReward(game.player.gems, id)) return showToast("Túi ngọc đạt giới hạn số lượng. Hãy khảm bớt trước khi vào bí cảnh.");
   game.dungeonReturn = {
     x: game.player.x,
     y: game.player.y,
@@ -2834,6 +2845,10 @@ function claimDungeonReward(): void {
   if (isBondDungeon(dungeon.id)) {
     const bond = BOND_DUNGEONS[dungeon.id], result = settleCompanionVictory(player.companions,bond.companionId);
     if (result) { const def=COMPANIONS[result.id]; bondMessage=result.captured ? `${result.first?"Thu phục thành công":"Tăng Đồng tâm"}: ${def.name} · ${result.affinity}★${result.guaranteed?" · Mốc bảo đảm":""}. Vào ô Tri kỷ để Mang theo.` : `Thắng ${def.name}; chưa thu phục được. Cơ hội lần tới ${Math.round(captureChance(player.companions,result.id)*100)}%.`; }
+  } else if (isGemRealm(dungeon.id)) {
+    const gems = gemRealmReward(dungeon.id);
+    if (!addGems(player.gems, gems)) { game.dungeonRewardClaimed = false; return showToast("Túi ngọc đã đạt giới hạn số lượng; hãy khảm bớt trước khi nhận."); }
+    bondMessage = `Nhận ${gems.length} ngọc: ${gems.map(gemName).join("; ")}. Mở Túi ngọc để xem và khảm trang bị.`;
   } else player.dungeonClears[dungeon.id] += 1;
   player.dungeonTokens += dungeon.reward.tokens;
   player.gold += dungeon.reward.gold;
@@ -2916,6 +2931,8 @@ function sellItem(id: string): void {
     refreshUi(true);
     return;
   }
+  const selling = game.player.inventory[index];
+  if (!addGems(game.player.gems, (selling.gems ?? []).filter((gem): gem is GemSpec => Boolean(gem)))) return showToast("Túi ngọc đã đầy; hãy tháo hoặc khảm bớt ngọc trước khi bán.");
   const item = game.player.inventory.splice(index, 1)[0];
   const gold = itemSalePrice(item);
   game.player.gold += gold;
@@ -3402,7 +3419,7 @@ function killEnemy(enemy: Enemy): void {
   const chance =
     enemy.kind === "boss" ? 1 : enemy.kind === "elite" ? 0.92 : 0.32;
   if (Math.random() <= chance) {
-    const forced = game.mapMode === "dungeon" && game.dungeonId ? dungeonDropRarity(isBondDungeon(game.dungeonId) ? (DUNGEONS[game.dungeonId].minLevel >= 110 ? "frost" : DUNGEONS[game.dungeonId].minLevel >= 70 ? "inferno" : DUNGEONS[game.dungeonId].minLevel >= 35 ? "forest" : "wolfden") : game.dungeonId, enemy.kind, enemy.level) : rollEquipmentRarity(enemy.level, enemy.kind);
+    const forced = game.mapMode === "dungeon" && game.dungeonId ? dungeonDropRarity(isBondDungeon(game.dungeonId) || isGemRealm(game.dungeonId) ? (DUNGEONS[game.dungeonId].minLevel >= 110 ? "frost" : DUNGEONS[game.dungeonId].minLevel >= 70 ? "inferno" : DUNGEONS[game.dungeonId].minLevel >= 35 ? "forest" : "wolfden") : game.dungeonId, enemy.kind, enemy.level) : rollEquipmentRarity(enemy.level, enemy.kind);
     game.loot.push({
       id: `loot-${enemy.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       x: enemy.x + randomBetween(-12, 12),
@@ -3607,12 +3624,12 @@ function findOwnedItem(id: string): Item | undefined {
 }
 function openEnhancement(item: Item, result = ""): void {
   if (!game) return;
-  const info = enhancementInfo(item), next = { ...item, enhance: Math.min(MAX_ENHANCEMENT, item.enhance + 1) };
+  const info = enhancementInfo(item), next = { ...item, enhance: info.capped ? item.enhance : item.enhance + 1 };
   const before = gearStats(item), after = gearStats(next);
   const equipped = game.player.equipment[item.slot]?.id === item.id;
   const blocked = game.mapMode !== "world";
   const poor = game.player.gold < info.cost || game.player.refiningStones < info.stones;
-  openUtility("Cường hóa trang bị", `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${formatNumber(displayedStat(key, before[key]))}${statUnit(key)}</td><td>${formatNumber(displayedStat(key, after[key]))}${statUnit(key)}</td><td>${after[key] > before[key] ? `+${formatNumber(displayedStat(key, after[key] - before[key]))}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số tăng mạnh hơn ở bậc cao; mỗi +10 mở thêm một dòng phụ còn thiếu, tối đa 14 dòng. Dòng phần trăm giữ giới hạn hiệu lực khi chiến đấu. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? `<p class="enhancement-result">Đã đạt cường hóa tối đa +${MAX_ENHANCEMENT}.</p>` : `<div class="enhancement-cost"><b>${formatNumber(info.cost)} bạc + ${info.stones} đá</b><span>Tỷ lệ ${(info.chance * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? `+${MAX_ENHANCEMENT} tối đa` : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
+  openUtility("Cường hóa trang bị", `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${formatNumber(displayedStat(key, before[key]))}${statUnit(key)}</td><td>${formatNumber(displayedStat(key, after[key]))}${statUnit(key)}</td><td>${after[key] > before[key] ? `+${formatNumber(displayedStat(key, after[key] - before[key]))}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số tăng mạnh hơn ở bậc cao; mỗi +10 kích hoạt một dòng thuộc tính cường hóa và một lỗ khảm ngọc. Dòng phần trăm giữ giới hạn hiệu lực khi chiến đấu. Thất bại giữ nguyên cấp và chỉ số.</p>${enhancementLinesMarkup(item)}${socketSummaryMarkup(item)}<button class="mini-button" data-open-sockets="${escapeHtml(item.id)}">Khảm ngọc</button>${info.capped ? `<p class="enhancement-result">Đã đạt giới hạn rèn +${info.cap} của phẩm chất ${item.rarity}.</p>` : `<div class="enhancement-cost"><b>${formatNumber(info.cost)} bạc + ${info.stones} đá</b><span>Tỷ lệ ${(info.chance * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? `+${info.cap} tối đa` : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
 }
 function confirmEnhancement(id: string, rank: number): void {
   if (!game || game.mapMode !== "world") return;
@@ -3622,7 +3639,7 @@ function confirmEnhancement(id: string, rank: number): void {
   const paid = enhancementInfo(item);
   const outcome = attemptEnhancement(item, game.player);
   if (outcome === "success") syncStats();
-  const message = outcome === "success" ? `Thành công: ${item.name} +${item.enhance}.` : outcome === "failed" ? `Thất bại: giữ nguyên +${item.enhance}, đã dùng ${formatNumber(paid.cost)} bạc và ${paid.stones} đá.` : outcome === "capped" ? `Trang bị đã đạt +${MAX_ENHANCEMENT}.` : "Không đủ bạc hoặc đá tinh luyện.";
+  const message = outcome === "success" ? `Thành công: ${item.name} +${item.enhance}.` : outcome === "failed" ? `Thất bại: giữ nguyên +${item.enhance}, đã dùng ${formatNumber(paid.cost)} bạc và ${paid.stones} đá.` : outcome === "capped" ? `Trang bị đã đạt giới hạn +${paid.cap}.` : "Không đủ bạc hoặc đá tinh luyện.";
   addLog(message); persistGame(); refreshUi(true); openEnhancement(item, message);
 }
 function huntArea(): string {
@@ -4120,7 +4137,7 @@ function update(dt: number, now: number): void {
   )
     drinkPotion("mp");
   if (game.autoBattle && !currentTarget()) {
-    const target = nearestEnemy(game.dungeonId && isBondDungeon(game.dungeonId) ? Number.POSITIVE_INFINITY : 520);
+    const target = nearestEnemy(game.dungeonId && (isBondDungeon(game.dungeonId) || isGemRealm(game.dungeonId)) ? Number.POSITIVE_INFINITY : 520);
     if (target) game.targetId = target.id;
   }
 
@@ -4441,6 +4458,7 @@ function drawWorld(now: number): void {
     const id = game.dungeonId!;
     if (DUNGEONS[id].tier >= 2 && dungeonArtRevisions.get(id) !== trainingArtRevision) {
       dungeonArts[id] = createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT);
+      if (isGemRealm(id)) drawGemMine(dungeonArts[id]!.getContext("2d")!, WORLD_WIDTH, WORLD_HEIGHT, RARITY_COLORS[DUNGEONS[id].reward.rarity]);
       dungeonArtRevisions.set(id, trainingArtRevision);
     }
     dungeonArts[id] ??= DUNGEONS[id].tier >= 2 ? createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT) : createMapArt(id === "bamboo" ? "bamboo" : "dungeon", WORLD_WIDTH, WORLD_HEIGHT);
@@ -4463,7 +4481,10 @@ function drawWorld(now: number): void {
         WORLD_WIDTH,
         WORLD_HEIGHT,
       );
-    } else ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    } else {
+      if (worldArtRevision !== trainingArtRevision) { worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles); worldArtRevision = trainingArtRevision; }
+      ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    }
     ctx.fillStyle = "#fff0bd";
     ctx.font = "600 14px 'DM Sans', sans-serif";
     if (!playerIdleActive() && !game.goldenEncounter && !exploring()) drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
@@ -5427,7 +5448,7 @@ function renderSkillBar(): void {
 function itemRow(item: Item, index: number, equipped = false): string {
   const statLabel = `${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}`;
   const info = enhancementInfo(item);
-  const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>${info.capped ? `+${MAX_ENHANCEMENT} tối đa` : `Rèn +${item.enhance + 1} · ${formatNumber(info.cost)} bạc`}</button>`;
+  const enhanceButton = `<button class="mini-button enhance-btn" data-index="${index}" ${equipped ? `data-equipped="${item.slot}"` : ""}>${info.capped ? `+${info.cap} tối đa` : `Rèn +${item.enhance + 1} · ${formatNumber(info.cost)} bạc`}</button>`;
   const equipButton = equipped
     ? ""
     : `<button class="mini-button equip-btn" data-index="${index}">Mặc đồ</button>`;
@@ -5441,10 +5462,27 @@ function itemRow(item: Item, index: number, equipped = false): string {
   return `<div class="item-row" style="--rarity-color:${item.color}"><div class="item-icon">${itemArt(item)}</div><div class="item-copy"><strong>${escapeHtml(item.name)} ${item.enhance ? `+${item.enhance}` : ""}</strong><span>${item.rarity} · Cấp ${item.level} · ${statLabel}</span>${gearIdentityMarkup(item)}${gearStatsMarkup(item)}</div><div class="item-actions">${equipButton}${enhanceButton}${saleButton}${cancelButton}</div></div>`;
 }
 
+let selectedSocketId: string | null = null;
+function openGemBag(): void { if (game) openUtility("Túi ngọc", gemBagMarkup(game.player.gems)); }
+function openGemRealms(): void { if (game) openUtility("Bí cảnh cày ngọc", gemRealmsMarkup(game.player.level, game.mapMode !== "world" || Boolean(game.goldenEncounter), game.player.gems)); }
+function openSockets(id: string): void {
+  const item = findOwnedItem(id); if (!game || !item) return;
+  selectedSocketId = id;
+  openUtility("Khảm ngọc trang bị", socketsMarkup({ ...item, name: escapeHtml(item.name) }, game.player.gems, game.mapMode !== "world"));
+}
+function changeSocket(button: HTMLButtonElement): void {
+  if (!game || game.mapMode !== "world" || !selectedSocketId) return;
+  const item = findOwnedItem(selectedSocketId); if (!item) return showToast("Trang bị không còn trong túi hoặc trên nhân vật.");
+  const removing = button.hasAttribute("data-socket-remove"), index = Number(removing ? button.dataset.socketRemove : button.dataset.socketInsert);
+  const key = removing ? null : document.querySelector<HTMLSelectElement>(`[data-socket-select="${index}"]`)?.value;
+  if (key === undefined || !setSocket(item, game.player.gems, index, key)) return showToast("Lỗ chưa mở, ngọc đã được dùng hoặc bạn chọn viên đang khảm.");
+  syncStats(); persistGame(); refreshUi(true); openSockets(item.id);
+  showToast(removing ? "Đã tháo và trả ngọc về túi." : "Đã khảm ngọc. Chỉ số cộng ngay nếu trang bị đang mặc.");
+}
 function supplyMarkup(): string {
   if (!game) return "";
   const player = game.player;
-  return `<div class="supply-list">${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="supply-row"><span class="supply-icon potion-${kind}">${resourceMarkup(kind)}</span><div><strong>${POTIONS[kind].name}</strong><small>${player.potions[kind]} bình · Hồi 40% ${POTIONS[kind].label} tối đa</small></div><button class="mini-button" data-use-potion="${kind}" ${player.potionCooldown > 0 || player.potions[kind] < 1 ? "disabled" : ""}>${player.potionCooldown > 0 ? `${Math.ceil(player.potionCooldown)}s` : "Dùng"}</button></div>`).join("")}</div>`;
+  return `<button class="outline-button" data-open-gem-bag>◆ Túi ngọc · Khảm trang bị</button><div class="supply-list">${(["hp", "mp"] as PotionKind[]).map((kind) => `<div class="supply-row"><span class="supply-icon potion-${kind}">${resourceMarkup(kind)}</span><div><strong>${POTIONS[kind].name}</strong><small>${player.potions[kind]} bình · Hồi 40% ${POTIONS[kind].label} tối đa</small></div><button class="mini-button" data-use-potion="${kind}" ${player.potionCooldown > 0 || player.potions[kind] < 1 ? "disabled" : ""}>${player.potionCooldown > 0 ? `${Math.ceil(player.potionCooldown)}s` : "Dùng"}</button></div>`).join("")}</div>`;
 }
 
 function renderInventory(): void {
@@ -5465,7 +5503,7 @@ function renderInventory(): void {
     player.gold,
     player.refiningStones,
     player.skillPoints,
-    player.skillRanks,
+    player.skillRanks, player.passiveRanks, player.gems,
     player.potions,
     Math.ceil(player.potionCooldown),
     player.inventory,
@@ -5514,7 +5552,7 @@ function renderInventory(): void {
       )
       .join("");
     inventoryContent.innerHTML = `
-      <div class="smith-intro"><span class="smith-icon">⚒</span><div><strong>Lò rèn Rừng Trúc</strong><p>Xem trước chi phí, tỷ lệ và chỉ số trước khi rèn. Thất bại giữ nguyên cấp; tối đa +${MAX_ENHANCEMENT}.</p></div></div>
+      <div class="smith-intro"><span class="smith-icon">⚒</span><div><strong>Lò rèn Rừng Trúc</strong><p>Xem trước chi phí, tỷ lệ và chỉ số trước khi rèn. Thất bại giữ nguyên cấp. Giới hạn phẩm chất: Trắng +10 · Lục +20 · Lam +30 · Tím +40 · Vàng +60 · Cam +80 · Đỏ +100. Bậc 1 tối đa +10; mỗi bậc tăng thêm 10 đến giới hạn phẩm chất. Mỗi +10 mở dòng thuộc tính và lỗ khảm.</p></div></div>
       <div class="resource-hint"><span>Chi phí hiện tại phụ thuộc cấp cường hóa</span><b>${player.refiningStones} đá · ${player.gold} bạc</b></div>
       <div class="item-list smith-list">${equipment}</div>
     `;
@@ -5534,6 +5572,10 @@ function renderInventory(): void {
         })
         .join("")}</div>
     `;
+    inventoryContent.insertAdjacentHTML("beforeend", `<section class="passive-section"><h3>Tâm pháp bị động · ${sect.name}</h3><p class="dim">8 tâm pháp chung và 1 tâm pháp môn phái. Dùng 1 điểm võ học mỗi bậc, tối đa 10. Có thể rút điểm miễn phí; không cần tung chiêu. Đã học vẫn hiệu lực sau trùng sinh.</p>${passivesFor(sect.id).map(def => {
+      const rank = player.passiveRanks[def.id] ?? 0, unlocked = player.level >= def.level;
+      return `<article class="passive-card ${rank ? "learned" : ""}" data-passive-card="${def.id}"><span class="passive-glyph">${def.glyph}</span><div><b>${def.name}${def.school ? " · Môn phái" : ""}</b><small>Bậc ${rank}/${MAX_PASSIVE_RANK} · Mở cấp ${def.level}</small><p>Mỗi bậc: ${gemBonusText(def.bonuses)}</p><div class="btnrow"><button class="mini-button" data-passive-up="${def.id}" ${!unlocked || rank >= MAX_PASSIVE_RANK || player.skillPoints < 1 || game!.mapMode !== "world" ? "disabled" : ""}>${rank >= MAX_PASSIVE_RANK ? "Tối đa" : !unlocked ? `Cần cấp ${def.level}` : "Học +1"}</button><button class="mini-button" data-passive-refund="${def.id}" ${!rank || game!.mapMode !== "world" ? "disabled" : ""}>Rút 1 điểm</button></div></div></article>`;
+    }).join("")}</section>`);
     inventoryContent.insertAdjacentHTML("afterbegin", `<button class="outline-button point-suggest" data-recommend-points="skills" ${player.skillPoints < 1 ? "disabled" : ""}>Đề xuất cộng võ học · ${player.skillPoints} điểm</button>`);
     return;
   }
@@ -5554,7 +5596,7 @@ function renderInventory(): void {
         <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>${dungeon.name}</strong><p>Đợt ${game.dungeonWave + 1}/${dungeon.waves.length} · Còn ${game.enemies.filter((enemy) => !enemy.dead).length} quái.<br>${dungeon.mechanic}</p><div class="dungeon-timer">${minutes}:${seconds}</div><p>Ngã xuống, hết giờ hoặc rời sớm: không nhận thưởng hoàn thành.</p><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
       `;
     } else {
-      inventoryContent.innerHTML = `<button class="outline-button" data-open-bond-realms>❀ Bí cảnh bắt vợ · 10 tầng Tri kỷ</button><p class="panel-notice">12 bí cảnh · Cấp 3–155 · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
+      inventoryContent.innerHTML = `<button class="outline-button" data-open-gem-realms>◆ Bí cảnh cày ngọc · 7 tầng</button><button class="outline-button" data-open-bond-realms>❀ Bí cảnh bắt vợ · 10 tầng Tri kỷ</button><p class="panel-notice">12 bí cảnh · Cấp 3–155 · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
         REGULAR_DUNGEONS,
       )
         .map((dungeon) => {
@@ -6272,7 +6314,7 @@ function showItemDetail(item: Item): void {
   const enhancement = enhancementInfo(item);
   openUtility(
     item.name,
-    `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · ${GEAR_SLOTS[item.slot].name}</p><small class="gear-effect-label">${equipmentEffectLabel(item.rarity, item.enhance)}</small>${gearIdentityMarkup(item)}${gearStatsMarkup(item, current)}${item.setId ? `<button class="mini-button" data-open-set="${item.setId}">Bộ ${GEAR_SETS[item.setId].name} · ${setStatuses(Object.values(game.player.equipment)).find(set => set.id === item.setId)?.pieces ?? 0}/11 đang mặc</button>` : ""}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${enhancement.capped ? `Đã cường hóa tối đa +${MAX_ENHANCEMENT}` : `Cường hóa · ${formatNumber(enhancement.cost)} bạc + ${enhancement.stones} đá`}</button>` : ""}`,
+    `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${item.rarity} · Cấp ${item.level} · ${equipmentGrade(item.level)} · Điểm ${formatNumber(gearScore(item))}</b><p>Cường hóa +${item.enhance} · Giới hạn bậc/phẩm chất +${enhancement.cap} · ${GEAR_SLOTS[item.slot].name}</p><small class="gear-effect-label">${equipmentEffectLabel(item.rarity, item.enhance)}</small>${gearIdentityMarkup(item)}${gearStatsMarkup(item, current)}${enhancementLinesMarkup(item)}${socketSummaryMarkup(item)}${item.setId ? `<button class="mini-button" data-open-set="${item.setId}">Bộ ${GEAR_SETS[item.setId].name} · ${setStatuses(Object.values(game.player.equipment)).find(set => set.id === item.setId)?.pieces ?? 0}/11 đang mặc</button>` : ""}</div><div class="item-comparison"><small>${current ? `Đang mặc: ${escapeHtml(current.name)} +${current.enhance}` : "Vị trí này đang trống"}</small><strong class="${diff < 0 ? "weaker" : ""}">${equipped ? "Đang trang bị" : `${diff >= 0 ? "+" : ""}${formatNumber(diff)} ${attribute} so với hiện tại`}</strong></div>${inBag ? `<button class="outline-button" data-inspect-equip="${escapeHtml(item.id)}">Mặc trang bị</button>` : `<p class="dim">${equipped ? "Món này đang được nhân vật sử dụng." : "Món này đã được giữ trong Đồ chờ nhận."}</p>`}${inBag || equipped ? `<button class="outline-button" data-open-sockets="${escapeHtml(item.id)}">Khảm ngọc · ${item.enhance < 10 ? "Mở ở +10" : "Xem các lỗ"}</button><button class="outline-button detail-enhance" data-detail-enhance="${escapeHtml(item.id)}">${enhancement.capped ? `Giới hạn cường hóa +${enhancement.cap}` : `Cường hóa · ${formatNumber(enhancement.cost)} bạc + ${enhancement.stones} đá`}</button>` : ""}`,
   );
 }
 function openDailyRewards(): void {
@@ -6352,7 +6394,7 @@ function validateSave(value: unknown): {
       typeof player[key] !== "number" ||
       !Number.isFinite(player[key]) ||
       player[key] < 0 ||
-      player[key] > (["hp", "maxHp", "mp", "maxMp"].includes(key) ? 1e12 : 1e9)
+      player[key] > (["hp", "maxHp", "mp", "maxMp", "gold", "refiningStones"].includes(key) ? 1e12 : 1e9)
     )
       throw new Error("save-invalid");
   }
@@ -6382,6 +6424,9 @@ function validateSave(value: unknown): {
   if (!validLootSettings(player.lootSettings)) throw new Error("save-invalid");
   player.lootSettings = normalizeLootSettings(player.lootSettings);
   player.sieges = normalizeSiegeProgress(player.sieges);
+  if (!validGemBag(player.gems) || !validPassives(player.passiveRanks)) throw new Error("save-invalid");
+  player.gems = normalizeGemBag(player.gems);
+  player.passiveRanks = { ...(player.passiveRanks ?? {}) };
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
   player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
@@ -6425,6 +6470,7 @@ function validateSave(value: unknown): {
         Object.hasOwn(GEAR_SLOTS, item.slot) &&
         RARITIES.includes(item.rarity) &&
         validBonuses(item.bonuses) &&
+        validSockets(item) &&
         validGearIdentity(item) &&
         Number.isFinite(item.power) &&
         item.power >= 0 &&
@@ -6586,6 +6632,19 @@ function bindIdleUi(): void {
   document.getElementById("gear-sets-btn")!.addEventListener("click", () => openGearSets());
   document.querySelector(".app-shell")!.addEventListener("click", event => {
     const target = event.target as HTMLElement;
+    if (target.closest("[data-open-gem-realms]")) openGemRealms();
+    if (target.closest("[data-open-gem-bag]")) openGemBag();
+    const gemRealmButton = target.closest<HTMLButtonElement>("[data-gem-realm-enter]");
+    if (gemRealmButton && !gemRealmButton.disabled && isGemRealm(gemRealmButton.dataset.gemRealmEnter)) { closeUtility(); enterDungeon(gemRealmButton.dataset.gemRealmEnter); }
+    const socketButton = target.closest<HTMLButtonElement>("[data-open-sockets]");
+    if (socketButton && !socketButton.disabled) openSockets(socketButton.dataset.openSockets!);
+    const socketAction = target.closest<HTMLButtonElement>("[data-socket-insert],[data-socket-remove]");
+    if (socketAction && !socketAction.disabled) changeSocket(socketAction);
+    const passiveButton = target.closest<HTMLButtonElement>("[data-passive-up],[data-passive-refund]");
+    if (passiveButton && !passiveButton.disabled && game && game.mapMode === "world") {
+      const refund = passiveButton.hasAttribute("data-passive-refund"), id = refund ? passiveButton.dataset.passiveRefund! : passiveButton.dataset.passiveUp!;
+      if (allocatePassive(game.player, playerSect(game.player).id, id, refund)) { syncStats(); persistGame(); refreshUi(true); }
+    }
     if (target.closest("[data-open-exploration]")) openExplorationAtlas();
     if (target.closest("[data-open-companions]")) openCompanions();
     const companionButton=target.closest<HTMLButtonElement>("[data-equip-companion]");
@@ -7125,7 +7184,7 @@ function bindIdleUi(): void {
     .addEventListener("click", () =>
       openUtility(
         "Hành tẩu giang hồ",
-        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, một ô ấn quân hàm và ô Tri kỷ, 7 phẩm chất, tối đa 14 dòng chỉ số và cường hóa đến +${MAX_ENHANCEMENT}. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Tranh đoạt lãnh thổ</h3><p>Từ cấp 10 có thể công Biên Thành. Chiếm lần lượt 9 thành, dọn 3 đợt trong 4 phút. Chiến công mở 7 chức vị, từ Hương Trưởng đến Thái Thú, Thừa Tướng và Hoàng Đế. Nhận sắc phong rồi mang ấn trong Nhân vật; chỉ ấn đang mang cộng chỉ số.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Tri kỷ</h3><p>Giang hồ → Bí cảnh bắt vợ có 10 tầng từ cấp 5 đến 155. Thắng hộ vệ và mỹ nhân, rồi vào Hành trang → Phụ bản → Thử thu phục · Nhận thưởng. Mỗi lần thắng hụt tăng 5 điểm % cơ hội, có mốc bảo đảm. Nhân vật → ô Tri kỷ → Mang theo để tăng chỉ số, đi theo và trợ chiến; Bích Dao có thêm hồi HP. Thu phục trùng tăng Đồng tâm tối đa 5★. Tri kỷ giữ sau trùng sinh.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
+        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, một ô ấn quân hàm và ô Tri kỷ, 7 phẩm chất, tối đa 14 dòng chỉ số và cường hóa đến +${MAX_ENHANCEMENT}. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Ngọc khảm và tâm pháp</h3><p>Hoạt động → Bí cảnh cày ngọc có 7 tầng cấp 10–150, nhận ngọc cấp 1–10 với 7 phẩm chất. Nhận thưởng trong Phụ bản sau khi hạ thủ hộ. Túi ngọc riêng không chiếm ô trang bị. Mở chi tiết trang bị → Khảm ngọc; mỗi +10 mở một lỗ và một dòng thuộc tính cường hóa. Giới hạn rèn tăng theo bậc và phẩm chất, tối đa +100 ở trang bị đỏ bậc cao; đồ cũ giữ cấp đã đạt. Võ công có 8 tâm pháp chung và 1 tâm pháp môn phái, dùng điểm võ học để học/rút điểm.</p><h3>Tranh đoạt lãnh thổ</h3><p>Từ cấp 10 có thể công Biên Thành. Chiếm lần lượt 9 thành, dọn 3 đợt trong 4 phút. Chiến công mở 7 chức vị, từ Hương Trưởng đến Thái Thú, Thừa Tướng và Hoàng Đế. Nhận sắc phong rồi mang ấn trong Nhân vật; chỉ ấn đang mang cộng chỉ số.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Tri kỷ</h3><p>Giang hồ → Bí cảnh bắt vợ có 10 tầng từ cấp 5 đến 155. Thắng hộ vệ và mỹ nhân, rồi vào Hành trang → Phụ bản → Thử thu phục · Nhận thưởng. Mỗi lần thắng hụt tăng 5 điểm % cơ hội, có mốc bảo đảm. Nhân vật → ô Tri kỷ → Mang theo để tăng chỉ số, đi theo và trợ chiến; Bích Dao có thêm hồi HP. Thu phục trùng tăng Đồng tâm tối đa 5★. Tri kỷ giữ sau trùng sinh.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
       ),
     );
   document.getElementById("campfire-btn")!.addEventListener("click", () => { const fire = nearestCampfire(); if (fire) restAtCampfire(fire); });
@@ -7557,7 +7616,7 @@ mobileAuto.addEventListener("click", () => {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
   game.autoBattle = !game.autoBattle;
   if (game.autoBattle) {
-    const target = currentTarget() ?? nearestEnemy(game.dungeonId && isBondDungeon(game.dungeonId) ? Number.POSITIVE_INFINITY : 520);
+    const target = currentTarget() ?? nearestEnemy(game.dungeonId && (isBondDungeon(game.dungeonId) || isGemRealm(game.dungeonId)) ? Number.POSITIVE_INFINITY : 520);
     if (target) game.targetId = target.id;
     addLog(
       target

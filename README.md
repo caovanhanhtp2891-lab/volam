@@ -3,6 +3,20 @@
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
 
+## Ngọc khảm · Tâm pháp · v0.26.0
+
+- **Map rõ hơn:** nền Canvas vẽ ở kích thước bản đồ thật, bỏ kéo mỗi ô nền 384×256 lên toàn map. Bộ hình cảnh vật mới có 12 mẫu cây/trúc/phong/hoa, cổ tự/cổng đá, đá rêu, tinh thể và kiến trúc tuyết/sa mạc. Đường đi có sỏi, thảm cỏ và bờ nước sắc; minimap/thẻ chuyển map dùng cùng phong cảnh. Giữ 16 vùng và map lớn 3600×2400. Bí cảnh ngọc có khoáng mạch riêng.
+- **Hiệu ứng chiêu:** vệt bay có màu môn phái, lõi sáng và hạt chuyển động; đạn lớn hơn, hình chiêu có viền tương phản. Trúng địch tạo vòng xung kích/mảnh vỡ, băng vỡ riêng, lửa cao và bọt độc chuyển động. Quái hiện nhãn CHÁY/ĐỘC/ĂN MÒN theo trạng thái thật. Chế độ Gọn giảm chi tiết; sát thương và trạng thái vẫn bắt đầu tại thời điểm va chạm.
+- **Võ công → Tâm pháp bị động:** 8 tâm pháp chung + 1 riêng cho mỗi phái, tức 9 tâm pháp trên nhân vật và 18 định nghĩa cho 10 phái. Mỗi bậc dùng 1 điểm võ học, tối đa 10; rút điểm miễn phí. Cộng công/phòng/HP/MP, hồi phục, thân pháp, chí mạng, xuyên giáp, tốc đánh hoặc hút HP thật; chỉ tâm pháp đúng phái có hiệu lực. Đã học giữ sau trùng sinh.
+- **Hoạt động → Bí cảnh cày ngọc:** 7 map ở cấp 10/25/45/65/90/120/150, 2–5 đợt có thủ hộ. Thắng và chọn **Hành trang → Phụ bản → Nhận thưởng** để lấy 3/5/7/9/11/13/15 viên; mỗi lượt có ít nhất 1 viên phẩm chất cao nhất của map. Cày lại không giới hạn. Thua/rút lui/hết giờ không nhận ngọc; nút nhận thưởng không cấp lần hai. Ngọc vào túi riêng, không mất khi 60 ô trang bị đầy.
+- **Hoạt động → Túi ngọc**, hoặc **Hành trang → Túi ngọc**: 5 loại theo ngũ hành, 10 cấp, 7 phẩm chất trắng → đỏ. Hồng Ngọc: công/sát thương chí mạng; Lam Ngọc: MP/hồi MP; Lục Ngọc: HP/hồi HP; Hoàng Ngọc: phòng/giảm sát thương; Kim Cương: chí mạng/xuyên giáp. Cấp và phẩm chất càng cao chỉ số càng lớn.
+- **Chi tiết trang bị → Khảm ngọc:** mỗi mốc +10 mở một lỗ (+10 có 1, +20 có 2, đến +100 có 10). Khảm từ túi ngọc, thay/tháo miễn phí trả viên cũ về túi. Ngọc chỉ cộng chỉ số/lực chiến khi mặc món đó, không nhân lại theo cường hóa. Bán món đã khảm trả ngọc về túi; bộ lọc không vứt đồ có ngọc.
+- **Rèn:** giới hạn phẩm chất Trắng +10, Lục +20, Lam +30, Tím +40, Vàng +60, Cam +80, Đỏ +100. Bậc 1 (cấp 1–10) tối đa +10; mỗi bậc thêm 10, đến giới hạn phẩm chất. Mỗi +10 kích hoạt một dòng thuộc tính riêng, kể cả đồ đỏ đã đủ 14 dòng nền. Chi tiết/rèn hiện cả dòng đã mở và dòng khóa. Thất bại giữ cấp, chỉ số và lỗ khảm. Món từ bản cũ đã vượt giới hạn vẫn giữ cấp/chỉ số/lỗ, không rèn tiếp quá giới hạn mới.
+
+Save cũ nhận túi ngọc/tâm pháp rỗng; giữ đồ, Tri kỷ và tiến trình. Nâng giới hạn kiểm tra bạc/đá trong file lưu lên 10¹² để phần thưởng hợp lệ vượt 10⁹ không khiến save mất khả năng tải. Chỉ số chiến đấu vẫn dùng đơn vị lõi và chuyển ×100 tại ranh giới chiến đấu/hiển thị.
+
+Kiểm tra: `pnpm test`, `pnpm typecheck`, `pnpm exec vite build --base=/volam/`. Trình duyệt: `node tests/gemcraft-browser.cjs` (Playwright và Chromium), với `VOLAM_TEST_URL=http://127.0.0.1:4174/volam/` khi chạy preview. Bao phủ file cũ, tâm pháp/cộng-rút điểm, mốc +10/thất bại, giới hạn bậc/phẩm chất, đồ cũ +100, khảm/thay/tháo, bảy map đấu thật/túi đầy/nhận lặp/cày lại, save/reload và bốn kích thước màn hình.
+
 ## Tri kỷ · Linh quang · v0.25.0
 
 Tên **cảnh giới, danh hiệu và quân hàm** trên đầu tăng cỡ chữ **25%**, dùng nét chữ có viền tối sắc và ba hàng có khoảng cách; bỏ nhòe sáng trên chữ. Quân hàm đang mang hiện cùng danh hiệu và cảnh giới. Màn Nhân vật cũng tăng chữ tương ứng. Vòng sáng có dải linh quang xoay trước/sau thân và hạt sáng chuyển động, tăng độ cầu kỳ theo cảnh giới; khi cưỡi ngựa vòng thân theo vị trí người trên yên. Chế độ Gọn giảm số dải/hạt.

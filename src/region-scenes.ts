@@ -1,3 +1,4 @@
+import { landscapeThumbnail } from "./landscape-art.ts";
 export const TRAINING_ATLAS_URL = new URL(
   "./assets/training-regions.webp",
   import.meta.url,
@@ -30,6 +31,4 @@ export function regionFrame(region: number, width: number, height: number) {
     height: height / 4,
   };
 }
-export function regionThumbnail(region: number): string {
-  return `<i class="region-thumbnail" aria-hidden="true" style="background-image:url('${TRAINING_ATLAS_URL}');background-position:${((region % 4) * 100) / 3}% ${(Math.floor(region / 4) * 100) / 3}%"></i>`;
-}
+export function regionThumbnail(region: number): string { return landscapeThumbnail(region); }

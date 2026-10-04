@@ -14,7 +14,7 @@ test("all fourteen stat lines survive serialization, stack once and scale with e
   const item = piece("weapon", "bao-vu", { power: 20, bonuses, enhance: 10 });
   const stats = gearStats(item);
   assert.equal(Object.keys(stats).length, 14);
-  assert.equal(stats.attack, 40); for (const key of ["defense", "hp", "mp", "hpRegen", "mpRegen"]) assert.equal(stats[key], 8); for (const key of ["crit", "speed", "critDamage", "attackSpeed", "lifeSteal", "armorPen", "damageReduction", "dodge"]) assert.equal(stats[key], 6);
+  assert.equal(stats.attack, 44); for (const key of ["defense", "hp", "mp", "hpRegen", "mpRegen"]) assert.equal(stats[key], 8); for (const key of ["crit", "speed", "critDamage", "attackSpeed", "lifeSteal", "armorPen", "damageReduction", "dodge"]) assert.equal(stats[key], 6);
   assert.equal(validBonuses(bonuses), true);
   assert.deepEqual(gearStats(JSON.parse(JSON.stringify(item))), stats);
   assert.deepEqual(loadoutStats([item]), stats, "one set piece grants no set bonus");

@@ -3140,3 +3140,39 @@ h2 {
 .title-name { font-size: 20px; text-shadow: none; }
 .title-card[data-prestige-tier="5"] .title-name { font-size: 18.75px; text-shadow: none; }
 .title-preview > b { font-size: 26.25px; text-shadow: none; }
+
+/* Gemcraft and visible enhancement thresholds. */
+.enhancement-lines,.socket-summary { margin: 14px 0; text-align: left; border-top: 1px solid #c9b87635; padding-top: 12px; }
+.enhancement-lines > b,.socket-summary > b { display: block; color: #edd795; font-size: 13px; margin-bottom: 8px; }
+.enhancement-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding: 7px 8px; font-size: 12px; border-radius: 4px; margin: 4px 0; }
+.enhancement-line.activated { background: #2d514537; border-left: 2px solid #8bddb4; color: #b6f4ca; }
+.enhancement-line.sealed { background: #1b282c; border-left: 2px solid #768883; color: #adbbb5; }
+.enhancement-line strong { font-weight: 600; }
+.socket-icons { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.gem-art { display: inline-block; position: relative; width: 58px; height: 58px; flex: 0 0 auto; color: var(--gem-color); }
+.gem-art svg { width: 100%; height: 100%; filter: drop-shadow(0 0 3px var(--gem-quality)); }
+.gem-art b { position: absolute; right: 1px; bottom: 0; color: #fff1c9; background: #182529; border: 1px solid var(--gem-quality); border-radius: 50%; width: 21px; height: 21px; font-size: 12px; display: grid; place-items: center; }
+.gem-art[data-gem-quality="5"] svg,.gem-art[data-gem-quality="6"] svg { filter: drop-shadow(0 0 5px var(--gem-quality)); }
+.socket-icons .gem-art,.socket-empty { width: 34px; height: 34px; }
+.socket-icons .gem-art b { width: 16px; height: 16px; font-size: 10px; }
+.socket-empty { display: inline-grid; place-items: center; color: #a9c4bc; border: 1px dashed #9cae9280; border-radius: 7px; background: #142724; font-size: 22px; flex: 0 0 auto; }
+.socket-empty.sealed { color: #a3aaa4; font-size: 17px; }
+.gem-bag,.gem-realms { display: grid; gap: 10px; margin-top: 14px; }
+.gem-card,.gem-realm,.socket-row { display: flex; align-items: flex-start; gap: 12px; background: linear-gradient(135deg,#283b37,#152326); border: 1px solid #657d6752; border-left: 3px solid var(--rarity-color,#ab9b67); padding: 12px; border-radius: 8px; text-align: left; }
+.gem-card > div,.gem-realm > div,.socket-row > div { min-width: 0; flex: 1; }
+.gem-card b,.gem-realm b,.socket-row b { display: block; color: var(--rarity-color,#eddbb0); line-height: 1.5; font-size: 14px; }
+.gem-card small,.gem-realm small,.socket-row small { display: block; color: #b7ccbd; font-size: 12px; line-height: 1.5; }
+.gem-card p,.gem-realm p,.socket-row p { font-size: 12px; line-height: 1.7; color: #e0e9d5; margin: 7px 0; }
+.socket-row { margin: 12px 0; }
+.socket-row select { width: 100%; min-width: 0; margin: 6px 0; font-size: 12px; padding: 7px; }
+.socket-row label { color: #c9d9c6; font-size: 12px; }
+.passive-section { margin-top: 20px; padding-top: 10px; border-top: 1px solid #c3b77955; }
+.passive-section h3 { color: #e8dba1; font-family: var(--display-font,serif); }
+.passive-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px; margin: 10px 0; border: 1px solid #516a574d; border-radius: 8px; background: #20342e; }
+.passive-card.learned { border-color: #9dbe825f; background: linear-gradient(135deg,#305141,#1d302c); }
+.passive-glyph { display: grid; place-items: center; flex: 0 0 42px; height: 42px; font-size: 25px; border: 1px solid #c7be835c; border-radius: 50%; color: #decc86; background: #142720; }
+.passive-card > div { min-width: 0; flex: 1; }
+.passive-card b,.passive-card small { display: block; line-height: 1.6; font-size: 13px; }
+.passive-card small { color: #bdd4bf; font-size: 12px; }
+.passive-card p { line-height: 1.7; margin: 6px 0; font-size: 12px; color: #d9e3c7; }
+@media (max-width: 380px) { .gem-card,.gem-realm,.socket-row { gap: 8px; padding: 9px; } .gem-art { width: 46px; height: 46px; } .enhancement-line { font-size: 11px; } }

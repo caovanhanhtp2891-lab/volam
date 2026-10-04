@@ -36,9 +36,9 @@ const forge = async p=>{await click(p,'[data-idle-tab="char"]');await click(p,'[
   const ownership=s=>JSON.stringify([s.player.equipment,s.player.inventory,s.player.pendingItems,s.groundLoot]);const migrated=ownership(original);
   await click(p,'#load-btn');await step(p);assert.equal(ownership(await save(p)),migrated,'repeated loading does not multiply upgraded items');
   await p.reload({waitUntil:'networkidle'});await step(p);assert.equal(ownership(await save(p)),migrated,'reload keeps every storage location');
-  await forge(p);assert.match(await p.locator('[data-confirm-enhance]').textContent(),/\+11/);await close(p);
+  await forge(p);assert.match(await p.locator('[data-confirm-enhance]').textContent(),/\+10 tối đa/);assert.equal(await p.locator('[data-confirm-enhance]').isDisabled(),true);await close(p);
   // Use canonical gear to test all 100 actual button transactions, including affix unlocks.
-  await seed(p,s=>{s.player.equipment.weapon={...s.player.equipment.weapon,enhance:0};s.player.inventory=[];s.player.pendingItems=[];s.groundLoot=[];});await p.evaluate(()=>window.roll=0);await forge(p);
+  await seed(p,s=>{s.player.equipment.weapon={...s.player.equipment.weapon,enhance:0,level:160,rarity:"Thần Thoại",color:"#ff405d"};s.player.inventory=[];s.player.pendingItems=[];s.groundLoot=[];});await p.evaluate(()=>window.roll=0);await forge(p);
   let previous=await save(p);
   for(let rank=0;rank<100;rank++){
    const item=previous.player.equipment.weapon,info=enhancementInfo(item);assert.equal(item.enhance,rank);assert.equal(await p.locator('[data-confirm-enhance]').isDisabled(),false);
@@ -74,8 +74,8 @@ const forge = async p=>{await click(p,'[data-idle-tab="char"]');await click(p,'[
   // Energy allocation contributes to the displayed linear power as well as MP.
   await seed(p,s=>{s.player.idle.inTown=true;s.player.botSettings.enabled=false});const base=await power(p);await seed(p,s=>{s.player.idle.attributes.energy+=10});assert.ok(await power(p)>base);
   await click(p,'[data-idle-tab="char"]');await click(p,'#realm-guide-btn');assert.equal(await p.locator('.realm-table tbody tr').count(),23);assert.match(await p.locator('.realm-table').textContent(),/12\.000\.000/);await close(p);
-  await seed(p,s=>{s.player.equipment.weapon=migrateEquipmentBalance({...original.player.equipment.weapon,enhance:99});s.player.gold=1000000000;s.player.refiningStones=1000;});
+  await seed(p,s=>{s.player.equipment.weapon=migrateEquipmentBalance({...original.player.equipment.weapon,enhance:99,level:160,rarity:"Thần Thoại",color:"#ff405d"});s.player.gold=1000000000;s.player.refiningStones=1000;});
   for(const [width,height]of[[320,568],[390,844],[844,390],[1440,900]]){await p.setViewportSize({width,height});await forge(p);assert.ok(await p.locator('.utility-dialog').evaluate(e=>e.scrollWidth<=e.clientWidth+1));assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await close(p)}
-  assert.deepEqual(errors,[]);console.log('PASS: all gear storage locations migrate once; +10 continues to +100; 100 actual successes and exact power previews; +99 failure/stale click/material limits/save reload; enemy/boss/PK red, neutral amber, teammates green; linear realms and MP points; four viewport layouts.');
+  assert.deepEqual(errors,[]);console.log('PASS: all gear storage locations migrate once; red high-grade gear continues to +100; 100 actual successes and exact power previews; +99 failure/stale click/material limits/save reload; enemy/boss/PK red, neutral amber, teammates green; linear realms and MP points; four viewport layouts.');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

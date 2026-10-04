@@ -35,7 +35,7 @@ async function aim(page, point) {
       window.cancelAnimationFrame = id => frames.delete(id);
       window.advanceGame = ms => { while (ms > 0) { const dt = Math.min(25, ms); time += dt; ms -= dt; const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(cb => cb(time)); } };
       window.statusDraws = { fire: 0, acid: 0 };
-      const test = document.createElement("canvas").getContext("2d"); test.fillStyle = "#ff792db5"; const burnInk = test.fillStyle;
+      const test = document.createElement("canvas").getContext("2d"); test.fillStyle = "#ff792de5"; const burnInk = test.fillStyle;
       const p = CanvasRenderingContext2D.prototype, clear = p.clearRect, translate = p.translate, fill = p.fill, stroke = p.stroke;
       p.clearRect = function (...args) { if (this.canvas.id === "game-canvas") this.nextCamera = true; return clear.apply(this, args); };
       p.translate = function (x, y) { if (this.nextCamera) { window.camera = { x: -x, y: -y }; this.nextCamera = false; } return translate.call(this, x, y); };
@@ -46,7 +46,7 @@ async function aim(page, point) {
     page.on("pageerror", error => errors.push(error.message));
     page.on("response", response => { if (response.status() >= 400 && response.url().startsWith(url)) errors.push(`${response.status()} ${response.url()}`); });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.25.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.26.0");
     await click(page, '[data-faction="gaibang"]'); await click(page, "#join-sect"); await step(page);
 
     await seed(page, data => { Object.assign(data.player, { level: 30, attack: 220, defense: 90 }); Object.assign(data.player.idle, { inTown: true, enabled: false, autoSkills: false, autoEquip: false, autoLoot: false }); });

@@ -43,7 +43,7 @@ test('old gear is rebalanced once without rerolling or losing identity, affixes,
 });
 
 test('all 100 upgrade steps cost resources exactly once and have a strictly decreasing success rate',()=>{
-  const gear=piece(),owner={gold:1e9,refiningStones:1e6};let previousChance=Infinity;
+  const gear=piece({rarity:"Thần Thoại",level:160}),owner={gold:1e9,refiningStones:1e6};let previousChance=Infinity;
   for(let rank=0;rank<MAX_ENHANCEMENT;rank++){
     const info=enhancementInfo(gear),before=structuredClone(owner),stats=gearStats(gear);
     assert.equal(info.capped,false);assert.ok(info.chance<previousChance);previousChance=info.chance;
@@ -57,7 +57,7 @@ test('all 100 upgrade steps cost resources exactly once and have a strictly decr
 });
 
 test('failure at +99 keeps every stat and affix; insufficient high-rank materials never charge',()=>{
-  const gear=piece({enhance:99}),info=enhancementInfo(gear),owner={gold:info.cost*2,refiningStones:20};const before=JSON.stringify(gear);
+  const gear=piece({enhance:99,rarity:"Thần Thoại",level:160}),info=enhancementInfo(gear),owner={gold:info.cost*2,refiningStones:20};const before=JSON.stringify(gear);
   assert.equal(attemptEnhancement(gear,owner,()=>.99),'failed');assert.equal(JSON.stringify(gear),before);
   assert.equal(owner.gold,info.cost);assert.equal(owner.refiningStones,10);
   owner.refiningStones=9;const poor=JSON.stringify(owner);assert.equal(attemptEnhancement(gear,owner,()=>{throw Error('must not roll')}),'poor');assert.equal(JSON.stringify(owner),poor);

@@ -1,3 +1,4 @@
+import { drawImpactBloom } from "./skill-radiance.ts";
 import { drawElementalMotion, elementalMotionKind } from "./elemental-motion.ts";
 import type { EffectMotif, SectId, SkillKey, SkillDefinition } from "./sects.ts";
 import { SKILL_PALETTES, SECT_SIGILS, type SkillPalette } from "./skill-art.ts";
@@ -18,6 +19,7 @@ const ring = (c: CanvasRenderingContext2D, r: number) => { c.beginPath(); c.arc(
 const segment = (c: CanvasRenderingContext2D, a: number, b: number, x: number, y: number) => { c.moveTo(a, b); c.lineTo(x, y); };
 // Saturated body with a narrow, hot core, sharing the same path.
 function ink(c: CanvasRenderingContext2D, palette: SkillPalette, width = 5, accent = false): void {
+  c.strokeStyle = palette.dark; c.lineWidth = width + 2.2; c.stroke();
   c.strokeStyle = accent ? palette.accent : palette.color; c.lineWidth = width; c.stroke();
   c.strokeStyle = palette.light; c.lineWidth = Math.max(.8, width * .23); c.stroke();
 }
@@ -110,6 +112,7 @@ export function drawSkillImpact(c: CanvasRenderingContext2D, effect: SectEffect,
   const p = Math.max(0, Math.min(1, progress));
   if (!effect.sect || p <= 0 || p >= 1) return;
   const palette = SKILL_PALETTES[effect.sect], full = effect.quality !== "simple";
+  drawImpactBloom(c, effect.x, effect.y, effect.radius * 1.18, p, palette, effect.sect, effect.quality === "simple");
   if (effect.sect === "thuy-yen") return drawIceExplosion(c, effect.x, effect.y, effect.radius, p, !full);
   const r = Math.max(8, Math.min(62, effect.radius)) * (.35 + .65 * Math.sqrt(p));
   const count = full ? effect.skill === "ultimate" ? 8 : 6 : 3;
@@ -399,19 +402,26 @@ export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; 
   const point = (p: number) => skillFlightPoint(from, to, p, sect);
   const at = point(t), tangent = point(Math.max(0, t - .025));
   c.save(); c.lineCap = "round"; c.lineJoin = "round";
-  c.beginPath();
-  for (let i = 0; i <= 6; i++) {
-    const pos = point(Math.max(0, t - (1 - i / 6) * .22));
-    if (i === 0) c.moveTo(pos.x, pos.y); else c.lineTo(pos.x, pos.y);
+  const steps = quality === "full" ? 10 : 5;
+  for (let i = 0; i < steps; i++) {
+    const a = point(Math.max(0, t - (1 - i / steps) * .26)), b = point(Math.max(0, t - (1 - (i + 1) / steps) * .26));
+    const strength = (i + 1) / steps;
+    c.globalAlpha = strength * .85;
+    c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+    c.strokeStyle = palette.dark; c.lineWidth = (key === "ultimate" ? 12 : 8) * strength + 2; c.stroke();
+    c.strokeStyle = palette.color; c.lineWidth = (key === "ultimate" ? 10 : 6) * strength; c.stroke();
+    c.strokeStyle = palette.light; c.lineWidth = 1 + strength; c.stroke();
+    if (quality === "full" && i % 2 === 0) {
+      const offset = Math.sin(now / 95 + i * 2.1) * (3 + strength * 3);
+      c.fillStyle = palette.accent; c.beginPath(); c.arc(a.x, a.y + offset, 1.6 + strength, 0, TAU); c.fill();
+    }
   }
-  c.strokeStyle = palette.color + "80"; c.lineWidth = key === "ultimate" ? 7 : 4; c.stroke();
-  if (quality === "full") { c.strokeStyle = palette.light + "a0"; c.lineWidth = 1.2; c.stroke(); }
   c.restore();
   drawSectProjectile(c, at.x, at.y, Math.atan2(at.y - tangent.y, at.x - tangent.x), sect, key, now, quality);
 }
 
 export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
-  const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 18 : 12;
+  const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 24 : 16;
   c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
   if (sect === "thuy-yen") { drawIceMissile(c, r, now, !full); c.restore(); return; }
   drawElementalMotion(c, elementalMotionKind(sect), r * 1.15, now, palette.color, palette.light, !full);

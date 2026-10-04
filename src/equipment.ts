@@ -3,26 +3,10 @@ import { gearTrait, setBonuses, type GearVariant, type GearIdentity, type SetId 
 import { STAT_LABELS, PERCENT_STATS, emptyStats, secondaryScore, type GearStat, type GearStats } from "./gear-stats.ts";
 export { STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife } from "./gear-stats.ts";
 export type { GearStat, GearStats } from "./gear-stats.ts";
-export const RARITIES = [
-  "Thường",
-  "Tốt",
-  "Hiếm",
-  "Cực phẩm",
-  "Hoàng Kim",
-  "Truyền Thuyết",
-  "Thần Thoại",
-] as const;
-export type Rarity = (typeof RARITIES)[number];
-export const RARITY_COLORS: Record<Rarity, string> = {
-  Thường: "#e3e8ec",
-  Tốt: "#73d19b",
-  Hiếm: "#64b5f6",
-  "Cực phẩm": "#cf91ff",
-  "Hoàng Kim": "#ffd35a",
-  "Truyền Thuyết": "#ff963f",
-  "Thần Thoại": "#ff405d",
-};
-export const RARITY_NAMES = ["Trắng", "Lục", "Lam", "Tím", "Vàng", "Cam", "Đỏ"] as const;
+import { RARITIES, RARITY_COLORS, type Rarity } from "./rarity.ts";
+export { RARITIES, RARITY_COLORS, RARITY_NAMES } from "./rarity.ts";
+export type { Rarity } from "./rarity.ts";
+import { socketStats, socketCount, type GemSpec } from "./gems.ts";
 // One roll per drop. Red is the rarest and only enters the pool at level 101.
 export function rollEquipmentRarity(level: number, kind: "normal" | "elite" | "boss" = "normal", random = Math.random): Rarity {
   const roll = random();
@@ -50,6 +34,7 @@ export interface EquipmentData extends GearIdentity {
   enhance: number;
   bonuses?: Partial<GearStats>;
   balanceVersion?: number;
+  gems?: (GemSpec | null)[];
 }
 export function rarityTier(rarity?: string): number {
   return Math.max(0, RARITIES.indexOf(rarity as Rarity));
@@ -88,6 +73,21 @@ const statBase = (level: number, key: GearStat): number => ({
   damageReduction: 1 + level / 120, dodge: 1 + level / 160, hpRegen: 1 + level / 20, mpRegen: 1 + level / 60,
 })[key];
 export const MAX_ENHANCEMENT = 100;
+export const ENHANCEMENT_CAPS = [10, 20, 30, 40, 60, 80, 100] as const;
+export function enhancementCap(item: Pick<EquipmentData, "rarity" | "level">): number {
+  return Math.min(ENHANCEMENT_CAPS[rarityTier(item.rarity)], Math.max(10, Math.min(100, Math.ceil(item.level / 10) * 10)));
+}
+// Threshold lines also exist on red equipment that already rolled all 14 stats.
+// Values are deterministic; previews, reloads and failures cannot reroll them.
+export function enhancementMilestones(item: EquipmentData) {
+  const keys: readonly GearStat[] = ["attack", "hp", "defense", "mp", "armorPen", "critDamage", "lifeSteal", "damageReduction", "hpRegen", "crit"];
+  const offset = item.slot === "weapon" ? 0 : ["armor", "helmet", "boots", "belt", "necklace", "ring", "ring2", "bracelet", "pendant", "horse"].indexOf(item.slot) + 1;
+  return Array.from({ length: Math.floor(Math.max(enhancementCap(item), item.enhance) / 10) }, (_, i) => {
+    const threshold = (i + 1) * 10, key = keys[(i + offset) % keys.length];
+    const value = Math.max(1, Math.floor(statBase(item.level, key) * rarityStatStrength(item.rarity, key) * (.6 + threshold / 100)));
+    return { threshold, key, value, active: item.enhance >= threshold };
+  });
+}
 export function enhancementMultiplier(enhance: number, key: GearStat): number {
   const rank = Math.max(0, Math.min(MAX_ENHANCEMENT, Math.floor(enhance)));
   return 1 + (key === "speed" ? rank * .002 + rank ** 2 * .00001
@@ -112,12 +112,18 @@ export function gearStats(item: EquipmentData): GearStats {
       : 0);
   for (const key of Object.keys(stats) as GearStat[])
     stats[key] += Math.ceil(((item.bonuses?.[key] ?? 0) + (affixes[key] ?? 0)) * enhancementMultiplier(rank, key));
+  for (const line of enhancementMilestones(item)) if (line.active) stats[line.key] += line.value;
+  const gems = socketStats(item);
+  for (const key of Object.keys(stats) as GearStat[]) stats[key] += gems[key];
   return stats;
 }
 export function enhancementInfo(item: EquipmentData) {
   const rank = Math.max(0, Math.min(MAX_ENHANCEMENT, item.enhance));
   return {
-    capped: rank >= MAX_ENHANCEMENT,
+    cap: enhancementCap(item),
+    sockets: socketCount(item),
+    legacy: rank > enhancementCap(item),
+    capped: rank >= enhancementCap(item),
     cost: 45 + rank * 35 + rank ** 2 * 8,
     stones: 1 + Math.floor(rank / 10),
     chance: .015 + .985 * (1 - Math.min(99, rank) / 99) ** 2.2,
@@ -312,6 +318,7 @@ export function discardCandidates<T extends EquipmentData>(
       !item.setId &&
       rarityTier(item.rarity) < rarityTier("Hoàng Kim") &&
       item.enhance === 0 &&
+      !item.gems?.some(Boolean) &&
       rarityTier(item.rarity) <= filter.maxRarity &&
       item.level <= filter.maxLevel &&
       (!filter.weakerOnly ||

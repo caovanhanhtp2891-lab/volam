@@ -1,3 +1,4 @@
+import { drawSceneryTemple } from "./landscape-art";
 import { createTerrainArt } from "./map-art";
 import {
   EXPLORATION_WIDTH,
@@ -56,34 +57,7 @@ export function createExplorationArt(region: number): HTMLCanvasElement {
     c.setLineDash([]);
     const x = z.x - 360,
       y = z.y - 310;
-    c.fillStyle = "#3b4138";
-    c.fillRect(x - 65, y, 130, 95);
-    c.fillStyle = i === 3 ? "#633e36" : "#705b40";
-    c.fillRect(x - 52, y + 8, 104, 80);
-    c.fillStyle = "#b59c6c";
-    c.fillRect(x - 60, y - 8, 120, 12);
-    c.fillStyle = i === 3 ? "#934b43" : "#627967";
-    c.beginPath();
-    c.moveTo(x - 90, y - 8);
-    c.lineTo(x, y - 66);
-    c.lineTo(x + 90, y - 8);
-    c.closePath();
-    c.fill();
-    c.strokeStyle = "#d2b87f";
-    c.lineWidth = 3;
-    c.stroke();
-    c.fillStyle = "#262c24";
-    c.fillRect(x - 20, y + 38, 40, 57);
-    for (const side of [-1, 1]) {
-      c.fillStyle = "#c8b383";
-      c.fillRect(x + side * 75, y + 10, 5, 75);
-      c.fillStyle = i === 3 ? "#ad5249" : "#528c77";
-      c.beginPath();
-      c.moveTo(x + side * 75 + 5, y + 10);
-      c.lineTo(x + side * 75 + 55, y + 20);
-      c.lineTo(x + side * 75 + 5, y + 47);
-      c.fill();
-    }
+    drawSceneryTemple(c, x, y + 85, .9, region);
     c.fillStyle = "#15201bbd";
     c.fillRect(z.x - 190, z.y + 300, 380, 58);
     c.strokeStyle = "#af9b69";
