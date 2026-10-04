@@ -1,5 +1,5 @@
 import type { EquipmentData } from "./equipment";
-import { rarityTier, RARITY_COLORS } from "./equipment.ts";
+import { rarityTier, RARITY_COLORS, MAX_ENHANCEMENT } from "./equipment.ts";
 import type { Element } from "./idle";
 import { GEAR_SETS, type SetId } from "./gear-catalog.ts";
 import { drawSetCrest } from "./set-art.ts";
@@ -16,10 +16,10 @@ export function equipmentVisualState(
   simple = false,
 ) {
   const tier = rarityTier(item.rarity),
-    enhance = Math.max(0, Math.min(10, item.enhance ?? 0));
+    enhance = Math.max(0, Math.min(MAX_ENHANCEMENT, item.enhance ?? 0));
   const band = Math.max(
     [0, 0, 1, 1, 2, 3, 4][tier],
-    enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
+    enhance >= 100 ? 6 : enhance >= 60 ? 5 : enhance >= 30 ? 4 : enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
   );
   return {
     tier,
@@ -30,7 +30,7 @@ export function equipmentVisualState(
       ? 0
       : Math.max(
           [0, 0, 2, 3, 4, 6, 8][tier],
-          enhance >= 10 ? 6 : enhance >= 7 ? 4 : 0,
+          enhance >= 100 ? 12 : enhance >= 60 ? 10 : enhance >= 30 ? 8 : enhance >= 10 ? 6 : enhance >= 7 ? 4 : 0,
         ),
     beam: [0, 36, 70, 98, 125, 155, 190][tier],
   };

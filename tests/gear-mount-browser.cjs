@@ -87,7 +87,7 @@ async function move(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.23.0",
+      "0.24.0",
     );
     await page.locator("#hero-name-input").fill("Kim Phong Kỵ Sĩ");
     await page.locator('[data-faction="shaolin"]').click();

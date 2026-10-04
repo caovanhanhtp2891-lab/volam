@@ -1,37 +1,37 @@
 export const REALMS = [
   { name: "Phàm Nhân", minPower: 0, color: "#c6b897", accent: "#e3d8bc" },
-  { name: "Luyện Thể", minPower: 100_000, color: "#9bdd98", accent: "#e0ffd7" },
-  { name: "Luyện Khí", minPower: 1_000_000, color: "#62dedb", accent: "#d8fffa" },
-  { name: "Trúc Cơ", minPower: 3_000_000, color: "#61eba8", accent: "#e5ffc4" },
-  { name: "Kim Đan", minPower: 8_000_000, color: "#ffcf58", accent: "#fff4bd" },
-  { name: "Nguyên Anh", minPower: 20_000_000, color: "#ffab78", accent: "#fff0d1" },
-  { name: "Hóa Thần", minPower: 50_000_000, color: "#67cfff", accent: "#d7f4ff" },
-  { name: "Luyện Hư", minPower: 100_000_000, color: "#b9a1ff", accent: "#ece4ff" },
-  { name: "Hợp Thể", minPower: 200_000_000, color: "#52eed1", accent: "#d7fff4" },
-  { name: "Đại Thừa", minPower: 400_000_000, color: "#f197e8", accent: "#ffe3f8" },
-  { name: "Độ Kiếp", minPower: 700_000_000, color: "#a78aff", accent: "#e0f7ff" },
-  { name: "Chân Tiên", minPower: 1_000_000_000, color: "#8fdcff", accent: "#f0fdff" },
-  { name: "Thiên Tiên", minPower: 1_500_000_000, color: "#82f3e7", accent: "#fff4ca" },
-  { name: "Huyền Tiên", minPower: 2_200_000_000, color: "#ae96ff", accent: "#f4e2ff" },
-  { name: "Kim Tiên", minPower: 3_000_000_000, color: "#ffd66c", accent: "#fff8df" },
+  { name: "Luyện Thể", minPower: 2_000, color: "#9bdd98", accent: "#e0ffd7" },
+  { name: "Luyện Khí", minPower: 5_000, color: "#62dedb", accent: "#d8fffa" },
+  { name: "Trúc Cơ", minPower: 10_000, color: "#61eba8", accent: "#e5ffc4" },
+  { name: "Kim Đan", minPower: 20_000, color: "#ffcf58", accent: "#fff4bd" },
+  { name: "Nguyên Anh", minPower: 35_000, color: "#ffab78", accent: "#fff0d1" },
+  { name: "Hóa Thần", minPower: 60_000, color: "#67cfff", accent: "#d7f4ff" },
+  { name: "Luyện Hư", minPower: 100_000, color: "#b9a1ff", accent: "#ece4ff" },
+  { name: "Hợp Thể", minPower: 160_000, color: "#52eed1", accent: "#d7fff4" },
+  { name: "Đại Thừa", minPower: 250_000, color: "#f197e8", accent: "#ffe3f8" },
+  { name: "Độ Kiếp", minPower: 380_000, color: "#a78aff", accent: "#e0f7ff" },
+  { name: "Chân Tiên", minPower: 550_000, color: "#8fdcff", accent: "#f0fdff" },
+  { name: "Thiên Tiên", minPower: 800_000, color: "#82f3e7", accent: "#fff4ca" },
+  { name: "Huyền Tiên", minPower: 1_150_000, color: "#ae96ff", accent: "#f4e2ff" },
+  { name: "Kim Tiên", minPower: 1_600_000, color: "#ffd66c", accent: "#fff8df" },
   {
     name: "Thái Ất Kim Tiên",
-    minPower: 4_200_000_000,
+    minPower: 2_200_000,
     color: "#ffc381",
     accent: "#fff0a3",
   },
   {
     name: "Đại La Kim Tiên",
-    minPower: 5_600_000_000,
+    minPower: 3_000_000,
     color: "#ffdf8f",
     accent: "#ffb9df",
   },
-  { name: "Tiên Vương", minPower: 7_200_000_000, color: "#ca9aff", accent: "#ffdf92" },
-  { name: "Tiên Đế", minPower: 8_800_000_000, color: "#ffd277", accent: "#ffa9cb" },
-  { name: "Đạo Tổ", minPower: 10_000_000_000, color: "#fff2bb", accent: "#85eaff" },
-  { name: "Hỗn Nguyên", minPower: 12_000_000_000, color: "#9ff4e6", accent: "#f9d6ff" },
-  { name: "Hồng Mông", minPower: 14_500_000_000, color: "#e7abff", accent: "#fff2bc" },
-  { name: "Vô Cực", minPower: 17_500_000_000, color: "#ffffff", accent: "#9fdcff" },
+  { name: "Tiên Vương", minPower: 4_000_000, color: "#ca9aff", accent: "#ffdf92" },
+  { name: "Tiên Đế", minPower: 5_200_000, color: "#ffd277", accent: "#ffa9cb" },
+  { name: "Đạo Tổ", minPower: 6_500_000, color: "#fff2bb", accent: "#85eaff" },
+  { name: "Hỗn Nguyên", minPower: 8_000_000, color: "#9ff4e6", accent: "#f9d6ff" },
+  { name: "Hồng Mông", minPower: 9_800_000, color: "#e7abff", accent: "#fff2bc" },
+  { name: "Vô Cực", minPower: 12_000_000, color: "#ffffff", accent: "#9fdcff" },
 ] as const;
 
 export const REALM_PHASES = [
@@ -55,14 +55,13 @@ export interface Cultivation {
 }
 
 const positive = (value: number) =>
-  Number.isFinite(value) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER / 100, value)) : 0;
+  Number.isFinite(value) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER / 10, value)) : 0;
 export function strengthScore(attack: number, defense: number, maxHp: number, extra = 0): number {
   return positive(attack) * 3 + positive(defense) * 2 + positive(maxHp) * .15 + positive(extra);
 }
 export function powerFromScore(score: number): number {
   const safe = positive(score);
-  if (safe >= Math.cbrt(Number.MAX_SAFE_INTEGER * 1000)) return Number.MAX_SAFE_INTEGER;
-  return Math.floor(safe ** 3 / 1000);
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.floor(safe * 10));
 }
 export function combatPower(
   attack: number,

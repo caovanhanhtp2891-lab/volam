@@ -11,53 +11,51 @@ test("twenty-three realms cover every boundary from mortal to limitless", () => 
     assert.equal(cultivationForPower(REALMS[i].minPower - 1).rank, i - 1);
     assert.equal(cultivationForPower(REALMS[i].minPower).rank, i);
   }
-  assert.equal(REALMS[1].minPower, 100_000);
-  assert.equal(REALMS[2].minPower, 1_000_000);
-  assert.equal(REALMS[19].minPower, 10_000_000_000);
+  assert.equal(REALMS[1].minPower, 2_000);
+  assert.equal(REALMS[2].minPower, 5_000);
+  assert.equal(REALMS[19].minPower, 6_500_000);
 });
 
-test("strength scales to billions while preserving the order of gear and every stat contribution", () => {
+test("strength grows linearly in proportion to stats while preserving the order of gear and every stat contribution", () => {
   const base = combatPower(40, 15, 145);
-  assert.equal(base, 5066);
-  assert.equal(combatPower(240, 15, 145), 459652);
+  assert.equal(base, 1717);
+  assert.equal(combatPower(240, 15, 145), 7717);
   assert.equal(cultivationForPower(base).realm.name, "Phàm Nhân");
-  assert.equal(cultivationForPower(combatPower(240, 15, 145)).realm.name, "Luyện Thể");
+  assert.equal(cultivationForPower(combatPower(240, 15, 145)).realm.name, "Luyện Khí");
   for (const stats of [[41,15,145,0], [40,16,145,0], [40,15,146,0], [40,15,145,1]])
     assert.ok(combatPower(...stats) > base);
   assert.equal(powerFromScore(strengthScore(40,15,145)), base);
-  assert.ok(combatPower(7200,0,0) >= 10_000_000_000, "endgame strength reaches Dao To without multiplying damage");
+  assert.ok(combatPower(220000,0,0) >= 6_500_000, "high enhancement strength can reach Dao To without inflating the power formula");
   assert.equal(cultivationForPower(combatPower(40,15,145)).realm.name, "Phàm Nhân", "removing strong gear lowers the realm");
 });
 
 test("mortal progress and nine layers have exact integer boundaries", () => {
   for (const [power,label] of [
-    [0,"Phàm Nhân"], [99_999,"Phàm Nhân"],
-    [100_000,"Luyện Thể · Tầng 1"], [199_999,"Luyện Thể · Tầng 1"],
-    [200_000,"Luyện Thể · Tầng 2"], [999_999,"Luyện Thể · Tầng 9"],
-    [1_000_000,"Luyện Khí · Tầng 1"], [1_222_222,"Luyện Khí · Tầng 1"],
-    [1_222_223,"Luyện Khí · Tầng 2"], [2_999_999,"Luyện Khí · Tầng 9"],
+    [0,"Phàm Nhân"], [1999,"Phàm Nhân"], [2000,"Luyện Thể · Tầng 1"],
+    [2333,"Luyện Thể · Tầng 1"], [2334,"Luyện Thể · Tầng 2"], [4999,"Luyện Thể · Tầng 9"],
+    [5000,"Luyện Khí · Tầng 1"], [5555,"Luyện Khí · Tầng 1"], [5556,"Luyện Khí · Tầng 2"], [9999,"Luyện Khí · Tầng 9"],
   ]) assert.equal(cultivationForPower(power).label,label);
-  assert.equal(cultivationForPower(50_000).progress,.5);
+  assert.equal(cultivationForPower(1000).progress,.5);
   assert.equal(cultivationForPower(0).nextLabel,"Luyện Thể · Tầng 1");
-  assert.equal(cultivationForPower(1_222_222).nextPower,1_222_223);
-  assert.equal(cultivationForPower(999_999).nextLabel,"Luyện Khí · Tầng 1");
+  assert.equal(cultivationForPower(5555).nextPower,5556);
+  assert.equal(cultivationForPower(4999).nextLabel,"Luyện Khí · Tầng 1");
 });
 
 test("five phases start at Truc Co and reaching the next realm resets the phase", () => {
-  for (const [power,phase] of [[3_000_000,"Sơ kỳ"],[4_000_000,"Trung kỳ"],[5_000_000,"Hậu kỳ"],[6_000_000,"Đỉnh phong"],[7_000_000,"Đại viên mãn"]]) {
+  for (const [power,phase] of [[10_000,"Sơ kỳ"],[12_000,"Trung kỳ"],[14_000,"Hậu kỳ"],[16_000,"Đỉnh phong"],[18_000,"Đại viên mãn"]]) {
     assert.equal(cultivationForPower(power).realm.name,"Trúc Cơ");
     assert.equal(cultivationForPower(power).phase,phase);
     assert.equal(cultivationForPower(power).progress,0);
   }
-  assert.equal(cultivationForPower(7_999_999).nextLabel,"Kim Đan · Sơ kỳ");
-  assert.equal(cultivationForPower(8_000_000).phase,"Sơ kỳ");
-  assert.equal(cultivationForPower(1_000_000_000).realm.name,"Chân Tiên");
-  assert.equal(cultivationForPower(10_000_000_000).label,"Đạo Tổ · Sơ kỳ");
-  assert.equal(cultivationForPower(11_999_999_999).nextLabel,"Hỗn Nguyên · Sơ kỳ");
+  assert.equal(cultivationForPower(19_999).nextLabel,"Kim Đan · Sơ kỳ");
+  assert.equal(cultivationForPower(20_000).phase,"Sơ kỳ");
+  assert.equal(cultivationForPower(550_000).realm.name,"Chân Tiên");
+  assert.equal(cultivationForPower(6_500_000).label,"Đạo Tổ · Sơ kỳ");
+  assert.equal(cultivationForPower(7_999_999).nextLabel,"Hỗn Nguyên · Sơ kỳ");
 });
 
 test("progress always points forward, including realms beyond Dao To and the final phase", () => {
-  const top=cultivationForPower(19_900_000_000);
+  const top=cultivationForPower(13_760_000);
   assert.equal(top.label,"Vô Cực · Đại viên mãn");
   assert.equal(top.nextPower,null); assert.equal(top.nextLabel,null); assert.equal(top.progress,1);
   const samples=[0,Number.MAX_SAFE_INTEGER];

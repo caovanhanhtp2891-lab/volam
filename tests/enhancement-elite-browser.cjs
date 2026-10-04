@@ -9,7 +9,7 @@ async function seed(page, change) {
   await page.evaluate(({ key, value }) => { localStorage.setItem(key, JSON.stringify(value)); document.querySelector("#load-btn").click(); }, { key, value });
 }
 async function time(page, delta) { await page.evaluate(delta => window.__huntNow += delta, delta); await page.waitForTimeout(200); }
-const gear = (id, slot, changes = {}) => ({ id, name: id, slot, power: 10, enhance: 0, level: 5, rarity: "Tốt", color: "#73d19b", icon: "◆", ...changes });
+const gear = (id, slot, changes = {}) => ({ id, name: id, slot, power: 10, enhance: 0, balanceVersion: 2, level: 5, rarity: "Tốt", color: "#73d19b", icon: "◆", ...changes });
 async function clickEnemy(page, enemy) {
   const at = await page.evaluate(enemy => {
     const c = document.querySelector("#game-canvas"), r = c.getBoundingClientRect();
@@ -63,25 +63,25 @@ async function clickEnemy(page, enemy) {
     console.log("PASS bag enhancement contributes only after equipping the item");
 
     await seed(page, s => { s.player.equipment.weapon.enhance = 3; s.player.gold = 1000; s.player.refiningStones = 20; });
-    await page.evaluate(() => window.__roll = .9);
+    await page.evaluate(() => window.__roll = .99);
     await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     const beforeFail = (await save(page)).player; await page.locator('[data-confirm-enhance]').click();
     const failed = (await read(page)).player;
-    assert.equal(failed.equipment.weapon.enhance, 3); assert.equal(failed.gold, 850); assert.equal(failed.refiningStones, 19);
+    assert.equal(failed.equipment.weapon.enhance, 3); assert.equal(failed.gold, 778); assert.equal(failed.refiningStones, 19);
     assert.equal(failed.maxHp, beforeFail.maxHp); assert.equal(failed.maxMp, beforeFail.maxMp); assert.equal(failed.speed, beforeFail.speed);
     await page.locator("#utility-close").click();
     for (const mode of ["poor", "capped"]) {
-      await seed(page, s => { s.player.equipment.weapon.enhance = mode === "capped" ? 10 : 0; s.player.gold = mode === "poor" ? 0 : 1000; });
+      await seed(page, s => { s.player.equipment.weapon.enhance = mode === "capped" ? 100 : 0; s.player.gold = mode === "poor" ? 0 : 1000; });
       await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click(); assert.equal(await page.locator('[data-confirm-enhance]').isDisabled(), true); await page.locator("#utility-close").click();
     }
-    console.log("PASS failed, insufficient-material and +10 limit attempts keep stats and charge only valid attempts");
+    console.log("PASS failed, insufficient-material and +100 limit attempts keep stats and charge only valid attempts");
 
     await seed(page, s => {
       const p = s.player; p.idle.enabled = false; p.idle.inTown = false; p.idle.autoSkills = false; p.idle.autoLoot = false; p.idle.autoPotions = false;
       p.level = 5; p.attack = 10000; p.defense = 10000; p.x = 560; p.y = 330; p.equipment = {}; p.xp = 0;
       p.eliteHunt = { normalKills: 19, spawned: 0 }; s.campfires = []; delete s.wildElite; s.groundLoot = [];
     });
-    await page.locator('[data-idle-tab="log"]').click(); await page.waitForTimeout(300);
+    await page.locator('[data-idle-tab="log"]').click(); await page.locator('#world-panel-close').click(); await page.waitForTimeout(300);
     await clickEnemy(page, (await save(page)).enemies.find(e => e.id === "bandit-1"));
     await page.locator('[data-basic-attack]').click();
     await page.waitForFunction(key => Boolean(JSON.parse(localStorage.getItem(key)).wildElite), key, { timeout: 6000 });

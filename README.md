@@ -2,6 +2,16 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Thần binh · Bách luyện · v0.24.0
+
+- Thanh máu **quái, boss và BOT đồ sát màu đỏ**; đồng đội/trợ chiến màu xanh, BOT trung lập màu vàng. Trạng thái thù địch ưu tiên hơn trạng thái đồng đội. Thanh máu nhân vật của mình giữ màu xanh.
+- **Lực chiến** tính tuyến tính từ chỉ số thực tế, gồm nội lực cơ bản và tiềm năng thân pháp; chỉ tính chí mạng tới giới hạn sử dụng được. Bỏ công thức lập phương gây số quá lớn. Điều chỉnh đủ 23 cảnh giới: Luyện Thể từ 2.000, Luyện Khí 5.000, Chân Tiên 550.000, Đạo Tổ 6.500.000, Vô Cực 12.000.000. Cảnh giới hiển thị được tính lại theo lực chiến mới; cấp độ, tiềm năng, bạc và tiến trình vẫn giữ.
+- **Cường hóa tối đa +100**. Tỷ lệ giảm liên tục: +1 là 100%, +10 khoảng 81,37%, +50 khoảng 23,42%, +100 là 1,5%. Chi phí bạc tăng theo bậc, đá tăng từ 1 lên 10 mỗi lần. Thất bại vẫn giữ bậc và chỉ số. Chỉ số công/phòng/máu/nội lực tăng mạnh theo bậc; hệ số ở +100 là 13 lần, phần trăm và tốc độ tăng nhẹ hơn. Mỗi mốc +10 mở thêm một dòng còn thiếu, tới tối đa 14 loại dòng phụ. Bảng cường hóa cho xem trước chỉ số, lực chiến, bạc và đá; đạt +100 khóa thao tác.
+- Khoảng cách **bảy phẩm chất** rõ hơn: hệ số chỉ số chính lần lượt **1 / 1,4 / 2 / 3 / 4,5 / 6,8 / 10**, với **2 / 3 / 5 / 7 / 10 / 12 / 14** dòng phụ khi tạo đồ. Các dòng phần trăm và tốc độ dùng hệ số riêng để tránh tăng quá mức. Đồ cũ được cập nhật đúng một lần ở cả đồ đang mặc, túi, đồ chờ nhận và đồ dưới đất; giữ ID, bộ đồ, mẫu đồ, các dòng đã có và bậc cường hóa. Tải lại hoặc nhập lại bản lưu đã cập nhật không tăng chỉ số lần nữa.
+- Biểu tượng và vòng sáng có thêm mốc **+30, +60, +100**, cùng tên hiệu ứng Long Tinh từ +90; +100 dùng hiệu ứng Cực Quang Thiên Ấn. Chế độ Gọn và giảm chuyển động vẫn áp dụng.
+
+Kiểm tra: 206 unit tests, typecheck và build `--base=/volam/`. `tests/balance-enhancement-browser.cjs` thực hiện đủ 100 lần cường hóa qua giao diện, đối chiếu dự đoán lực chiến với kết quả ở từng bậc, kiểm tra thất bại/thiếu đá/đạt trần, lưu-tải bốn nơi chứa đồ, màu máu và màn hình 320–1440px. Kiểm tra hồi quy bằng các bài trình duyệt HUD, cảnh giới, nhặt đồ/BOT/công thành và cường hóa/tinh anh/lửa trại.
+
 ## Hoạt động · Thanh sắc · v0.23.0
 
 - Tab **Giang hồ** đổi thành **Hoạt động**, mở danh sách ngay bằng một lần chạm từ mọi tab. Giao diện chia nhóm Chinh phục, Du ngoạn và Vui chơi, với biểu tượng/màu riêng: Phụ bản, Leo tháp, Công thành chiến, Tranh đoạt lãnh thổ, Khám phá, Đồng hành BOT, Sổ quái, Quay thưởng, Tài xỉu và Xổ số. Quay thưởng/Tài xỉu/Xổ số mở thẳng trò đã chọn. Săn boss, luyện công, nhiệm vụ và quà cũng nằm trong Hoạt động; đóng bảng để trở lại sân đấu.
@@ -247,7 +257,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Cài đặt** hiển thị bản **v0.23.0 · Hoạt động · Thanh sắc** để xác định bản đang tải.
+- Tab **Cài đặt** hiển thị bản **v0.24.0 · Thần binh · Bách luyện** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 

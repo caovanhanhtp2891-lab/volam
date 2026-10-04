@@ -43,13 +43,13 @@ test("SVG paints stay local to their icon, unsafe colors cannot become markup, o
   const a = equipmentMarkup("weapon", "#ffd35a", "Hoàng Kim", "", {
     variant: "axe",
     level: 160,
-    enhance: 10,
+    enhance: 100,
     element: "hoa",
   });
   const b = equipmentMarkup("weapon", "#ffd35a", "Hoàng Kim", "", {
     variant: "axe",
     level: 160,
-    enhance: 10,
+    enhance: 100,
     element: "hoa",
   });
   const ids = (markup) =>

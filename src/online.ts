@@ -15,6 +15,10 @@ export interface OnlineSnapshot {
     x: number;
     y: number;
     level: number;
+    hostile?: boolean;
+    teammate?: boolean;
+    hp?: number;
+    maxHp?: number;
   }>;
 }
 

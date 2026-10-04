@@ -336,7 +336,7 @@ h3 small {
   background: linear-gradient(#5e9ac7, #234f86);
 }
 .enemy-meter > span {
-  background: #bc5140;
+  background: #ef5360;
 }
 .canvas-frame {
   position: relative;
@@ -2946,7 +2946,7 @@ h2 {
   margin: 8px 0 0;
 }
 .siege-hud .meter span {
-  background: linear-gradient(90deg, #c46e51, #efb765);
+  background: linear-gradient(90deg, #ab273e, #ef5360);
 }
 .siege-orders {
   gap: 4px;
@@ -3088,3 +3088,11 @@ h2 {
 @keyframes prestige-ink { 50% { color: var(--prestige-accent, #fff0bf); text-shadow: 0 1px 2px #081016, 0 0 4px var(--prestige-color); } }
 @media (prefers-reduced-motion: reduce) { .prestige-badge { animation: none !important; } }
 [data-effects="simple"] .prestige-badge { animation: none; }
+
+/* High enhancement uses the same quality color with denser forge runes. */
+.gear-art.enhanced-3 .gear-high-forge { transform-origin: 32px 32px; animation: gear-enchant 8s linear infinite; }
+.gear-art.enhanced-4 { filter: drop-shadow(0 0 4px var(--gear-color)); }
+.gear-art.enhanced-4 .gear-high-forge { transform-origin: 32px 32px; animation: gear-enchant 6s linear infinite; }
+.gear-art.enhanced-max .gear-high-forge { stroke: #fff0c4; }
+@media (prefers-reduced-motion: reduce) { .gear-high-forge { animation: none !important; } }
+[data-effects="simple"] .gear-high-forge { animation: none; }

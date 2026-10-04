@@ -42,7 +42,7 @@ export function stolenLife(damage: number, remainingHp: number, stats: Partial<G
 }
 export function secondaryScore(stats: GearStats): number {
   const mods = combatModifiers(stats);
-  return stats.mp * .1 + stats.crit * 8 + stats.speed * 2 +
+  return stats.mp * .1 + Math.min(28, Math.max(0, stats.crit)) * 8 + stats.speed * 2 +
     mods.critDamage * 2 + mods.attackSpeed * 5 + mods.lifeSteal * 10 +
     mods.armorPen * 5 + mods.damageReduction * 8 + mods.dodge * 8 +
     mods.hpRegen * 2 + mods.mpRegen * 3;

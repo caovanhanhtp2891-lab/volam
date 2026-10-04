@@ -1,6 +1,6 @@
 import type { Element } from "./idle";
 import { gearTrait, setBonuses, type GearVariant, type GearIdentity, type SetId } from "./gear-catalog.ts";
-import { STAT_LABELS, emptyStats, secondaryScore, type GearStat, type GearStats } from "./gear-stats.ts";
+import { STAT_LABELS, PERCENT_STATS, emptyStats, secondaryScore, type GearStat, type GearStats } from "./gear-stats.ts";
 export { STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife } from "./gear-stats.ts";
 export type { GearStat, GearStats } from "./gear-stats.ts";
 export const RARITIES = [
@@ -49,6 +49,7 @@ export interface EquipmentData extends GearIdentity {
   power: number;
   enhance: number;
   bonuses?: Partial<GearStats>;
+  balanceVersion?: number;
 }
 export function rarityTier(rarity?: string): number {
   return Math.max(0, RARITIES.indexOf(rarity as Rarity));
@@ -56,35 +57,70 @@ export function rarityTier(rarity?: string): number {
 export function equipmentGrade(level: number): string {
   return `Bậc ${Math.ceil(level / 10)}`;
 }
-// Old items retain their primary power; bonus rolls only exist on new drops.
+export const EQUIPMENT_BALANCE_VERSION = 2;
+export const RARITY_STRENGTH = [1, 1.4, 2, 3, 4.5, 6.8, 10] as const;
+const UTILITY_STRENGTH = [1, 1.4, 1.9, 2.5, 3.2, 4, 5] as const;
+const LEGACY_PRIMARY_STRENGTH = [1, 1.18, 1.42, 1.8, 2.5, 3.2, 4.2];
+export function rarityStatStrength(rarity: Rarity, key: GearStat): number {
+  return (PERCENT_STATS.includes(key) || key === "speed" ? UTILITY_STRENGTH : RARITY_STRENGTH)[rarityTier(rarity)];
+}
+export function equipmentPrimaryPower(level: number, rarity: Rarity, slot: string, random = Math.random): number {
+  const base = slot === "weapon" ? 9 + level * 2.1 : 8 + level * 2.4;
+  return Math.max(1, Math.floor(base * RARITY_STRENGTH[rarityTier(rarity)] * (.95 + random() * .1)));
+}
+// Preserve item identity, rolls and enhancement. Rebalance every storage location
+// once so importing or loading the same updated save cannot multiply stats again.
+export function migrateEquipmentBalance<T extends EquipmentData>(item: T): T {
+  if (item.balanceVersion === EQUIPMENT_BALANCE_VERSION) return item;
+  if (item.balanceVersion !== undefined && item.balanceVersion !== 0) throw new Error("save-invalid");
+  const tier = rarityTier(item.rarity);
+  item.power = Math.min(1e7, Math.ceil(item.power * RARITY_STRENGTH[tier] / LEGACY_PRIMARY_STRENGTH[tier]));
+  if (item.bonuses) for (const key of Object.keys(item.bonuses) as GearStat[]) {
+    item.bonuses[key] = Math.min(1e6, Math.ceil(item.bonuses[key]! * rarityStatStrength(item.rarity, key) / (1 + tier * .3)));
+  }
+  item.balanceVersion = EQUIPMENT_BALANCE_VERSION;
+  return item;
+}
+const statBase = (level: number, key: GearStat): number => ({
+  attack: 2 + level * .3, defense: 2 + level * .35, hp: 12 + level * 2, mp: 7 + level,
+  crit: 1 + level / 80, speed: 1 + level / 25, critDamage: 2 + level / 45,
+  attackSpeed: 1 + level / 90, lifeSteal: 1 + level / 160, armorPen: 1 + level / 100,
+  damageReduction: 1 + level / 120, dodge: 1 + level / 160, hpRegen: 1 + level / 20, mpRegen: 1 + level / 60,
+})[key];
+export const MAX_ENHANCEMENT = 100;
+export function enhancementMultiplier(enhance: number, key: GearStat): number {
+  const rank = Math.max(0, Math.min(MAX_ENHANCEMENT, Math.floor(enhance)));
+  return 1 + (key === "speed" ? rank * .002 + rank ** 2 * .00001
+    : PERCENT_STATS.includes(key) ? rank * .015 + rank ** 2 * .0001
+    : rank * .05 + rank ** 2 * .0007);
+}
+const ENHANCEMENT_AFFIXES: readonly GearStat[] = ["hp", "mp", "attack", "defense", "crit", "armorPen", "attackSpeed", "damageReduction", "lifeSteal", "critDamage", "dodge", "hpRegen", "mpRegen", "speed"];
+export function enhancementAffixes(item: EquipmentData): Partial<GearStats> {
+  const missing = ENHANCEMENT_AFFIXES.filter(key => !(item.bonuses?.[key] ?? 0));
+  return Object.fromEntries(missing.slice(0, Math.floor(Math.min(MAX_ENHANCEMENT, item.enhance) / 10)).map(key =>
+    [key, Math.max(1, Math.floor(statBase(item.level, key) * rarityStatStrength(item.rarity, key) * .5))]));
+}
 export function gearStats(item: EquipmentData): GearStats {
   const stats = emptyStats();
-  const scale = (value: number) =>
-    value + Math.ceil(value * item.enhance * 0.04);
+  const rank = Math.max(0, Math.min(MAX_ENHANCEMENT, item.enhance));
+  const affixes = enhancementAffixes(item);
   // Every successful rank improves the primary stat, even on low-level gear.
   stats[item.slot === "weapon" ? "attack" : "defense"] =
     item.power +
     (item.power > 0
-      ? Math.max(item.enhance, Math.ceil(item.power * item.enhance * 0.04))
+      ? Math.max(rank, Math.ceil(item.power * (enhancementMultiplier(rank, "attack") - 1)))
       : 0);
   for (const key of Object.keys(stats) as GearStat[])
-    stats[key] += scale(item.bonuses?.[key] ?? 0);
+    stats[key] += Math.ceil(((item.bonuses?.[key] ?? 0) + (affixes[key] ?? 0)) * enhancementMultiplier(rank, key));
   return stats;
 }
-export const MAX_ENHANCEMENT = 10;
 export function enhancementInfo(item: EquipmentData) {
+  const rank = Math.max(0, Math.min(MAX_ENHANCEMENT, item.enhance));
   return {
-    capped: item.enhance >= MAX_ENHANCEMENT,
-    cost: 45 + item.enhance * 35,
-    stones: 1,
-    chance:
-      item.enhance < 3
-        ? 1
-        : item.enhance < 6
-          ? 0.78
-          : item.enhance < 8
-            ? 0.58
-            : 0.42,
+    capped: rank >= MAX_ENHANCEMENT,
+    cost: 45 + rank * 35 + rank ** 2 * 8,
+    stones: 1 + Math.floor(rank / 10),
+    chance: .015 + .985 * (1 - Math.min(99, rank) / 99) ** 2.2,
   };
 }
 export function attemptEnhancement(
@@ -238,23 +274,8 @@ export function rollGearBonuses(
     );
   const bonuses: Partial<GearStats> = {};
   for (const key of chosen) {
-    const strength = (1 + tier * 0.3) * (0.85 + random() * 0.3) * ((trait?.stats as readonly GearStat[] | undefined)?.includes(key) ? 1.2 : 1);
-    const base = {
-      attack: 2 + level * 0.3,
-      defense: 2 + level * 0.35,
-      hp: 12 + level * 2,
-      mp: 7 + level,
-      crit: 1 + level / 80,
-      speed: 1 + level / 25,
-      critDamage: 2 + level / 45,
-      attackSpeed: 1 + level / 90,
-      lifeSteal: 1 + level / 160,
-      armorPen: 1 + level / 100,
-      damageReduction: 1 + level / 120,
-      dodge: 1 + level / 160,
-      hpRegen: 1 + level / 20,
-      mpRegen: 1 + level / 60,
-    }[key];
+    const strength = rarityStatStrength(rarity, key) * (0.85 + random() * 0.3) * ((trait?.stats as readonly GearStat[] | undefined)?.includes(key) ? 1.2 : 1);
+    const base = statBase(level, key);
     bonuses[key] = Math.max(1, Math.floor(base * strength));
   }
   return bonuses;

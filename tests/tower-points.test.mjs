@@ -84,8 +84,8 @@ test('automatic allocation is opt-in on old saves and persisted on new saves', (
   assert.equal(normalizeIdle({autoAttributes:'true'}).autoAttributes,false);
 });
 test('last realms have bounded, continuous gaps and the final phases use the preceding span', () => {
-  assert.deepEqual(REALMS.slice(-4).map(r=>r.minPower),[10e9,12e9,14.5e9,17.5e9]);
+  assert.deepEqual(REALMS.slice(-4).map(r=>r.minPower),[6.5e6,8e6,9.8e6,12e6]);
   for(let i=20;i<REALMS.length;i++) assert.ok(REALMS[i].minPower/REALMS[i-1].minPower<=1.25);
-  for(const [n, phase] of ['Sơ kỳ','Trung kỳ','Hậu kỳ','Đỉnh phong','Đại viên mãn'].entries()) assert.equal(cultivationForPower(17.5e9+n*.6e9).phase,phase);
-  assert.equal(cultivationForPower(19.9e9).nextPower,null);
+  for(const [n, phase] of ['Sơ kỳ','Trung kỳ','Hậu kỳ','Đỉnh phong','Đại viên mãn'].entries()) assert.equal(cultivationForPower(12e6+n*.44e6).phase,phase);
+  assert.equal(cultivationForPower(13.76e6).nextPower,null);
 });

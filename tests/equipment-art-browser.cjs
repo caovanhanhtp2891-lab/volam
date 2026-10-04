@@ -88,7 +88,7 @@ async function gallery(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.23.0",
+      "0.24.0",
     );
     await page.locator("#hero-name-input").fill("Bảo Khố Kiếm Sĩ");
     await page.locator('[data-faction="wudang"]').click();

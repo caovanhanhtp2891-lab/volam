@@ -76,7 +76,7 @@ async function auraPixels(page) {
     await page.locator('[data-idle-tab="char"]').click();
     await seed(page, (s) => {
       s.player.level = 1;
-      s.player.attack = 80;
+      s.player.attack = 40;
       s.player.defense = 0;
       s.player.equipment = {};
       s.player.idle.inTown = true;
@@ -94,7 +94,7 @@ async function auraPixels(page) {
     });
     assert.equal(await page.locator("#realm-name").textContent(), "Phàm Nhân");
     for (const [id, expected] of [
-      ["realm-sword-0", "Luyện Thể"],
+      ["realm-sword-0", "Luyện Khí"],
       ["realm-sword-1", "Phàm Nhân"],
     ]) {
       await page.locator('[data-idle-tab="inv"]').click();
@@ -132,9 +132,9 @@ async function auraPixels(page) {
     await page.locator("#utility-close").click();
     let low;
     for (let rank = 0; rank < realms.length; rank++) {
-      const target = Math.max(5000, realms[rank].power * 1.0001 + 5);
+      const target = Math.max(1000, realms[rank].power * 1.0001 + 5);
       await seed(page, (s) => {
-        s.player.attack = (Math.cbrt(target * 1000) - 165 * 0.15) / 3;
+        s.player.attack = (target / 10 - 165 * 0.15 - 80 * .1) / 3;
         s.player.defense = 0;
         s.player.equipment = {};
         s.player.idle.attributes = {
