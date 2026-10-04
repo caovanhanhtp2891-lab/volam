@@ -3,6 +3,10 @@ import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
 import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
+import { SPECIES, MONSTERS, faunaOf, monsterForStage, type SpeciesId } from "./bestiary";
+import { monsterMarkup, monsterSize, drawMonster } from "./monster-art";
+import { EXPLORATION_WIDTH, EXPLORATION_HEIGHT, freshExploration, validExploration, normalizeExploration, explorationZones, explorationSpawns, canExplore, zoneAt, type ExplorationProgress } from "./exploration";
+import { createExplorationArt } from "./exploration-art";
 import { freshLuckyProgress, validLuckyProgress, normalizeLuckyProgress, playLuckyEvent, type LuckyGame, type LuckyProgress } from "./lucky-events";
 import { luckyMarkup, updateLuckyPresentation } from "./lucky-ui";
 import { BOT_TEMPLATES, createBot, chooseBotTarget, moveBot, freshBotSettings, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
@@ -34,7 +38,7 @@ import {
 import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
 import { drawSprite, spriteMarkup, characterPortraitMarkup, type SpriteId } from "./art";
 import { characterArtKey, defaultCharacterSex, type CharacterSex } from "./character-art";
-import { createMapArt, createTrainingArt, trainingArtRevision, drawRegionWeather } from "./map-art";
+import { createMapArt, createTrainingArt, createTerrainArt, trainingArtRevision, drawRegionWeather } from "./map-art";
 import { REGION_SCENES, regionThumbnail } from "./region-scenes";
 import {
   freshMotion,
@@ -75,6 +79,7 @@ import { drawCultivationAura } from "./cultivation-art";
 import {
   BAG_CAPACITY,
   DUNGEONS,
+  freshDungeonClears, normalizeDungeonClears, dungeonDropRarity,
   POTIONS,
   MAX_POTIONS,
   buyPotion,
@@ -175,6 +180,7 @@ interface Player {
   lucky: LuckyProgress;
   botSettings: BotSettings;
   sieges: SiegeProgress;
+  exploration: ExplorationProgress;
 }
 
 interface Npc {
@@ -188,6 +194,9 @@ interface Npc {
 }
 
 interface Enemy {
+  monsterId?: SpeciesId;
+  ranged?: boolean;
+  home?: { x: number; y: number };
   botProfile?: BotTemplate;
   structure?: "gate" | "banner";
   wildElite?: boolean;
@@ -240,6 +249,8 @@ interface GroundLoot {
 }
 
 interface Telegraph {
+  theme?: Element;
+  flight?: { from: { x: number; y: number }; startedAt: number; arrow: boolean };
   x: number;
   y: number;
   radius: number;
@@ -357,6 +368,7 @@ interface GameState {
   lastBossDefeatedAt: number;
   mapMode: "world" | "dungeon" | "territory";
   territoryEncounter?: { siege?: { id: number; size: number; order: BotOrder }; id: TerritoryId; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
+  dungeonReturn?: { x: number; y: number; inTown: boolean; autoBattle: boolean };
   dungeonTimeLeft: number;
   dungeonCleared: boolean;
   dungeonRewardClaimed: boolean;
@@ -368,8 +380,8 @@ interface GameState {
   autoBattle: boolean;
 }
 
-const WORLD_WIDTH = 1900;
-const WORLD_HEIGHT = 1200;
+let WORLD_WIDTH = 1900;
+let WORLD_HEIGHT = 1200;
 let VIEW_WIDTH = 960;
 let VIEW_HEIGHT = 600;
 const MOBILE_GAME_QUERY =
@@ -564,6 +576,7 @@ const obstacles = [
 
 const worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
 const dungeonArts: Partial<Record<DungeonId, HTMLCanvasElement>> = {};
+const dungeonArtRevisions = new Map<DungeonId, number>();
 let territoryArt: HTMLCanvasElement | undefined;
 
 const NPCS: Npc[] = [
@@ -597,7 +610,7 @@ const NPCS: Npc[] = [
   {
     id: "dungeon",
     name: "Sứ giả thí luyện",
-    title: "2 phụ bản solo · Cấp 3+",
+    title: "12 bí cảnh · Cấp 3–155",
     x: 1710,
     y: 300,
     color: "#a787e8",
@@ -728,6 +741,7 @@ function createEnemy(
     id,
     name,
     kind,
+    monsterId: legacySpecies(name, kind),
     x,
     y,
     radius: kind === "boss" ? 38 : kind === "elite" ? 25 : 19,
@@ -758,7 +772,8 @@ function createEnemy(
   };
 }
 
-function makeEnemies(): Enemy[] {
+function makeEnemies(exploration?: ExplorationProgress): Enemy[] {
+  if (exploration?.active) return makeExplorationEnemies(exploration.region);
   return [
     createEnemy(
       "bandit-1",
@@ -830,17 +845,29 @@ function makeEnemies(): Enemy[] {
 }
 
 function makeDungeonEnemies(id: DungeonId, wave: number): Enemy[] {
-  return DUNGEONS[id].waves[wave].map((enemy) =>
-    createEnemy(
-      enemy.id,
-      enemy.name,
-      enemy.kind,
-      enemy.x,
-      enemy.y,
-      enemy.level,
-      enemy.color,
-    ),
-  );
+  const dungeon = DUNGEONS[id];
+  return dungeon.waves[wave].map((spawn) => {
+    const enemy = createEnemy(
+      spawn.id,
+      spawn.name,
+      spawn.kind,
+      spawn.x,
+      spawn.y,
+      spawn.level,
+      spawn.color,
+    );
+    if (spawn.species) {
+      enemy.monsterId = spawn.species;
+      enemy.element = MONSTERS[spawn.species].element;
+      enemy.ranged = MONSTERS[spawn.species].behavior === "ranged";
+    }
+    if (dungeon.tier >= 2) {
+      const scale = 1 + (dungeon.tier - 2) * 0.055;
+      enemy.maxHp = enemy.hp = Math.floor(enemy.maxHp * scale);
+      enemy.attack = Math.floor(enemy.attack * scale);
+    }
+    return enemy;
+  });
 }
 
 function createGame(sectId: SectId, factionId?: FactionId): GameState {
@@ -893,7 +920,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     bossDefeated: false,
     questRewardClaimed: false,
     dungeonTokens: 0,
-    dungeonClears: { tomb: 0, bamboo: 0 },
+    dungeonClears: freshDungeonClears(),
     ...normalizeSupplies({}),
     pendingItems: [],
     goldenClears: [],
@@ -901,7 +928,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     preferences: normalizePreferences(),
     journey: normalizeJourney(),
     military: freshMilitary(),
-    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), sieges: freshSiegeProgress(),
+    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(),
     facingX: 1,
     facingY: 0,
   };
@@ -1403,6 +1430,219 @@ function makeTerritoryEnemies(id: TerritoryId, wave: number): Enemy[] {
     return enemy;
   });
 }
+const explorationArts = new Map<string, HTMLCanvasElement>();
+function exploring(): boolean {
+  return Boolean(
+    game?.player.exploration.active &&
+      game.mapMode === "world" &&
+      !game.goldenEncounter,
+  );
+}
+function syncWorldSize(): void {
+  const width = exploring() ? EXPLORATION_WIDTH : 1900;
+  const height = exploring() ? EXPLORATION_HEIGHT : 1200;
+  const changed = WORLD_WIDTH !== width || WORLD_HEIGHT !== height;
+  WORLD_WIDTH = width; WORLD_HEIGHT = height;
+  if (canvas.dataset.worldWidth !== String(width)) canvas.dataset.worldWidth = String(width);
+  if (canvas.dataset.worldHeight !== String(height)) canvas.dataset.worldHeight = String(height);
+  if (changed) centerWorldCamera();
+}
+function centerWorldCamera(): void {
+  if (!game) return;
+  game.cameraX = clamp(game.player.x - VIEW_WIDTH / 2, 0, Math.max(0, WORLD_WIDTH - VIEW_WIDTH));
+  game.cameraY = clamp(game.player.y - VIEW_HEIGHT / 2, 0, Math.max(0, WORLD_HEIGHT - VIEW_HEIGHT));
+}
+function explorationArt(region: number): HTMLCanvasElement {
+  const key = `${region}:${trainingArtRevision}`;
+  if (!explorationArts.has(key))
+    explorationArts.set(key, createExplorationArt(region));
+  const result = explorationArts.get(key)!;
+  explorationArts.delete(key);
+  explorationArts.set(key, result);
+  if (explorationArts.size > 2)
+    explorationArts.delete(explorationArts.keys().next().value!);
+  return result;
+}
+function legacySpecies(name: string, kind: Enemy["kind"]): SpeciesId {
+  if (/Lang/.test(name)) return kind === "boss" ? "alpha" : "wolf";
+  if (/Trùng/.test(name)) return "beetle";
+  if (/Mộ|U Binh/.test(name))
+    return kind === "boss"
+      ? "tombgeneral"
+      : /Tướng/.test(name)
+        ? "tombguard"
+        : "skeleton";
+  if (/cung|Cung/.test(name)) return "archer";
+  if (/Ma Vương/.test(name)) return "demonlord";
+  return kind === "boss"
+    ? "demonlord"
+    : kind === "elite"
+      ? "mercenary"
+      : "bandit";
+}
+function makeExplorationEnemies(region: number): Enemy[] {
+  return explorationSpawns(region).map((spawn) => {
+    const def = MONSTERS[spawn.species],
+      enemy = createEnemy(
+        spawn.id,
+        spawn.name,
+        spawn.kind,
+        spawn.x,
+        spawn.y,
+        spawn.level,
+        ELEMENTS[def.element].color,
+      );
+    enemy.monsterId = spawn.species;
+    enemy.element = def.element;
+    enemy.ranged = def.behavior === "ranged";
+    enemy.home = { x: spawn.x, y: spawn.y };
+    return enemy;
+  });
+}
+function openExplorationAtlas(
+  region = game?.player.exploration.active
+    ? game.player.exploration.region
+    : game
+      ? stageInfo(game.player.idle.stage).region
+      : 0,
+): void {
+  if (!game || !Number.isInteger(region) || region < 0 || region >= 16) return;
+  const blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter),
+    unlocked = canExplore(region, game.player.level, game.player.idle),
+    fauna = faunaOf(region);
+  openUtility(
+    "Khám phá · Đại thế giới",
+    `<div class="exploration-intro">${regionThumbnail(region)}<div><b>${REGIONS[region]}</b><small>3.600 × 2.400 · 4 khu vực · 6 loài quái và boss</small></div></div><p class="dim">Đi bộ hoặc cưỡi ngựa giữa các khu; chạm Đến khu để dịch chuyển. Khu sâu có quái cao cấp hơn. Quái thường hồi sinh 12 giây, tinh anh 20 giây, boss 60 giây trong phiên chơi.</p><label class="form-row">Chọn map<select id="exploration-region">${REGIONS.map((name, i) => `<option value="${i}" ${i === region ? "selected" : ""}>${name} · Cấp ${i * 10 + 1}–${i * 10 + 10}</option>`).join("")}</select></label><div class="exploration-zones">${explorationZones(
+      region,
+    )
+      .map(
+        (zone) =>
+          `<article class="exploration-zone ${zone.boss ? "boss-zone" : ""}" data-zone-card="${zone.index}"><b>${zone.name}</b><small>Quái cấp ${zone.minLevel}–${zone.maxLevel}${zone.boss ? " · Sào huyệt boss" : ""}</small><div class="zone-fauna">${[...new Set([fauna.species[(zone.index * 2) % 6], fauna.species[(zone.index * 2 + 1) % 6], fauna.species[(zone.index * 2 + 2) % 6], ...(zone.boss ? [fauna.boss] : [])])].map((id) => `<span>${monsterMarkup(id)}<small>${MONSTERS[id].name}</small></span>`).join("")}</div><button class="outline-button" data-explore-region="${region}" data-explore-zone="${zone.index}" ${blocked || !unlocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại" : !unlocked ? `Cần cấp ${region * 10 + 1} hoặc mở ải` : `Đến khu · ${zone.name}`}</button></article>`,
+      )
+      .join(
+        "",
+      )}</div><div class="btnrow"><button class="mini-button" data-open-bestiary>Sổ quái · 32 chủng loại</button>${exploring() ? `<button class="mini-button" data-exit-exploration>Về thành</button>` : ""}</div>`,
+  );
+}
+function openBestiary(): void {
+  openUtility(
+    "Sổ quái · 32 chủng loại",
+    `<p class="dim">24 loài thường và 8 thủ lĩnh. Mỗi vùng có quần thể riêng; bí cảnh phối hợp quái, trùm phụ và boss cuối.</p><div class="bestiary-grid">${SPECIES.map((id) => `<article style="--monster-color:${ELEMENTS[MONSTERS[id].element].color}">${monsterMarkup(id)}<b>${MONSTERS[id].name}</b><small>${MONSTERS[id].boss ? "BOSS · " : ""}Hệ ${ELEMENTS[MONSTERS[id].element].name}</small></article>`).join("")}</div>`,
+  );
+}
+function enterExploration(region: number, zone: number): void {
+  if (
+    !game ||
+    game.mapMode !== "world" ||
+    game.goldenEncounter ||
+    !canExplore(region, game.player.level, game.player.idle) ||
+    !Number.isInteger(zone) ||
+    zone < 0 ||
+    zone > 3
+  )
+    return;
+  if (!persistGame()) return;
+  collectIdleLoot(true);
+  const player = game.player,
+    previous = player.exploration;
+  const same = previous.active && previous.region === region;
+  player.exploration = {
+    active: true,
+    region,
+    zone,
+    returnTraining: previous.active
+      ? previous.returnTraining
+      : player.idle.enabled,
+    returnTown: previous.active ? previous.returnTown : player.idle.inTown,
+  };
+  player.idle.enabled = false;
+  player.idle.inTown = false;
+  if (!same) game.enemies = makeExplorationEnemies(region);
+  game.worldEnemies = game.enemies;
+  game.loot = [];
+  game.worldLoot = [];
+  game.targetId = null;
+  game.moveTarget = null;
+  game.combat = freshCombat();
+  game.telegraphs = [];
+  game.effects = [];
+  game.zones = [];
+  game.botContext = "";
+  game.botHits = [];
+  const place = explorationZones(region)[zone];
+  player.x = place.x;
+  player.y = place.y + 110;
+  game.autoBattle = false;
+  syncWorldSize();
+  game.cameraX = clamp(player.x - VIEW_WIDTH / 2, 0, WORLD_WIDTH - VIEW_WIDTH);
+  game.cameraY = clamp(
+    player.y - VIEW_HEIGHT / 2,
+    0,
+    WORLD_HEIGHT - VIEW_HEIGHT,
+  );
+  resetJoystick();
+  keys.clear();
+  closeUtility();
+  showIdlePage("log");
+  addLog(
+    `Khám phá ${REGIONS[region]} · ${place.name}. Quái cấp ${place.minLevel}–${place.maxLevel}.`,
+  );
+  persistGame();
+  refreshUi(true);
+}
+function exitExploration(): void {
+  if (!game || !exploring()) return;
+  collectIdleLoot(true);
+  const player = game.player;
+  player.idle.enabled = player.exploration.returnTraining;
+  player.idle.inTown = true;
+  player.exploration.active = false;
+  game.targetId = null;
+  game.moveTarget = null;
+  game.effects = [];
+  game.zones = [];
+  game.telegraphs = [];
+  game.combat = freshCombat();
+  game.botContext = "";
+  game.botHits = [];
+  game.autoBattle = false;
+  game.enemies = [];
+  game.worldEnemies = [];
+  player.x = PLAYER_START.x;
+  player.y = PLAYER_START.y;
+  player.hp = player.maxHp;
+  player.mp = player.maxMp;
+  syncWorldSize();
+  closeUtility();
+  resetJoystick();
+  keys.clear();
+  addLog("Đã về thành; tiến trình luyện ải và trang bị được giữ nguyên.");
+  persistGame();
+  refreshUi(true);
+}
+function refreshExplorationHud(): void {
+  if (!game) return;
+  const active = exploring(),
+    hud = document.getElementById("exploration-hud")!;
+  hud.classList.toggle("hidden", !active);
+  if (!active) return;
+  const region = game.player.exploration.region,
+    zone = zoneAt(region, game.player);
+  game.player.exploration.zone = zone.index;
+  document.getElementById("exploration-zone-name")!.textContent = zone.name;
+  document.getElementById("exploration-zone-level")!.textContent =
+    `Quái cấp ${zone.minLevel}–${zone.maxLevel}${zone.boss ? " · BOSS" : ""}`;
+  document.getElementById("mobile-map-name")!.textContent =
+    REGIONS[region].toLocaleUpperCase("vi");
+  document.querySelector(".mobile-map-channel")!.textContent =
+    "Khám phá · 4 khu vực";
+  document.getElementById("stage-name")!.textContent =
+    `${REGIONS[region]} · ${zone.name}`;
+  document.getElementById("stage-description")!.textContent =
+    `Đại thế giới · Quái cấp ${zone.minLevel}–${zone.maxLevel}`;
+  document.getElementById("town-btn")!.innerHTML = "Về<br>thành";
+}
+
 let luckyTab: LuckyGame = "wheel";
 let siegeArt: HTMLCanvasElement | undefined;
 function openLuckyEvents(tab: LuckyGame = luckyTab): void {
@@ -1734,7 +1974,7 @@ function tickBots(dt: number, now: number): void {
   const context = siege
     ? `siege-${siege.id}`
     : visible
-      ? `world-${game.player.idle.stage}-${game.player.idle.inTown}-${settings.assist}`
+      ? `world-${exploring() ? `explore-${game.player.exploration.region}` : game.player.idle.stage}-${game.player.idle.inTown}-${settings.assist}`
       : "off";
   if (context !== game.botContext) {
     game.botContext = context;
@@ -1796,7 +2036,7 @@ function tickBots(dt: number, now: number): void {
     const locked =
       bot.motion.actionDuration > 0 &&
       now - bot.motion.actionAt < bot.motion.actionDuration;
-    if (!locked) moveBot(bot, goal, dt, now, (x, y) => isBlocked(x, y, 19), 12);
+    if (!locked) moveBot(bot, goal, dt, now, (x, y) => isBlocked(x, y, 19), 12, {width:WORLD_WIDTH,height:WORLD_HEIGHT});
     else bot.motion.moving *= 0.85;
     if (bot.stunUntil > now || locked) continue;
     if (
@@ -2076,7 +2316,8 @@ function advanceTerritory(): void {
 
 function enterDungeon(id: DungeonId): void {
   if (!game) return;
-  if (game.goldenEncounter) return showToast("Rời boss Hoàng Kim trước khi vào phụ bản.");
+  if (game.goldenEncounter)
+    return showToast("Rời boss Hoàng Kim trước khi vào phụ bản.");
   const dungeon = DUNGEONS[id];
   if (!dungeon) return;
   if (game.mapMode !== "world") {
@@ -2089,7 +2330,13 @@ function enterDungeon(id: DungeonId): void {
     );
     return;
   }
-  persistGame();
+  if (!persistGame()) return;
+  game.dungeonReturn = {
+    x: game.player.x,
+    y: game.player.y,
+    inTown: game.player.idle.inTown,
+    autoBattle: game.autoBattle,
+  };
   game.worldEnemies = game.enemies;
   game.worldLoot = game.loot;
   game.dungeonId = id;
@@ -2114,7 +2361,7 @@ function enterDungeon(id: DungeonId): void {
   canvasBadge.innerHTML = `<span class="live-dot"></span> ${dungeon.shortName} · SOLO`;
   canvasTip.textContent = `${dungeon.name} · Đợt 1/${dungeon.waves.length}`;
   addLog(
-    `Đã vào ${dungeon.name}. Dọn hết từng đợt trong ${dungeon.timeLimit / 60} phút, quái không hồi sinh.`,
+    `Đã vào ${dungeon.name}. Dọn hết từng đợt trong ${Math.floor(dungeon.timeLimit / 60)} phút ${dungeon.timeLimit % 60} giây, quái không hồi sinh.`,
   );
   closeMobileSheet();
   refreshUi(true);
@@ -2151,13 +2398,15 @@ function advanceDungeonWave(): void {
   );
 }
 
-function leaveDungeon(): void {
+function leaveDungeon(resumeBattle = true): void {
   if (!game || game.mapMode !== "dungeon") return;
   if (game.dungeonCleared && !game.dungeonRewardClaimed) {
     addLog("Hãy nhận phần thưởng phụ bản trước khi rời đi.");
     return;
   }
   const cleared = game.dungeonCleared;
+  const restore = game.dungeonReturn;
+  game.dungeonReturn = undefined;
   game.enemies = game.worldEnemies;
   game.mapMode = "world";
   game.dungeonTimeLeft = 0;
@@ -2178,13 +2427,20 @@ function leaveDungeon(): void {
   keys.clear();
   game.player.x = PLAYER_START.x;
   game.player.y = PLAYER_START.y;
-  if (playerIdleActive()) {
+  if (restore) {
+    game.player.x = restore.x;
+    game.player.y = restore.y;
+    game.player.idle.inTown = restore.inTown;
+    game.autoBattle = restore.autoBattle && resumeBattle;
+  } else if (playerIdleActive()) {
     game.player.x = 950;
     game.player.y = 650;
   }
   canvasBadge.innerHTML = `<span class="live-dot"></span> RỪNG TRÚC · KÊNH 01`;
   canvasTip.textContent = "Click quái để áp sát · E để nhặt đồ quanh bạn";
   if (!cleared) addLog("Bạn đã rời phụ bản trước khi hoàn thành.");
+  syncWorldSize();
+  persistGame();
   refreshUi(true);
 }
 
@@ -2206,7 +2462,7 @@ function claimDungeonReward(): void {
   player.gold += dungeon.reward.gold;
   player.refiningStones += dungeon.reward.stones;
   const awarded = rewardExperience(dungeon.reward.xp);
-  const recovered: Item[] = [createItem(dungeon.reward.itemLevel, "Hiếm")];
+  const recovered: Item[] = Array.from({length:dungeon.reward.itemCount},()=>createItem(dungeon.reward.itemLevel, dungeon.reward.rarity));
   for (const loot of game.loot) {
     player.gold += loot.gold;
     player.refiningStones += loot.stones;
@@ -2214,7 +2470,7 @@ function claimDungeonReward(): void {
   }
   storeRewardItems(player, recovered);
   addLog(
-    `Nhận thưởng ${dungeon.name}: +${formatNumber(awarded)} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá. Đã thu hồi đồ chưa nhặt.`,
+    `Nhận thưởng ${dungeon.name}: +${formatNumber(awarded)} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá · ${dungeon.reward.itemCount} đồ ${dungeon.reward.rarity}. Đã thu hồi đồ chưa nhặt.`,
   );
   if (player.pendingItems.length)
     addLog(
@@ -2338,7 +2594,7 @@ function isBlocked(x: number, y: number, radius: number): boolean {
     return true;
   if (game?.territoryEncounter?.siege) return siegeBlocked(x, y, radius, game.enemies.some(e => e.structure === "gate" && !e.dead));
   if (
-    game?.goldenEncounter ||
+    game?.goldenEncounter || exploring() ||
     (game && game.mapMode !== "world") ||
     (game?.player.idle.enabled && !game.player.idle.inTown)
   )
@@ -2718,7 +2974,7 @@ function killEnemy(enemy: Enemy): void {
   if (game.combat.corpses.length > 16) game.combat.corpses.shift();
   const idleFight = game.mapMode === "world" && playerIdleActive();
   const huntEligible = game.mapMode === "world" && !game.goldenEncounter && enemy.kind === "normal" && enemy.level <= game.player.level;
-  enemy.respawnAt =
+  enemy.respawnAt = enemy.wildElite ? Number.POSITIVE_INFINITY : exploring() ? nowMs() + (enemy.kind === "boss" ? 60000 : enemy.kind === "elite" ? 20000 : 12000) :
     idleFight || game.mapMode !== "world" || enemy.kind === "boss" || enemy.wildElite
       ? Number.POSITIVE_INFINITY
       : nowMs() + 8000;
@@ -2733,7 +2989,9 @@ function killEnemy(enemy: Enemy): void {
       : enemy.kind === "elite"
         ? 150
         : 42 + enemy.level * 8;
-  const awardedXp = rewardExperience(xp);
+  const dungeonTier = game.mapMode === "dungeon" && game.dungeonId ? DUNGEONS[game.dungeonId].tier : 0;
+  const killXp = exploring() && enemy.kind !== "normal" ? xp + enemy.level * (enemy.kind === "boss" ? 25 : 9) : Math.floor(xp * (dungeonTier >= 2 ? 1 + dungeonTier * .35 : 1));
+  const awardedXp = rewardExperience(killXp);
   if (enemy.id.startsWith("bandit-") && game.mapMode === "world") {
     player.questKills += 1;
     checkMainQuest();
@@ -2744,19 +3002,19 @@ function killEnemy(enemy: Enemy): void {
       addLog(`${enemy.name} đã gục ngã!`);
     } else if (idleFight) {
       addLog(`${enemy.name} đã gục ngã! Nhận trang bị từ Cực phẩm trở lên.`);
-    } else {
+    } else if (enemy.id === "lang-vuong") {
       player.bossDefeated = true;
       game.lastBossDefeatedAt = nowMs();
       addLog("Lang Vương đã gục ngã! Bạn nhận được phần thưởng Cực phẩm.");
       checkMainQuest();
-    }
+    } else addLog(`${enemy.name} đã gục ngã!`);
   } else {
     addLog(`${enemy.name} bị đánh bại. +${formatNumber(awardedXp)} XP.`);
   }
   const chance =
     enemy.kind === "boss" ? 1 : enemy.kind === "elite" ? 0.92 : 0.32;
   if (Math.random() <= chance) {
-    const forced = rollEquipmentRarity(enemy.level, enemy.kind);
+    const forced = game.mapMode === "dungeon" && game.dungeonId ? dungeonDropRarity(game.dungeonId, enemy.kind, enemy.level) : rollEquipmentRarity(enemy.level, enemy.kind);
     game.loot.push({
       id: `loot-${enemy.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       x: enemy.x + randomBetween(-12, 12),
@@ -2767,7 +3025,7 @@ function killEnemy(enemy: Enemy): void {
       item: createItem(Math.max(1, enemy.level), forced),
       gold:
         enemy.kind === "boss"
-          ? 300
+          ? Math.floor(300 * (1 + dungeonTier * .8))
           : enemy.kind === "elite"
             ? 90
             : randomInt(8, 22),
@@ -2856,7 +3114,8 @@ function damagePlayer(amount: number, source: string): void {
     );
     if (game.goldenEncounter) leaveGoldenBoss("Thất bại. Có thể khiêu chiến lại trong khung giờ này.");
     else if (game.territoryEncounter) leaveTerritory("Công thành thất bại. Có thể gọi trận lại.", "defeat");
-    else if (inDungeon) leaveDungeon();
+    else if (inDungeon) leaveDungeon(false);
+    else if (exploring()) { const safe=explorationZones(player.exploration.region)[0]; player.x=safe.x; player.y=safe.y+110; game.moveTarget=null; }
     else if (player.idle.enabled) {
       player.idle.stage = Math.max(1, player.idle.stage - 1);
       player.idle.wave = 1;
@@ -2975,6 +3234,7 @@ function huntArea(): string {
   if (game.goldenEncounter) return "golden";
   if (game.mapMode === "dungeon") return `dungeon-${game.dungeonId}`;
   if (game.territoryEncounter) return `territory-${game.territoryEncounter.id}`;
+  if (exploring()) return `explore-${game.player.exploration.region}`;
   if (game.player.idle.inTown) return "town";
   return game.player.idle.enabled ? `stage-${game.player.idle.stage}` : "world";
 }
@@ -2988,7 +3248,7 @@ function saveWildElite(): SavedWildElite | undefined {
   if (!game) return;
   const elite = (game.goldenEncounter?.enemies ?? game.enemies).find(enemy => enemy.wildElite && !enemy.dead);
   if (!elite) return;
-  return { id: elite.id, name: elite.name, area: game.player.idle.enabled ? `stage-${game.player.idle.stage}` : "world", x: elite.x, y: elite.y, level: elite.level, hp: elite.hp, element: elite.element };
+  return { id: elite.id, name: elite.name, area: huntArea(), monsterId: elite.monsterId, x: elite.x, y: elite.y, level: elite.level, hp: elite.hp, element: elite.element };
 }
 function spawnWildElite(source: Enemy): void {
   if (!game) return;
@@ -3000,7 +3260,7 @@ function spawnWildElite(source: Enemy): void {
     if (!isBlocked(nx, ny, radius)) { x = nx; y = ny; break; }
   }
   const elite = createEnemy(`wild-elite-${Date.now()}-${game.player.eliteHunt.spawned}`, `${source.name} tinh anh`, "elite", x, y, Math.min(160, source.level + 2), "#ffbf68");
-  elite.wildElite = true; elite.element = source.element;
+  elite.wildElite = true; elite.element = source.element; elite.monsterId = source.monsterId; elite.ranged = source.ranged;
   for (const enemy of game.enemies) if (enemy.wildElite && enemy.dead) game.combat.enemyMotions.delete(enemy.id);
   game.enemies = game.enemies.filter(enemy => !enemy.wildElite || !enemy.dead);
   game.enemies.push(elite); game.worldEnemies = game.enemies;
@@ -3113,11 +3373,9 @@ function loadGame(): void {
     snapshot.player.dungeonTokens ??= 0;
     Object.assign(snapshot.player, normalizeSupplies(snapshot.player));
     snapshot.player.pendingItems ??= [];
-    snapshot.player.dungeonClears ??= {
-      tomb: snapshot.player.dungeonTokens > 0 ? 1 : 0,
-      bamboo: 0,
-    };
-    const worldEnemies = makeEnemies();
+    snapshot.player.dungeonClears = normalizeDungeonClears(snapshot.player.dungeonClears, snapshot.player.dungeonTokens);
+    if (snapshot.player.exploration.active) { snapshot.player.idle.enabled = false; snapshot.player.idle.inTown = false; }
+    const worldEnemies = makeEnemies(snapshot.player.exploration);
     game = {
       combat: freshCombat(),
       bots: [], botContext: "", botHits: [],
@@ -3150,7 +3408,7 @@ function loadGame(): void {
       settleSiege(game.player.sieges, game.player.sieges.pending.id, "interrupted", game.player.level, Date.now());
       addLog("Trận công thành trước đã gián đoạn. Có thể gọi trận mới bất cứ lúc nào.");
     }
-    syncStats();
+    syncStats(); syncWorldSize(); centerWorldCamera();
     if (game.player.idle.enabled) {
       const reward = offlineReward(
         snapshot.savedAt,
@@ -3170,7 +3428,7 @@ function loadGame(): void {
     if (snapshot.wildElite && snapshot.wildElite.area === huntArea()) {
       const saved = snapshot.wildElite;
       const elite = createEnemy(saved.id, saved.name, "elite", saved.x, saved.y, saved.level, "#ffbf68");
-      elite.wildElite = true; elite.element = saved.element as Element | undefined;
+      elite.wildElite = true; elite.element = saved.element as Element | undefined; elite.monsterId = saved.monsterId ?? elite.monsterId; elite.ranged = Boolean(elite.monsterId && MONSTERS[elite.monsterId].behavior === "ranged");
       elite.hp = Math.min(elite.maxHp, saved.hp);
       game.enemies.push(elite);
     }
@@ -3281,7 +3539,7 @@ function selectAt(world: { x: number; y: number }): void {
   const fire = activeCampfires().find(candidate => distance(world, candidate) <= 25);
   if (fire) { restAtCampfire(fire); return; }
   const npc =
-    game.mapMode === "world"
+    game.mapMode === "world" && !exploring() && !game.goldenEncounter
       ? NPCS.find((candidate) => distance(world, candidate) <= 32)
       : undefined;
   if (npc) {
@@ -3380,6 +3638,7 @@ function updateCombat(now: number): void {
 }
 function update(dt: number, now: number): void {
   if (!game) return;
+  syncWorldSize();
   const player = game.player;
   const before = { x: player.x, y: player.y };
   if (game.territoryEncounter) {
@@ -3396,7 +3655,7 @@ function update(dt: number, now: number): void {
     leaveGoldenBoss("Khung giờ boss đã kết thúc.");
     return;
   }
-  if (game.goldenEncounter && player.idle.autoLoot) collectIdleLoot();
+  if ((game.goldenEncounter || exploring()) && player.idle.autoLoot) collectIdleLoot();
   tickBots(dt, now);
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
@@ -3417,7 +3676,7 @@ function update(dt: number, now: number): void {
       addLog(
         `Hết giờ! ${DUNGEONS[game.dungeonId!].name} đã đóng lại. Lượt này không có thưởng hoàn thành.`,
       );
-      leaveDungeon();
+      leaveDungeon(false);
       return;
     }
   }
@@ -3521,14 +3780,15 @@ function update(dt: number, now: number): void {
         game.mapMode === "world" &&
         !playerIdleActive() &&
         now >= enemy.respawnAt &&
-        enemy.kind !== "boss"
+        (enemy.kind !== "boss" || exploring())
       ) {
         enemy.dead = false;
         enemy.hp = enemy.maxHp;
         enemy.attackCooldown = 1;
         enemy.poisonUntil = enemy.poisonNextTick = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = enemy.chilledUntil = enemy.frozenUntil = enemy.burnUntil = enemy.burnNextTick = enemy.corrodedUntil = 0;
-        enemy.x += randomBetween(-22, 22);
-        enemy.y += randomBetween(-22, 22);
+        enemy.x = enemy.home?.x ?? enemy.x + randomBetween(-22, 22);
+        enemy.y = enemy.home?.y ?? enemy.y + randomBetween(-22, 22);
+        enemy.bossCooldown = 4;
       }
       continue;
     }
@@ -3558,12 +3818,22 @@ function update(dt: number, now: number): void {
     if (enemy.botProfile) { tickSiegeDefender(enemy, motion, dt, now); continue; }
     const enemyBefore = { x: enemy.x, y: enemy.y };
     const d = distance(enemy, player);
+    if (enemy.home && (d > 700 || distance(enemy, enemy.home) > (enemy.kind === "boss" ? 600 : 420))) {
+      const homeDistance = distance(enemy, enemy.home);
+      if (homeDistance > 4) {
+        const travel = Math.min(homeDistance, enemySpeed * dt);
+        enemy.x += (enemy.home.x - enemy.x) / homeDistance * travel;
+        enemy.y += (enemy.home.y - enemy.y) / homeDistance * travel;
+      }
+      updateMotion(motion, enemyBefore, enemy, dt, now);
+      continue;
+    }
     if (enemy.kind === "boss") {
       enemy.bossCooldown -= dt;
       if (d < 520 && enemy.bossCooldown <= 0) {
         const dungeonBoss = game.mapMode !== "world";
         const enraged = dungeonBoss && enemy.hp <= enemy.maxHp * 0.5;
-        const attackName = game.territoryEncounter ? "Phá Quân" : game.dungeonId === "tomb" ? "Địa Chấn" : "Liệt Trảo";
+        const attackName = enemy.monsterId && MONSTERS[enemy.monsterId].boss ? MONSTERS[enemy.monsterId].skill : game.territoryEncounter ? "Phá Quân" : game.dungeonId === "tomb" ? "Địa Chấn" : "Liệt Trảo";
         game.telegraphs.push({
           x: player.x,
           y: player.y,
@@ -3571,6 +3841,7 @@ function update(dt: number, now: number): void {
           triggerAt: now + 1100,
           damage: enemy.attack * 1.4,
           label: `${enemy.name} · ${attackName}`,
+          theme: enemy.element,
         });
         if (enraged)
           game.telegraphs.push({
@@ -3580,6 +3851,7 @@ function update(dt: number, now: number): void {
             triggerAt: now + 1550,
             damage: enemy.attack * 1.2,
             label: `${enemy.name} · Cuồng Nộ`,
+            theme: enemy.element,
           });
         enemy.bossCooldown = enraged ? 3.6 : 4.4;
         Object.assign(motion, {
@@ -3594,6 +3866,18 @@ function update(dt: number, now: number): void {
         const nextY = enemy.y + Math.sin(angle) * enemySpeed * dt;
         if (!isBlocked(nextX, enemy.y, enemy.radius)) enemy.x = nextX;
         if (!isBlocked(enemy.x, nextY, enemy.radius)) enemy.y = nextY;
+      }
+    } else if (enemy.ranged && d < 440) {
+      if (d > 185) {
+        const angle=Math.atan2(player.y-enemy.y,player.x-enemy.x),x=enemy.x+Math.cos(angle)*enemySpeed*dt,y=enemy.y+Math.sin(angle)*enemySpeed*dt;
+        if (!isBlocked(x,y,enemy.radius)) { enemy.x=x;enemy.y=y; }
+      } else {
+        enemy.attackCooldown-=dt;
+        if (enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = 2;
+          game.telegraphs.push({ x: player.x, y: player.y, radius: 36, triggerAt: now + 550, damage: enemy.attack, label: enemy.name, theme: enemy.element, flight: { from: {x:enemy.x,y:enemy.y-28}, startedAt:now, arrow:enemy.monsterId === "archer" } });
+          Object.assign(motion, { action:"cast", actionAt:now, actionDuration:600 });
+        }
       }
     } else if (d < 330) {
       if (d > 54) {
@@ -3632,6 +3916,7 @@ function update(dt: number, now: number): void {
   const remainingTelegraphs: Telegraph[] = [];
   for (const telegraph of game.telegraphs) {
     if (now >= telegraph.triggerAt) {
+      if (telegraph.theme) addSkillEffect({ x: telegraph.x, y: telegraph.y, radius: telegraph.radius, color: ELEMENTS[telegraph.theme].color, duration: 500, kind: "burst", theme: telegraph.theme });
       if (distance(player, telegraph) <= telegraph.radius + player.radius) {
         const modeBeforeHit = game.mapMode;
         const encounterBeforeHit = game.goldenEncounter;
@@ -3729,11 +4014,12 @@ function drawWorld(now: number): void {
     if (!game.territoryEncounter.siege) drawOutlinedText(`${land.name.toLocaleUpperCase("vi")} · CÔNG THÀNH · ĐỢT ${game.territoryEncounter.wave + 1}/3`, 660, 780);
   } else if (game.mapMode === "dungeon") {
     const id = game.dungeonId!;
-    dungeonArts[id] ??= createMapArt(
-      id === "bamboo" ? "bamboo" : "dungeon",
-      WORLD_WIDTH,
-      WORLD_HEIGHT,
-    );
+    if (DUNGEONS[id].tier >= 2 && dungeonArtRevisions.get(id) !== trainingArtRevision) {
+      dungeonArts[id] = createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT);
+      dungeonArtRevisions.set(id, trainingArtRevision);
+    }
+    dungeonArts[id] ??= DUNGEONS[id].tier >= 2 ? createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT) : createMapArt(id === "bamboo" ? "bamboo" : "dungeon", WORLD_WIDTH, WORLD_HEIGHT);
+    if (Object.keys(dungeonArts).length > 3) { const oldest = Object.keys(dungeonArts).find(key => key !== id) as DungeonId; delete dungeonArts[oldest]; }
     ctx.drawImage(dungeonArts[id]!, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#d4c7ef";
     ctx.font = "600 14px 'DM Sans', sans-serif";
@@ -3743,7 +4029,8 @@ function drawWorld(now: number): void {
       550,
     );
   } else {
-    if (playerIdleActive() || game.goldenEncounter) {
+    if (exploring()) { ctx.drawImage(explorationArt(player.exploration.region), 0, 0, WORLD_WIDTH, WORLD_HEIGHT); }
+    else if (playerIdleActive() || game.goldenEncounter) {
       ctx.drawImage(
         trainingArt(game.player.idle.stage),
         0,
@@ -3754,14 +4041,15 @@ function drawWorld(now: number): void {
     } else ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#fff0bd";
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    if (!playerIdleActive() && !game.goldenEncounter) drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
+    if (!playerIdleActive() && !game.goldenEncounter && !exploring()) drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
     ctx.fillStyle = "#dde8cd";
     ctx.font = "12px 'DM Sans', sans-serif";
-    if (playerIdleActive()) {
+    if (exploring()) drawRegionWeather(ctx, player.exploration.region, now, game.cameraX, game.cameraY, VIEW_WIDTH, VIEW_HEIGHT, player.preferences.skillEffects === "simple");
+    else if (playerIdleActive()) {
       const info = stageInfo(player.idle.stage);
       drawRegionWeather(ctx, info.region, now, game.cameraX, game.cameraY, VIEW_WIDTH, VIEW_HEIGHT, player.preferences.skillEffects === "simple");
     } else if (!game.goldenEncounter) drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
-    if (!playerIdleActive() && !game.goldenEncounter) for (const npc of NPCS) drawNpc(npc, now);
+    if (!playerIdleActive() && !game.goldenEncounter && !exploring()) for (const npc of NPCS) drawNpc(npc, now);
   }
 
   for (const fire of activeCampfires()) drawCampfire(fire, now);
@@ -3832,7 +4120,7 @@ function drawMinimap(now: number): void {
   mc.clearRect(0, 0, miniMap.width, miniMap.height);
   const background =
     game.mapMode === "world"
-      ? playerIdleActive() || game.goldenEncounter
+      ? exploring() ? explorationArt(game.player.exploration.region) : playerIdleActive() || game.goldenEncounter
         ? trainingArt(game.player.idle.stage)
         : worldArt
       : game.territoryEncounter ? game.territoryEncounter.siege ? siegeArt : territoryArt : dungeonArts[game.dungeonId!];
@@ -3858,7 +4146,7 @@ function drawMinimap(now: number): void {
     mc.arc(x * sx, y * sy, radius, 0, Math.PI * 2);
     mc.fill();
   };
-  if (game.mapMode === "world")
+  if (game.mapMode === "world" && !exploring() && !game.goldenEncounter)
     for (const npc of NPCS) dot(npc.x, npc.y, "#88e8ce", 2);
   for (const enemy of game.enemies) {
     if (!enemy.dead)
@@ -3962,11 +4250,51 @@ function drawFloatingText(floatingText: FloatingText, now: number): void {
 
 function drawTelegraph(telegraph: Telegraph, now: number): void {
   const remaining = clamp((telegraph.triggerAt - now) / 950, 0, 1);
-  ctx.fillStyle = `rgba(255, 85, 91, ${0.13 + (1 - remaining) * 0.14})`;
+  const color = telegraph.theme ? ELEMENTS[telegraph.theme].color : "#ff7872";
+  if (telegraph.flight) {
+    const t = clamp(
+      (now - telegraph.flight.startedAt) /
+        (telegraph.triggerAt - telegraph.flight.startedAt),
+      0,
+      1,
+    );
+    const from = telegraph.flight.from,
+      to = { x: telegraph.x, y: telegraph.y - 22 };
+    const x = from.x + (to.x - from.x) * t,
+      y = from.y + (to.y - from.y) * t;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.atan2(to.y - from.y, to.x - from.x));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = telegraph.flight.arrow ? 2 : 4;
+    ctx.beginPath();
+    ctx.moveTo(-25, 0);
+    ctx.lineTo(8, 0);
+    ctx.stroke();
+    if (telegraph.flight.arrow) {
+      ctx.fillStyle = "#eee2b7";
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(4, -4);
+      ctx.lineTo(4, 4);
+      ctx.fill();
+    } else {
+      const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
+      glow.addColorStop(0, "#fff4cb");
+      glow.addColorStop(0.3, color);
+      glow.addColorStop(1, hexToRgba(color, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.fillStyle = hexToRgba(color, 0.13 + (1 - remaining) * 0.14);
   ctx.beginPath();
   ctx.arc(telegraph.x, telegraph.y, telegraph.radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#ff7872";
+  ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.setLineDash([8, 6]);
   ctx.beginPath();
@@ -4067,6 +4395,7 @@ function drawEnemySprite(enemy: Enemy, now: number): void {
     const p = enemy.botProfile, motion = game?.combat.enemyMotions.get(enemy.id) ?? freshMotion();
     drawAnimatedHero(ctx, p.faction, p.sex, motion, now, botAppearance(p)); return;
   }
+  if (enemy.monsterId && drawMonster(ctx, enemy.monsterId, game?.combat.enemyMotions.get(enemy.id) ?? freshMotion(), now, enemy.kind === "elite")) return;
   const scale = enemy.radius / 19;
   const hitColor = enemy.hitFlash > 0 ? "#fff5df" : enemy.color;
   const isWolf =
@@ -4257,7 +4586,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.restore();
   const barWidth =
     enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
-  const labelY = enemy.y - enemy.radius * 2.6 - 12;
+  const labelY = enemy.y - (enemy.structure ? enemy.structure === "gate" ? 105 : 125 : enemy.botProfile ? 88 : enemy.monsterId ? monsterSize(enemy.monsterId, enemy.kind === "elite").height + 4 : enemy.radius * 2.6 + 12);
   drawBar(
     enemy.x - barWidth / 2,
     labelY,
@@ -4491,6 +4820,7 @@ function refreshUi(force = false): void {
         ? `Ải ${stageInfo(player.idle.stage).localStage}/10 · Đợt ${player.idle.wave}/4`
         : "Thanh Khê Trấn"
       : game.territoryEncounter ? `Công thành · ${Math.ceil(game.territoryEncounter.timeLeft)}s · Đợt ${game.territoryEncounter.wave + 1}/3` : `Đợt ${game.dungeonWave + 1}/${DUNGEONS[game.dungeonId!].waves.length}`;
+  refreshExplorationHud();
   setText(
     "#quest-kill-progress",
     `${Math.min(player.questKills, 5)} / 5 sơn tặc`,
@@ -4793,13 +5123,13 @@ function renderInventory(): void {
         .padStart(2, "0");
       inventoryContent.innerHTML = game.dungeonCleared
         ? `
-        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>${dungeon.name} hoàn thành</strong><p>Nhận thưởng để về Rừng Trúc. Tất cả đồ chưa nhặt sẽ được thu hồi; túi đầy sẽ chuyển vào Đồ chờ nhận.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
+        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>${dungeon.name} hoàn thành</strong><p>Nhận thưởng để trở về vị trí trước khi vào bí cảnh. Tất cả đồ chưa nhặt sẽ được thu hồi; túi đầy sẽ chuyển vào Đồ chờ nhận.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
       `
         : `
         <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>${dungeon.name}</strong><p>Đợt ${game.dungeonWave + 1}/${dungeon.waves.length} · Còn ${game.enemies.filter((enemy) => !enemy.dead).length} quái.<br>${dungeon.mechanic}</p><div class="dungeon-timer">${minutes}:${seconds}</div><p>Ngã xuống, hết giờ hoặc rời sớm: không nhận thưởng hoàn thành.</p><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
       `;
     } else {
-      inventoryContent.innerHTML = `<p class="panel-notice">2 phụ bản solo · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
+      inventoryContent.innerHTML = `<p class="panel-notice">12 bí cảnh · Cấp 3–155 · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
         DUNGEONS,
       )
         .map((dungeon) => {
@@ -4812,7 +5142,7 @@ function renderInventory(): void {
             player.level < dungeon.minLevel
               ? `Cần cấp ${dungeon.minLevel}`
               : `Cần hoàn thành ${DUNGEONS[dungeon.prerequisite!]?.name ?? "thí luyện"}`;
-          return `<div class="dungeon-card"><strong>${dungeon.name}</strong><small>Solo · Cấp ${dungeon.minLevel}+ · ${dungeon.timeLimit / 60} phút · ${dungeon.waves.length} đợt · Đã vượt ${player.dungeonClears[dungeon.id]} lần</small><p>${dungeon.description}</p><div class="dungeon-reward-line"><b>+${dungeon.reward.xp} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá · 1 đồ Hiếm</b></div><button class="outline-button dungeon-btn" data-dungeon-action="enter" data-dungeon-id="${dungeon.id}" ${unlocked && game!.mapMode === "world" ? "" : "disabled"}>${game!.mapMode !== "world" ? "Rời trận hiện tại trước" : unlocked ? "Vào phụ bản" : condition}</button></div>`;
+          return `<div class="dungeon-card" data-dungeon-card="${dungeon.id}"><div class="dungeon-art-line">${regionThumbnail(dungeon.region)}${monsterMarkup(dungeon.waves.at(-1)![0].species ?? (dungeon.id === "tomb" ? "tombgeneral" : "alpha"))}</div><strong>${dungeon.name}</strong><small>Solo · Cấp ${dungeon.minLevel}+ · ${Math.ceil(dungeon.timeLimit / 60)} phút · ${dungeon.waves.length} đợt · ${dungeon.waves.flat().filter(e=>e.kind==="boss").length} boss · Đã vượt ${player.dungeonClears[dungeon.id]} lần</small><p>${dungeon.description}</p><div class="dungeon-reward-line"><b>+${dungeon.reward.xp} XP · +${dungeon.reward.gold} bạc · +${dungeon.reward.tokens} token · +${dungeon.reward.stones} đá · <span style="color:${RARITY_COLORS[dungeon.reward.rarity]}">${dungeon.reward.itemCount} đồ ${dungeon.reward.rarity} cấp ${dungeon.reward.itemLevel}</span></b></div><button class="outline-button dungeon-btn" data-dungeon-action="enter" data-dungeon-id="${dungeon.id}" ${unlocked && game!.mapMode === "world" ? "" : "disabled"}>${game!.mapMode !== "world" ? "Rời trận hiện tại trước" : unlocked ? "Vào phụ bản" : condition}</button></div>`;
         })
         .join("")}`;
     }
@@ -4874,7 +5204,7 @@ function openTravelMap(): void {
   if (!game) return;
   const { player } = game, blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
   const options = Array.from({ length: MAX_STAGE }, (_, i) => i + 1).filter(stage => canEnterStage(player.idle, stage, player.level));
-  openUtility("Bản đồ · Du ngoạn giang hồ", `<p class="dim">Nhân vật cấp ${player.level}. Chạm vùng để đến ngay; đủ cấp quái hoặc đã mở ải đều được đi. ${blocked ? "Hãy rời boss/phụ bản/công thành trước khi chuyển map." : ""}</p><div class="travel-stage-row"><label>Chọn ải<select id="travel-stage">${options.map(stage => `<option value="${stage}" ${stage === player.idle.stage ? "selected" : ""}>${stageInfo(stage).name} · Cấp ${stage}</option>`).join("")}</select></label><button id="travel-stage-go" class="mini-button" ${blocked ? "disabled" : ""}>Đến ải</button></div><div class="region-list travel-atlas">${regionCards()}</div>`);
+  openUtility("Bản đồ · Du ngoạn giang hồ", `<p class="dim">Nhân vật cấp ${player.level}. Chạm vùng để đến ngay; đủ cấp quái hoặc đã mở ải đều được đi. ${blocked ? "Hãy rời boss/phụ bản/công thành trước khi chuyển map." : ""}</p><button class="outline-button" data-open-exploration>Khám phá bản đồ lớn · 4 khu vực/map</button><div class="travel-stage-row"><label>Chọn ải<select id="travel-stage">${options.map(stage => `<option value="${stage}" ${stage === player.idle.stage ? "selected" : ""}>${stageInfo(stage).name} · Cấp ${stage}</option>`).join("")}</select></label><button id="travel-stage-go" class="mini-button" ${blocked ? "disabled" : ""}>Đến ải</button></div><div class="region-list travel-atlas">${regionCards()}</div>`);
 }
 const trainingArts = new Map<string, HTMLCanvasElement>();
 function trainingArt(stage: number): HTMLCanvasElement {
@@ -4891,7 +5221,7 @@ function trainingArt(stage: number): HTMLCanvasElement {
   return result;
 }
 function prepareIdleWave(resetPosition = true): void {
-  if (!game || !game.player.idle.enabled || game.goldenEncounter) return;
+  if (!game || !game.player.idle.enabled || game.goldenEncounter || exploring()) return;
   const progress = game.player.idle;
   idleNextWave = 0;
   game.targetId = null;
@@ -4949,6 +5279,8 @@ function prepareIdleWave(resetPosition = true): void {
       info.level,
       ELEMENTS[info.element].color,
     );
+    enemy.monsterId = monsterForStage(info.region, progress.wave * 2 + index, bossWave);
+    enemy.name = `${MONSTERS[enemy.monsterId].name}${kind === "elite" ? " · Tinh anh" : ""}`;
     enemy.element = info.element;
     return enemy;
   });
@@ -5425,6 +5757,7 @@ function confirmRebirth(expected: number): void {
   const sect = playerSect(game.player);
   if (!rebirthCharacter(game.player, { attack: sect.baseAttack, defense: sect.baseDefense })) return;
   const player = game.player;
+  player.exploration.active = false;
   player.idle.stage = 1; player.idle.wave = 1; player.idle.inTown = true; player.idle.enabled = true;
   player.rage = 0; player.shield = 0; player.shieldUntil = 0; player.attackCooldown = 0;
   player.cooldowns = { skill1: 0, skill2: 0, ultimate: 0 }; player.potionCooldown = 0;
@@ -5569,7 +5902,10 @@ function validateSave(value: unknown): {
     player.maxMp < 1
   )
     throw new Error("save-invalid");
-  if (player.x > WORLD_WIDTH || player.y > WORLD_HEIGHT)
+  if (!validExploration(player.exploration)) throw new Error("save-invalid");
+  player.exploration = normalizeExploration(player.exploration);
+  const savedWidth = player.exploration.active ? EXPLORATION_WIDTH : 1900, savedHeight = player.exploration.active ? EXPLORATION_HEIGHT : 1200;
+  if (player.x > savedWidth || player.y > savedHeight)
     throw new Error("save-invalid");
   if (player.mounted !== undefined && typeof player.mounted !== "boolean") throw new Error("save-invalid");
   if (!validMilitary(player.military)) throw new Error("save-invalid");
@@ -5610,16 +5946,7 @@ function validateSave(value: unknown): {
           : 0,
     ]),
   ) as Record<SkillKey, number>;
-  player.dungeonClears = Object.fromEntries(
-    (["tomb", "bamboo"] as DungeonId[]).map((key) => [
-      key,
-      Number.isFinite(player.dungeonClears?.[key])
-        ? Math.max(0, Math.floor(player.dungeonClears[key]))
-        : key === "tomb" && player.dungeonTokens > 0
-          ? 1
-          : 0,
-    ]),
-  ) as Record<DungeonId, number>;
+  player.dungeonClears = normalizeDungeonClears(player.dungeonClears, player.dungeonTokens);
   const checkItem = (item: Item) =>
     Boolean(
       item &&
@@ -5671,10 +5998,10 @@ function validateSave(value: unknown): {
           loot.id.length < 200 &&
           Number.isFinite(loot.x) &&
           loot.x >= 0 &&
-          loot.x <= WORLD_WIDTH &&
+          loot.x <= savedWidth &&
           Number.isFinite(loot.y) &&
           loot.y >= 0 &&
-          loot.y <= WORLD_HEIGHT &&
+          loot.y <= savedHeight &&
           Number.isInteger(loot.gold) &&
           loot.gold >= 0 &&
           loot.gold <= 1e7 &&
@@ -5789,6 +6116,9 @@ function bindIdleUi(): void {
   document.getElementById("gear-sets-btn")!.addEventListener("click", () => openGearSets());
   document.querySelector(".app-shell")!.addEventListener("click", event => {
     const target = event.target as HTMLElement;
+    if (target.closest("[data-open-exploration]")) openExplorationAtlas();
+    if (target.closest("[data-open-bestiary]")) openBestiary();
+    if (target.closest("[data-exit-exploration]")) exitExploration();
     if (target.closest("[data-open-events]")) openLuckyEvents();
     if (target.closest("[data-open-bots]")) openBots();
     if (target.closest("[data-open-siege]")) openRequestedSiege();
@@ -5864,6 +6194,8 @@ function bindIdleUi(): void {
       !goToStage(game.player.idle, stage, game.player.level)
     )
       return;
+    if (exploring()) collectIdleLoot(true);
+    game.player.exploration.active = false; syncWorldSize();
     game.player.idle.enabled = true;
     // Unclaimed loot belongs to the old arena; collect before replacing its enemies.
     collectIdleLoot(true);
@@ -5911,6 +6243,8 @@ function bindIdleUi(): void {
     if (game.goldenEncounter) leaveGoldenBoss();
     if (game.mapMode !== "world")
       return showToast("Hãy hoàn thành phụ bản trước.");
+    if (exploring()) collectIdleLoot(true);
+    game.player.exploration.active = false; syncWorldSize();
     game.player.idle.enabled = true;
     game.player.idle.inTown = false;
     game.player.idle.push = false;
@@ -5929,6 +6263,7 @@ function bindIdleUi(): void {
       document.getElementById("training-btn")!.click(),
     );
   document.getElementById("town-btn")!.addEventListener("click", () => {
+    if (exploring()) { exitExploration(); return; }
     if (game?.territoryEncounter) { leaveTerritory(); return; }
     if (game?.goldenEncounter) { leaveGoldenBoss(); return; }
     if (!game || game.mapMode !== "world")
@@ -5968,6 +6303,7 @@ function bindIdleUi(): void {
   document
     .getElementById("utility-content")!
     .addEventListener("change", (event) => {
+      if ((event.target as HTMLElement).matches("#exploration-region")) openExplorationAtlas(Number((event.target as HTMLSelectElement).value));
       const control = event.target as HTMLSelectElement;
       if (control.id === "set-shop-id" && SET_IDS.includes(control.value as SetId)) { setShopId = control.value as SetId; selectedShopVariant = undefined; openSetShop(); }
       if (control.id === "set-shop-slot" && (EQUIPMENT_SLOTS as readonly string[]).includes(control.value)) { setShopSlot = control.value as ItemSlot; selectedShopVariant = undefined; openSetShop(); }
@@ -5987,6 +6323,7 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const explore = target.closest<HTMLButtonElement>("[data-explore-region]"); if (explore && !explore.disabled) enterExploration(Number(explore.dataset.exploreRegion), Number(explore.dataset.exploreZone));
       const lucky = target.closest<HTMLElement>("[data-lucky-tab]")?.dataset.luckyTab;
       if (lucky && ["wheel", "dice", "lottery"].includes(lucky)) openLuckyEvents(lucky as LuckyGame);
       const play = target.closest<HTMLButtonElement>("[data-play-lucky]"); if (play && !play.disabled) playLucky(play.dataset.playLucky as LuckyGame);
@@ -6264,6 +6601,8 @@ function bindIdleUi(): void {
     if (!game || game.mapMode !== "world") return;
     if (game.goldenEncounter) leaveGoldenBoss();
     collectIdleLoot();
+    if (exploring()) collectIdleLoot(true);
+    game.player.exploration.active = false; syncWorldSize();
     game.player.idle.enabled = false;
     game.player.idle.inTown = false;
     game.enemies = makeEnemies();
@@ -6277,6 +6616,8 @@ function bindIdleUi(): void {
   document.getElementById("idle-mode-btn")!.addEventListener("click", () => {
     if (!game || game.mapMode !== "world") return;
     if (game.goldenEncounter) leaveGoldenBoss();
+    if (exploring()) collectIdleLoot(true);
+    game.player.exploration.active = false; syncWorldSize();
     game.player.idle.enabled = true;
     game.player.idle.inTown = false;
     prepareIdleWave();

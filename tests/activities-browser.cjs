@@ -122,7 +122,7 @@ async function startSiege(page, city = "hoang-thanh", size = 6) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.18.0",
+      "0.19.0",
     );
     await click(page, '[data-faction="gaibang"]');
     await click(page, "#join-sect");
@@ -351,7 +351,7 @@ async function startSiege(page, city = "hoang-thanh", size = 6) {
     }
     assert.deepEqual(errors, []);
     console.log(
-      "PASS v0.18: saved event payouts/cooldown/reload/quota rollback; walking bots; real support damage; level-1 siege victory, commands, retreat, timeout and reload; old-save migration; responsive UI.",
+      "PASS v0.19: saved event payouts/cooldown/reload/quota rollback; walking bots; real support damage; level-1 siege victory, commands, retreat, timeout and reload; old-save migration; responsive UI.",
     );
   } finally {
     await browser.close();

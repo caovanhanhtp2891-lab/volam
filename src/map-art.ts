@@ -13,6 +13,53 @@ interface MapObstacle {
   type: string;
 }
 
+// Repeating mirrored terrain keeps painted details at a readable scale in large
+// worlds. Opposite edges meet at the same atlas pixels, avoiding hard seams.
+export function createTerrainArt(
+  region: number,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
+  const canvas = createTrainingArt(region, width, height);
+  if (!trainingAtlas.complete || !trainingAtlas.naturalWidth) return canvas;
+  const c = canvas.getContext("2d")!,
+    frame = regionFrame(
+      region,
+      trainingAtlas.naturalWidth,
+      trainingAtlas.naturalHeight,
+    );
+  const tileWidth = 900,
+    tileHeight = 600;
+  c.save();
+  c.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  for (let row = 0; row < Math.ceil(height / tileHeight); row++) {
+    for (let col = 0; col < Math.ceil(width / tileWidth); col++) {
+      c.save();
+      c.translate(
+        (col + (col % 2)) * tileWidth,
+        (row + (row % 2)) * tileHeight,
+      );
+      c.scale(col % 2 ? -1 : 1, row % 2 ? -1 : 1);
+      c.drawImage(
+        trainingAtlas,
+        frame.x,
+        frame.y,
+        frame.width,
+        frame.height,
+        0,
+        0,
+        tileWidth,
+        tileHeight,
+      );
+      c.restore();
+    }
+  }
+  c.fillStyle = "#08132316";
+  c.fillRect(0, 0, width, height);
+  c.restore();
+  return canvas;
+}
+
 // Original scenery for the idle arenas. Paint once per region, with a clear
 // center for combat and paths that remain readable on small portrait screens.
 export function createTrainingArt(region: number, width: number, height: number): HTMLCanvasElement {

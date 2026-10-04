@@ -2,6 +2,18 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Vạn thú · Bí cảnh · v0.19.0
+
+**Giang hồ → Khám phá · Bản đồ lớn** mở 16 map, mỗi map rộng **3.600 × 2.400**, có bốn khu vực đặt tên riêng, đường nối và mốc khu. Có thể đi bộ, cưỡi ngựa hoặc bấm **Đổi khu** để dịch chuyển. Map mở khi đủ cấp vào vùng hoặc đã mở ải tương ứng, giữ quyền truy cập sau trùng sinh. Mỗi map có 24 quái thường, ba tinh anh và một boss; các khu lần lượt có cấp 1–3, 4–5, 6–8, 9–10 cộng mức của vùng. Quái thường/tinh anh/boss hồi sinh sau 12/20/60 giây trong phiên chơi. **Về thành** trở lại chế độ luyện công trước đó và thu hồi đồ dưới đất.
+
+**32 mẫu hình mới** gồm 24 loài thường và tám thủ lĩnh: thú rừng, độc trùng, sơn tặc, quân cổ mộ, yêu linh, thạch linh, quái sa mạc và tuyết. Bộ hình dùng chung cho khám phá, luyện ải, bí cảnh và **Sổ quái**; quái có nhịp di chuyển, tấn công và trúng đòn. Cung thủ/yêu linh đánh xa, boss có chiêu báo trước vị trí và màu theo ngũ hành. Atlas WebP ~907 KB; nền khám phá ghép các ô địa hình ở tỷ lệ giữ chi tiết, cache tối đa hai map lớn.
+
+**Hành trang → Phụ bản** có 12 bí cảnh, từ Cổ Mộ cấp 3 đến Thiên Kiếp Cổ Cảnh cấp 155. Mười bí cảnh mới có 3–6 đợt, 2–3 boss và quân hộ vệ. XP, bạc, đá, token và số món thưởng tăng theo độ khó; bí cảnh cấp 60+ bảo đảm đồ cam, cấp 120+ bảo đảm đồ đỏ. Băng Viên thưởng bốn món đỏ, Long Điện/Thiên Kiếp thưởng năm món đỏ mỗi lượt hoàn thành. Có thêm vật phẩm rơi từ quái và boss. Nhận thưởng trở về vị trí trước khi vào bí cảnh; túi đầy chuyển vào **Đồ chờ nhận**, bấm nhận lặp không cấp lại thưởng. Ngã xuống, rời sớm hoặc hết giờ không nhận thưởng hoàn thành. Bí cảnh local chưa giới hạn lượt/ngày.
+
+File lưu cũ giữ nhân vật, trang bị, bạc và số lần vượt Cổ Mộ/Trúc Lâm; bổ sung bản ghi cho bí cảnh mới. Vị trí ngoài giới hạn map cũ, lửa trại và tinh anh trong map khám phá được lưu và tải lại. Tải lại trang tái tạo quái trong thế giới; thời gian hồi sinh của quái chưa lưu qua phiên.
+
+Kiểm tra dữ liệu và phần thưởng bằng `tests/exploration-dungeons.test.mjs`; kiểm tra di chuyển, 16 quần thể, sáu đợt Băng Viên, đồ đỏ, túi đầy, tải lại và giao diện bằng `tests/exploration-dungeons-browser.cjs`.
+
 ## Đồng hành · Công thành · v0.18.0
 
 Cử động thân trên có nhịp lấy đà → ra đòn → thu thế; bước chân nâng và đổi trọng tâm theo quãng đường thật. Vũ khí, áo/mũ và trang sức đi theo thân người khi tung chiêu; cưỡi ngựa giữ riêng tư thế chân trên yên.

@@ -1421,6 +1421,53 @@ h3 small {
   color: var(--gold);
   font-size: 12px;
 }
+
+/* Creature atlas, exploration regions and tiered dungeon rewards. */
+.monster-art {
+  display: block;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 4px 4px #0008);
+}
+.exploration-intro { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.exploration-intro b, .exploration-intro small { display: block; }
+.exploration-intro b { color: var(--gold); font-size: 16px; }
+.exploration-intro small { color: var(--muted); font-size: 11px; margin-top: 5px; }
+.exploration-zones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 12px 0; }
+.exploration-zone { padding: 10px; border: 1px solid #718069; border-radius: 5px; background: linear-gradient(140deg, #344939, #14251c); }
+.exploration-zone.boss-zone { border-color: #b1785d; background: linear-gradient(140deg, #50382e, #202720); }
+.exploration-zone > b { display: block; color: #ead69f; font-size: 14px; }
+.exploration-zone > small { display: block; font-size: 11px; color: #bcc9ae; margin: 5px 0; }
+.zone-fauna { display: flex; justify-content: center; gap: 2px; min-height: 106px; }
+.zone-fauna > span { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.zone-fauna .monster-art { width: 62px; height: 62px; max-width: 100%; }
+.zone-fauna small { text-align: center; color: #c9ceb8; font-size: 9px; line-height: 1.35; }
+.exploration-zone > button { font-size: 11px; margin: 6px 0 0; width: 100%; }
+.bestiary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.bestiary-grid article { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px 3px; border: 1px solid var(--monster-color); border-radius: 5px; background: #14241e; box-shadow: inset 0 0 14px #0006; text-align: center; }
+.bestiary-grid .monster-art { width: 96px; height: 96px; max-width: 100%; }
+.bestiary-grid b { color: #ede2b8; font-size: 11px; }
+.bestiary-grid small { color: var(--monster-color); margin: 4px 0; font-size: 10px; }
+.dungeon-art-line { position: relative; height: 80px; overflow: hidden; border-radius: 3px; margin: -4px -4px 8px; background: #0a1812; }
+.dungeon-art-line .region-thumbnail { width: 120px; height: 80px; border: 0; border-radius: 0; filter: brightness(.7); mask-image: linear-gradient(90deg, #000 70%, transparent); }
+.dungeon-art-line .monster-art { position: absolute; width: 80px; height: 80px; right: 12px; bottom: 0; }
+.exploration-hud { position: absolute; z-index: 3; left: 8px; top: calc(80px + env(safe-area-inset-top, 0px)); max-width: calc(100% - var(--map-width) - 28px); padding: 7px 9px; border: 1px solid #a08d5e; border-radius: 5px; background: #0c1b16e8; box-shadow: 0 2px 12px #0008; }
+.exploration-hud b, .exploration-hud small { display: block; }
+.exploration-hud b { color: #e6ce89; font-size: 12px; }
+.exploration-hud small { color: #b7c7b4; font-size: 10px; margin: 4px 0 6px; }
+.exploration-hud > div { display: flex; gap: 6px; }
+.exploration-hud button { font-size: 10px; padding: 4px 7px; }
+.app-shell:has(.exploration-hud:not(.hidden)) .canvas-badge { display: none; }
+.app-shell:has(.exploration-hud:not(.hidden)) #mobile-minimap { aspect-ratio: 3 / 2; }
+.app-shell:has(.exploration-hud:not(.hidden)) .loot-notices { top: calc(188px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 600px) {
+  .bestiary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .exploration-zones { grid-template-columns: 1fr; }
+  .zone-fauna { justify-content: flex-start; min-height: 84px; }
+  .zone-fauna > span { max-width: 85px; }
+}
 .dungeon-card small {
   display: block;
   color: var(--muted);

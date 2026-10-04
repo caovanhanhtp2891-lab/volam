@@ -128,13 +128,13 @@ test("dungeon unlocks require both level and the prerequisite completion", () =>
   assert.equal(canEnterDungeon("invalid", 99, {}), false);
 });
 
-test("each configured dungeon has unique spawn ids, waves and one final boss", () => {
+test("each configured dungeon has unique spawn ids, waves and a final boss", () => {
   const ids = new Set();
   for (const dungeon of Object.values(DUNGEONS)) {
     assert.ok(dungeon.timeLimit > 0 && dungeon.reward.xp > 0);
     assert.ok(dungeon.waves.length >= 2);
     const spawns = dungeon.waves.flat();
-    assert.equal(spawns.filter(enemy => enemy.kind === "boss").length, 1);
+    assert.ok(spawns.filter(enemy => enemy.kind === "boss").length >= 1);
     assert.equal(dungeon.waves.at(-1)[0].kind, "boss");
     for (const enemy of spawns) {
       assert.ok(!ids.has(enemy.id));

@@ -238,6 +238,7 @@ export function moveBot(
   now: number,
   blocked: (x: number, y: number) => boolean,
   stop = 12,
+  bounds = { width: 1900, height: 1200 },
 ): void {
   const before = { x: bot.x, y: bot.y },
     dx = goal.x - bot.x,
@@ -248,8 +249,11 @@ export function moveBot(
       d - stop,
       bot.speed * dt * (bot.slowUntil > now ? bot.slowFactor : 1),
     );
-    const x = Math.max(30, Math.min(1870, bot.x + (dx / d) * stride)),
-      y = Math.max(30, Math.min(1170, bot.y + (dy / d) * stride));
+    const x = Math.max(
+        30,
+        Math.min(bounds.width - 30, bot.x + (dx / d) * stride),
+      ),
+      y = Math.max(30, Math.min(bounds.height - 30, bot.y + (dy / d) * stride));
     if (!blocked(x, bot.y)) bot.x = x;
     if (!blocked(bot.x, y)) bot.y = y;
     if (bot.x === before.x && bot.y === before.y) {
@@ -257,8 +261,8 @@ export function moveBot(
       const sidestepX = bot.x - (dy / d) * stride * turn,
         sidestepY = bot.y + (dx / d) * stride * turn;
       if (!blocked(sidestepX, sidestepY)) {
-        bot.x = Math.max(30, Math.min(1870, sidestepX));
-        bot.y = Math.max(30, Math.min(1170, sidestepY));
+        bot.x = Math.max(30, Math.min(bounds.width - 30, sidestepX));
+        bot.y = Math.max(30, Math.min(bounds.height - 30, sidestepY));
       }
     }
   }

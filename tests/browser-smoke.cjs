@@ -15,11 +15,13 @@ async function seed(page, playerChanges, removeNewFields = false) {
   if (removeNewFields)
     for (const key of ["potions", "potionCooldown", "pendingItems", "dungeonClears", "idle"])
       delete snapshot.player[key];
-  await page.evaluate(({ key, data }) => localStorage.setItem(key, JSON.stringify(data)), {
+  await page.evaluate(({ key, data }) => {
+    localStorage.setItem(key, JSON.stringify(data));
+    document.querySelector("#load-btn").click();
+  }, {
     key: saveKey,
     data: snapshot,
   });
-  await page.locator("#load-btn").evaluate((el) => el.click());
   return snapshot;
 }
 
@@ -123,7 +125,8 @@ async function audit(page, width, height) {
     let state = (await saved(page)).player;
     assert.deepEqual(state.potions, { hp: 3, mp: 2 }, "old save migration");
     assert.deepEqual(state.pendingItems, []);
-    assert.deepEqual(state.dungeonClears, { tomb: 0, bamboo: 0 });
+    assert.equal(Object.keys(state.dungeonClears).length, 12);
+    assert.ok(Object.values(state.dungeonClears).every(count => count === 0));
     console.log("PASS old-save migration, no character reset");
 
     await seed(page, {
@@ -300,9 +303,10 @@ async function audit(page, width, height) {
     console.log("PASS bamboo three waves, its own boss, distinct rewards, unlock persistence");
     await closeSheet(page);
 
-    await seed(page, { ...strongFixture, hp: 1, defense: 0, equipment: {} });
+    await seed(page, { ...strongFixture, maxHp: (await saved(page)).player.maxHp, hp: 1, attack: 0, defense: 0, equipment: {}, potions: { hp: 0, mp: 0 }, shield: 0, shieldUntil: 0 });
     await openTab(page, "dungeon");
     await page.locator('[data-dungeon-id="tomb"]').click();
+    if (await page.locator("#mobile-auto").getAttribute("aria-pressed") === "false") await page.locator("#mobile-auto").click();
     await page.waitForFunction(() => document.querySelector("#mobile-map-name").textContent === "RỪNG TRÚC", {
       timeout: 20000,
     });
