@@ -1,16 +1,41 @@
 import type { GearVariant } from "./gear-catalog";
 import type { EquipmentVisual } from "./equipment-vfx";
 import { drawEquipmentRadiance } from "./equipment-vfx";
+import type { weaponPose } from "./actor-animation";
 export function drawHeldWeapon(
   c: CanvasRenderingContext2D,
   variant: GearVariant,
   weapon: EquipmentVisual,
   now: number,
   simple = false,
+  activity?: ReturnType<typeof weaponPose>,
 ): void {
   c.save();
   c.lineCap = "round";
   c.lineJoin = "round";
+  if ((activity?.trail ?? 0) > 0.01) {
+    c.save();
+    c.globalAlpha *= (activity?.trail ?? 0) * 0.35;
+    c.strokeStyle = "#d8eff3";
+    c.lineWidth = simple ? 1 : 2;
+    c.beginPath();
+    c.arc(
+      0,
+      0,
+      variant === "daggers" ? 21 : 35,
+      -Math.PI / 2 - 0.65,
+      -Math.PI / 2 + 0.15,
+    );
+    c.stroke();
+    if (!simple) {
+      c.globalAlpha *= 0.5;
+      c.lineWidth = 0.7;
+      c.beginPath();
+      c.arc(0, 0, 29, -Math.PI / 2 - 0.8, -Math.PI / 2);
+      c.stroke();
+    }
+    c.restore();
+  }
   const pole = ["spear", "halberd", "staff", "dragonstaff"].includes(variant);
   const sword = [
     "sword",
@@ -122,7 +147,14 @@ export function drawHeldWeapon(
     c.moveTo(1, -20);
     c.quadraticCurveTo(15, 0, 1, 20);
     c.stroke();
-    line(1, -20, 1, 20, 0.5, "#cec8ad");
+    const pull = (activity?.pull ?? 0) * 6;
+    c.strokeStyle = "#cec8ad";
+    c.lineWidth = 0.5;
+    c.beginPath();
+    c.moveTo(1, -20);
+    c.lineTo(1 - pull, 0);
+    c.lineTo(1, 20);
+    c.stroke();
     line(-8, 0, 17, 0, 0.8, "#c9d1cb");
     if (variant !== "bow") line(-3, -10, -3, 9, 2, "#705537");
   } else if (variant === "chakram") {

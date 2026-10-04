@@ -5,6 +5,7 @@ import type { ActorMotion } from "./combat";
 import { actorRig, RIDER_SEAT } from "./actor-rig";
 import { SECT_BY_FACTION } from "./sects";
 import { drawRiderLeg } from "./rider-art";
+import { horseGait } from "./actor-animation";
 export function drawMountedCharacter(
   c: CanvasRenderingContext2D,
   faction: FactionId,
@@ -15,7 +16,7 @@ export function drawMountedCharacter(
   appearance: HeroAppearance,
 ): void {
   const direction = motion.facingX < 0 ? -1 : 1,
-    bob = Math.abs(Math.sin(motion.stride * 1.05)) * motion.moving * 1.4;
+    bob = horseGait(motion.stride, motion.moving).bob;
   const seat = { x: RIDER_SEAT.x * direction, y: RIDER_SEAT.y - bob };
   c.save();
   c.translate(seat.x, seat.y);

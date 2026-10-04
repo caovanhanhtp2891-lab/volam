@@ -89,11 +89,14 @@ async function cast(page, skill) {
         }
       };
       window.rigDraws = { horses: 0, torsos: 0, grips: 0 };
+      window.statusDraws = { frozen: 0, chilled: 0, poisoned: 0, stunned: 0 };
+      window.walkFrames = new Set();
       const p = CanvasRenderingContext2D.prototype,
         clear = p.clearRect,
         translate = p.translate,
         draw = p.drawImage,
-        stroke = p.stroke;
+        stroke = p.stroke,
+        fill = p.fill;
       p.clearRect = function (...args) {
         if (this.canvas.id === "game-canvas") this.nextCamera = true;
         return clear.apply(this, args);
@@ -106,6 +109,11 @@ async function cast(page, skill) {
         return translate.call(this, x, y);
       };
       p.drawImage = function (source, ...args) {
+        if (
+          source instanceof HTMLImageElement &&
+          source.src.includes("horse-walk")
+        )
+          window.walkFrames.add(args[0]);
         if (
           source instanceof HTMLImageElement &&
           source.src.includes("riding-horses")
@@ -122,9 +130,20 @@ async function cast(page, skill) {
         return draw.call(this, source, ...args);
       };
       p.stroke = function (...args) {
+        if (this.canvas.id === "game-canvas" && this.strokeStyle === "#c3f3ff")
+          window.statusDraws.frozen++;
+        if (this.canvas.id === "game-canvas" && this.strokeStyle === "#94e5f4")
+          window.statusDraws.chilled++;
         if (this.strokeStyle === "#d4ae8b" && this.lineWidth === 1.5)
           window.rigDraws.grips++;
         return stroke.apply(this, args);
+      };
+      p.fill = function (...args) {
+        if (this.canvas.id === "game-canvas" && this.fillStyle === "#a4e76c")
+          window.statusDraws.poisoned++;
+        if (this.canvas.id === "game-canvas" && this.fillStyle === "#ffe59c")
+          window.statusDraws.stunned++;
+        return fill.apply(this, args);
       };
     });
     const page = await context.newPage();
@@ -136,7 +155,7 @@ async function cast(page, skill) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.14.0",
+      "0.15.0",
     );
     await click(page, '[data-sect="thuy-yen"]');
     await click(page, "#join-sect");
@@ -145,6 +164,9 @@ async function cast(page, skill) {
       ["cuiyan", "ultimate"],
       ["wudang", "skill1"],
       ["kunlun", "skill1"],
+      ["kunlun", "skill2"],
+      ["tangmen", "skill1"],
+      ["wudu", "skill1"],
       ["gaibang", "ultimate"],
     ]) {
       const definition = SECTS[SECT_BY_FACTION[faction]].kit[skill];
@@ -171,6 +193,9 @@ async function cast(page, skill) {
           autoEquip: false,
         });
       });
+      await page.evaluate(() => {
+        window.statusDraws = { frozen: 0, chilled: 0, poisoned: 0, stunned: 0 };
+      });
       await cast(page, skill);
       const immediate = await saved(page);
       assert.equal(immediate.player.mp, before.player.mp - definition.mp);
@@ -180,6 +205,13 @@ async function cast(page, skill) {
         "cast does not apply contact damage",
       );
       await step(page, 100);
+      assert.equal(
+        await page.evaluate(() =>
+          Object.values(window.statusDraws).some(Boolean),
+        ),
+        false,
+        "no debuff artwork before impact",
+      );
       assert.equal(
         (await saved(page)).enemies[0].hp,
         before.enemies[0].hp,
@@ -196,7 +228,7 @@ async function cast(page, skill) {
           path: path.join(captures, `ice-${skill}-flight.png`),
         });
       }
-      if (faction === "kunlun") {
+      if (faction === "kunlun" && skill === "skill1") {
         await step(page, 200);
         const first = await saved(page);
         assert.ok(first.enemies[0].hp < before.enemies[0].hp);
@@ -224,6 +256,39 @@ async function cast(page, skill) {
       if (definition.slow)
         assert.equal(hit.enemies[0].slowFactor, definition.slow);
       if (definition.stun) assert.ok(hit.enemies[0].stunUntil > 0);
+      const statuses = await page.evaluate(() => window.statusDraws);
+      if (faction === "cuiyan" && definition.slow)
+        assert.ok(statuses.chilled > 0);
+      if (definition.poison) assert.ok(statuses.poisoned > 0);
+      if (definition.stun && faction !== "cuiyan") {
+        assert.ok(statuses.stunned > 0);
+        assert.equal(
+          hit.enemies[0].frozenUntil,
+          0,
+          "lightning stun does not become ice",
+        );
+      }
+      if (faction === "cuiyan" && definition.stun) {
+        assert.ok(statuses.frozen > 0);
+        assert.equal(hit.enemies[0].frozenUntil, hit.enemies[0].stunUntil);
+        await step(page, 650);
+        const frozen = (await saved(page)).enemies[0];
+        assert.equal(frozen.x, hit.enemies[0].x);
+        assert.equal(frozen.y, hit.enemies[0].y);
+        await page.screenshot({
+          path: path.join(captures, "frozen-enemy.png"),
+        });
+        await step(page, 1600);
+        await page.evaluate(() => {
+          window.statusDraws.frozen = 0;
+        });
+        await step(page, 100);
+        assert.equal(
+          await page.evaluate(() => window.statusDraws.frozen),
+          0,
+          "ice cage disappears when stun expires",
+        );
+      }
       if (definition.zone) {
         await step(page, 100);
         assert.equal(
@@ -320,6 +385,57 @@ async function cast(page, skill) {
       6,
       "six horses draw different coat/saddle artwork",
     );
+    for (const variant of [
+      "bay",
+      "white",
+      "warhorse",
+      "ember",
+      "dapple",
+      "night",
+    ]) {
+      await seed(page, (s) => {
+        s.player.equipment.horse.variant = variant;
+        s.player.mounted = true;
+        s.player.x = 300;
+        s.player.y = 330;
+        Object.assign(s.player.idle, { enabled: false, inTown: false });
+      });
+      await click(page, '[data-idle-tab="log"]');
+      if (await page.locator(".game-layout").isVisible())
+        await click(page, "#world-panel-close");
+      await page.evaluate(() => {
+        window.walkFrames = new Set();
+        document.activeElement?.blur();
+      });
+      const walkingFrom = (await saved(page)).player.x;
+      await page.keyboard.down("d");
+      await step(page, 600);
+      const movedPlayer = (await saved(page)).player;
+      assert.ok(
+        movedPlayer.x > walkingFrom + 40,
+        `${variant}: riding moves through keyboard input`,
+      );
+      assert.equal(
+        await page.evaluate(() => window.walkFrames.size),
+        4,
+        `${variant}: four whole-body walking frames`,
+      );
+      if (variant === "bay")
+        await page.screenshot({
+          path: path.join(captures, "riding-in-motion.png"),
+        });
+      await page.keyboard.up("d");
+      await step(page, 300);
+      await page.evaluate(() => {
+        window.walkFrames = new Set();
+      });
+      await step(page, 100);
+      assert.equal(
+        await page.evaluate(() => window.walkFrames.size),
+        0,
+        `${variant}: gait stops at rest`,
+      );
+    }
     await click(page, '[data-idle-tab="log"]');
     await step(page, 50);
     await page.screenshot({
@@ -330,7 +446,7 @@ async function cast(page, skill) {
       viewport: { width: 1200, height: 900 },
     });
     await gallery.setContent(
-      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.14.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
+      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.15.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
     );
     await gallery.screenshot({
       path: path.join(captures, "all-20-riding-poses.png"),

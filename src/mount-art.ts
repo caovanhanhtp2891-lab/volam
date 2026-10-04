@@ -1,6 +1,8 @@
 import type { ActorMotion } from "./combat";
 import type { GearVariant } from "./gear-catalog";
-import { HORSE_SIZE, horseStride } from "./actor-rig";
+import { HORSE_SIZE } from "./actor-rig";
+import { horseGait } from "./actor-animation";
+import { horseBreed, horseWalkFrame } from "./horse-animation";
 import { drawEquipmentRadiance } from "./equipment-vfx";
 export interface MountAppearance {
   variant: GearVariant;
@@ -16,6 +18,9 @@ export const HORSE_ATLAS_URL = new URL(
 const horses = new Image();
 horses.decoding = "async";
 horses.src = HORSE_ATLAS_URL;
+const walkingHorses = new Image();
+walkingHorses.decoding = "async";
+walkingHorses.src = new URL("./assets/horse-walk.webp", import.meta.url).href;
 export function drawHorse(
   ctx: CanvasRenderingContext2D,
   horse: MountAppearance,
@@ -23,18 +28,7 @@ export function drawHorse(
   now: number,
 ): void {
   if (!horses.complete || !horses.naturalWidth) return;
-  const index =
-    horse.variant === "white"
-      ? 1
-      : horse.variant === "warhorse"
-        ? 2
-        : horse.variant === "ember"
-          ? 3
-          : horse.variant === "dapple"
-            ? 4
-            : horse.variant === "night"
-              ? 5
-              : 0;
+  const index = horseBreed(horse.variant);
   const sx = ((index % 3) * horses.naturalWidth) / 3,
     sy = (Math.floor(index / 3) * horses.naturalHeight) / 2,
     sw = horses.naturalWidth / 3,
@@ -42,6 +36,26 @@ export function drawHorse(
   const { width: w, height: h } = HORSE_SIZE;
   ctx.save();
   ctx.scale(motion.facingX < 0 ? -1 : 1, 1);
+  if (motion.moving > 0.2 && !horse.simpleEffects) {
+    ctx.save();
+    ctx.fillStyle = "#b9a77b";
+    for (let i = 0; i < 2; i++) {
+      const p = (((motion.stride / (Math.PI * 2) + i / 2) % 1) + 1) % 1;
+      ctx.globalAlpha = (1 - p) * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(
+        -30 - p * 16,
+        12 - p * 3,
+        2 + p * 5,
+        1 + p * 1.5,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   if (horse.enhancement >= 7) {
     ctx.save();
     ctx.translate(0, 10);
@@ -55,39 +69,25 @@ export function drawHorse(
     );
     ctx.restore();
   }
-  if (motion.moving < 0.025)
+  if (
+    motion.moving < 0.025 ||
+    !walkingHorses.complete ||
+    !walkingHorses.naturalWidth
+  )
     ctx.drawImage(horses, sx, sy, sw, sh, -w / 2, 12 - h, w, h);
   else {
-    for (const leg of [0, 2, 1, 3]) {
-      const step = horseStride(motion.stride, motion.moving, leg),
-        lx = -w / 2 + (leg * w) / 4;
-      ctx.save();
-      ctx.translate(lx + w / 8 + step.x, 12 - h * 0.36 - step.lift);
-      ctx.rotate(step.angle);
-      ctx.drawImage(
-        horses,
-        sx + (leg * sw) / 4,
-        sy + sh * 0.64,
-        sw / 4,
-        sh * 0.36,
-        -w / 8,
-        0,
-        w / 4,
-        h * 0.36,
-      );
-      ctx.restore();
-    }
-    const bob = Math.abs(Math.sin(motion.stride * 1.05)) * motion.moving * 1.4;
+    const gait = horseGait(motion.stride, motion.moving);
+    const frame = horseWalkFrame(horse.variant, gait.frame);
     ctx.drawImage(
-      horses,
-      sx,
-      sy,
-      sw,
-      sh * 0.67,
-      -w / 2,
-      12 - h - bob,
-      w,
-      h * 0.67,
+      walkingHorses,
+      frame.x,
+      frame.y,
+      frame.width,
+      frame.height,
+      ((frame.x - frame.originX) * w) / 256,
+      12 - h - gait.bob,
+      (frame.width * w) / 256,
+      h,
     );
   }
   ctx.restore();

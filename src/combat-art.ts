@@ -1,4 +1,4 @@
-import { actionProgress, type ActorMotion } from "./combat";
+import type { ActorMotion } from "./combat";
 import type { FactionId } from "./idle";
 import { SECTS, SECT_BY_FACTION, HERO_SIZE } from "./sects";
 import { drawWalkingSprite, drawRidingTorso } from "./art";
@@ -12,6 +12,7 @@ import {
   type WearableAppearance,
 } from "./worn-equipment-art";
 import { drawRiderLeg } from "./rider-art";
+import { weaponPose, bodyBreath } from "./actor-animation";
 export { drawEquipmentIcon } from "./equipment-art";
 export interface HeroAppearance extends GearAura, WearableAppearance {
   weaponVariant?: GearVariant;
@@ -43,14 +44,28 @@ export function drawAnimatedHero(
     appearance.riding || motion.action === "dash"
       ? 0
       : Math.sin(motion.stride) * motion.moving;
-  const swing =
-    motion.action === "attack" || motion.action === "cast"
-      ? Math.sin(actionProgress(motion, now) * Math.PI)
-      : 0;
+  const defaultWeapon: Partial<Record<string, GearVariant>> = {
+    "thieu-lam": "staff",
+    "thien-vuong": "spear",
+    "duong-mon": "crossbow",
+    "ngu-doc": "staff",
+    "nga-mi": "sword",
+    "thuy-yen": "fan",
+    "cai-bang": "dragonstaff",
+    "thien-nhan": "daggers",
+    "vo-dang": "sword",
+    "con-lon": "thundersword",
+  };
+  const variant =
+    appearance.weaponVariant ?? defaultWeapon[school.id] ?? "sword";
+  const pose = weaponPose(variant, motion, now);
   const direction = motion.facingX < 0 ? -1 : 1;
   ctx.save();
-  ctx.translate(swing * direction * 1.3, -Math.abs(step) * 0.8);
-  ctx.rotate(step * 0.014);
+  ctx.translate(
+    pose.lean * direction * 28,
+    -Math.abs(step) * 0.8 + bodyBreath(now, motion.moving, !!appearance.riding),
+  );
+  ctx.rotate(step * 0.014 + pose.lean * direction);
   if (now < motion.hurtUntil) ctx.globalAlpha *= 0.65;
   if (appearance.riding) {
     ctx.save();
@@ -71,23 +86,10 @@ export function drawAnimatedHero(
       sex,
     );
   // The clean atlas contains empty hands. Only the equipped/default weapon is drawn.
-  const defaultWeapon: Record<string, GearVariant> = {
-    "thieu-lam": "staff",
-    "thien-vuong": "spear",
-    "duong-mon": "crossbow",
-    "ngu-doc": "staff",
-    "nga-mi": "sword",
-    "thuy-yen": "fan",
-    "cai-bang": "dragonstaff",
-    "thien-nhan": "daggers",
-    "vo-dang": "sword",
-    "con-lon": "thundersword",
-  };
-  const variant = appearance.weaponVariant ?? defaultWeapon[school.id];
   ctx.save();
   ctx.scale(direction, 1);
   ctx.translate(rig.right.x, rig.right.y);
-  ctx.rotate(-0.16 + swing * (motion.action === "cast" ? 0.35 : 1.0));
+  ctx.rotate(pose.angle);
   drawHeldWeapon(
     ctx,
     variant,
@@ -97,6 +99,7 @@ export function drawAnimatedHero(
     },
     now,
     appearance.simpleEffects,
+    pose,
   );
   ctx.restore();
   ctx.save();

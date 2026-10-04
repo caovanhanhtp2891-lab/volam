@@ -51,6 +51,7 @@ import type { MountAppearance } from "./mount-art";
 import { drawMountedCharacter } from "./mounted-character-art";
 import { actorCastOffset } from "./actor-rig";
 import { skillUsesFlight, flightSpeed } from "./skill-flight";
+import { drawEnemyStatus } from "./enemy-status-art";
 import { drawGearAura } from "./gear-effects";
 import { RARITIES, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
@@ -199,6 +200,8 @@ interface Enemy {
   slowUntil: number;
   slowFactor: number;
   stunUntil: number;
+  chilledUntil: number;
+  frozenUntil: number;
   poisonUntil: number;
   poisonNextTick: number;
   poisonDamage: number;
@@ -724,6 +727,8 @@ function createEnemy(
     slowUntil: 0,
     slowFactor: 1,
     stunUntil: 0,
+    chilledUntil: 0,
+    frozenUntil: 0,
     poisonUntil: 0,
     poisonNextTick: 0,
     poisonDamage: 0,
@@ -1917,6 +1922,10 @@ function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier:
   if (definition.breakArmor) enemy.defenseDownUntil = now + definition.breakArmor * 1000;
   if (definition.slow) { enemy.slowUntil = now + 3000; enemy.slowFactor = definition.slow; }
   if (definition.stun) enemy.stunUntil = now + Math.min(definition.stun, enemy.kind === "boss" ? .35 : 2) * 1000;
+  if (definition.motif === "fan" || definition.motif === "frost") {
+    if (definition.slow) enemy.chilledUntil = enemy.slowUntil;
+    if (definition.stun) enemy.frozenUntil = enemy.stunUntil;
+  }
   if (definition.poison) {
     enemy.poisonUntil = now + definition.poison * 1000;
     enemy.poisonNextTick = now + 1000;
@@ -2858,7 +2867,7 @@ function update(dt: number, now: number): void {
         enemy.dead = false;
         enemy.hp = enemy.maxHp;
         enemy.attackCooldown = 1;
-        enemy.poisonUntil = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = 0;
+        enemy.poisonUntil = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = enemy.chilledUntil = enemy.frozenUntil = 0;
         enemy.x += randomBetween(-22, 22);
         enemy.y += randomBetween(-22, 22);
       }
@@ -2870,7 +2879,11 @@ function update(dt: number, now: number): void {
       if (enemy.dead) continue;
     }
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
-    if (enemy.stunUntil > now) continue;
+    if (enemy.stunUntil > now) {
+      const frozenMotion = game.combat.enemyMotions.get(enemy.id);
+      if (frozenMotion) { frozenMotion.moving = 0; frozenMotion.action = "idle"; }
+      continue;
+    }
     const enemySpeed = enemy.speed * (enemy.slowUntil > now ? enemy.slowFactor : 1);
     let motion = game.combat.enemyMotions.get(enemy.id);
     if (!motion) {
@@ -3562,6 +3575,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
     ctx.fillStyle = "#ffbf68"; ctx.font = "13px Georgia"; ctx.textAlign = "center"; ctx.fillText("◆", 0, -enemy.radius * 2.6);
   }
   drawEnemySprite(enemy, now);
+  drawEnemyStatus(ctx, enemy, now, game?.player.preferences.skillEffects === "simple");
   ctx.restore();
   const barWidth =
     enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
@@ -5619,7 +5633,19 @@ function drawSkillArtPreview(now: number): void {
   motion.actionAt = now - p * 1600; motion.actionDuration = 650;
   drawAnimatedHero(c, game.player.factionId, game.player.sex, motion, now, { ...currentHeroAppearance(), riding: false });
   c.restore();
-  if (skill.damage > 0) drawSprite(c, "bandit", victim.x, victim.y + 24, 44, 58);
+  if (skill.damage > 0) {
+    drawSprite(c, "bandit", victim.x, victim.y + 24, 44, 58);
+    if (p >= .55) {
+      const cold = skill.motif === "fan" || skill.motif === "frost", activeUntil = now + 1000;
+      c.save(); c.translate(victim.x, victim.y + 10);
+      drawEnemyStatus(c, {
+        radius: 17, slowUntil: skill.slow ? activeUntil : 0,
+        stunUntil: skill.stun ? activeUntil : 0, poisonUntil: skill.poison ? activeUntil : 0,
+        chilledUntil: cold && skill.slow ? activeUntil : 0, frozenUntil: cold && skill.stun ? activeUntil : 0,
+      }, now, quality === "simple");
+      c.restore();
+    }
+  }
   const base = { color: sect.color, sect: sect.id, kind: skill.motif, skill: artPreviewSkill, angle: 0, quality };
   const hand = actorCastOffset(sect.id, game.player.sex, 1);
   const origin = { x: actor.x + hand.x, y: actor.y + 12 + hand.y };

@@ -2,6 +2,14 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Kỵ mã hành vân · v0.15.0
+
+Sáu loại ngựa có **24 khung bước chân liền thân** thay cho chân cắt từ ảnh đứng. Chu kỳ chạy theo quãng đường thực, dừng khi nhân vật dừng; người ngồi trên yên nhún cùng ngựa. Chế độ Đầy đủ có bụi vó nhỏ, Gọn bỏ bụi. Nhân vật đi bộ giảm xoắn/gãy ở gấu áo và có nhịp thở khi đứng. Kiếm/côn có lấy đà–vung–thu hồi, thương đâm về trước, cung/nỏ kéo dây; điểm cầm giữ tại bàn tay.
+
+Địch trúng Thúy Yên có vệt lạnh khi chậm và **lớp băng bao quanh khi bị đóng băng**, mờ dần khi hết khóa; không bước/vung tay trong thời gian khóa. Độc có bọt xanh, choáng khác có sao vàng, phân biệt với băng. Các dấu chỉ xuất hiện khi trạng thái thực đã được áp dụng, mất khi hết hạn hoặc địch chết. Màn xem chiêu cũng minh họa trạng thái, không tiêu hao tài nguyên nhân vật.
+
+Kiểm tra 24 khung của sáu loại ngựa, dừng/di chuyển, trạng thái trước/sau chạm, khóa vị trí địch và tan băng trong `tests/flight-riding-browser.cjs`; chu kỳ, thu hồi vũ khí và hạn trạng thái trong `tests/actor-status.test.mjs`. Atlas bước chân WebP thêm ~476 KB, giữ nguyên 20 mẫu nhân vật và collider bán kính 12. Nhân vật/ngựa hiện vẫn dùng góc nhìn có đảo trái/phải, chưa có bộ ảnh riêng cho bốn hướng.
+
 ## Băng vũ & Kỵ mã · v0.14.0
 
 Thúy Yên phóng cụm băng có mặt tinh thể và vệt lạnh; khi tới địch mới trừ HP, làm chậm/đóng băng và nổ thành mảnh băng cùng vết nứt dưới chân. Phi Tuyết Liên Thiên hình quạt và Lưỡng Nghi Kiếm của Võ Đang cũng có đường bay thật. Lôi điện Côn Lôn nối lần lượt giữa các mục tiêu; hỏa/độc trận tầm xa bắt đầu tại lần chạm đầu. Đạn xuất phát ở tay cầm vũ khí, kể cả trên ngựa.

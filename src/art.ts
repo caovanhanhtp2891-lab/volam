@@ -55,21 +55,21 @@ export function drawWalkingSprite(
   if (Math.abs(step) < .025) return drawSprite(context, id, x, y, width, height, flip, sex);
   const { image: source, rect: [sx, sy, sw, sh] } = sourceFor(id, sex);
   if (!source.complete || !source.naturalWidth) return false;
-  const split = .72, overlap = .035;
+  const split = .78, overlap = .045;
   context.save();
   context.translate(x, y);
   if (flip) context.scale(-1, 1);
   for (const side of (step > 0 ? [-1, 1] : [1, -1])) {
     const stride = step * side;
     context.save();
-    context.translate(side * width * .12 + stride * 2.8, -height * (1 - split));
-    context.rotate(stride * .12);
+    context.translate(side * width * .12 + stride * 1.6, -height * (1 - split));
+    context.rotate(stride * .055);
     context.drawImage(source,
       (sx + (side > 0 ? sw / 2 : 0)) * source.naturalWidth,
       (sy + sh * (split - overlap)) * source.naturalHeight,
       sw * source.naturalWidth / 2, sh * source.naturalHeight * (1 - split + overlap),
       side < 0 ? -width / 2 + width * .12 : -width * .12,
-      -height * overlap - Math.max(0, stride) * 2.4,
+      -height * overlap - Math.max(0, stride) * 1.8,
       width / 2, height * (1 - split + overlap),
     );
     context.restore();
