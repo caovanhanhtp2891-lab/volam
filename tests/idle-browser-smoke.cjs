@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.29.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.30.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();

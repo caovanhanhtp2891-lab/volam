@@ -1,3 +1,5 @@
+import { drawWuxiaLandmark, groundPattern } from "./wuxia-sprites";
+
 export function createSiegeArt(): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = 1900;
@@ -5,14 +7,16 @@ export function createSiegeArt(): HTMLCanvasElement {
   const c = canvas.getContext("2d")!;
   c.fillStyle = "#293b30";
   c.fillRect(0, 0, 1900, 1200);
-  for (let y = 180; y < 1010; y += 38)
+  const paving = groundPattern(c, 1);
+  if (paving) { c.fillStyle = paving; c.fillRect(310, 180, 1280, 830); }
+  else for (let y = 180; y < 1010; y += 38)
     for (let x = 310; x < 1590; x += 70) {
       c.fillStyle = (x + y) % 3 === 0 ? "#4c5149" : "#414b42";
       c.fillRect(x, y, 68, 36);
       c.fillStyle = "#83917e22";
       c.fillRect(x + 4, y + 3, 60, 2);
     }
-  c.fillStyle = "#84816c";
+  c.fillStyle = paving ?? "#84816c";
   c.fillRect(840, 300, 220, 650);
   for (let y = 305; y < 940; y += 45) {
     c.strokeStyle = "#4b5149";
@@ -40,6 +44,7 @@ export function createSiegeArt(): HTMLCanvasElement {
   wall(1035, 520, 565, 50);
   for (const x of [340, 1480])
     for (const y of [230, 580]) {
+      if (drawWuxiaLandmark(c, 13, x, y + 90, 280)) continue;
       c.fillStyle = "#242c2b";
       c.fillRect(x - 70, y - 70, 150, 150);
       c.fillStyle = "#797e6b";

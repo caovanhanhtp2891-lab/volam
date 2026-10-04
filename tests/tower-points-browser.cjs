@@ -76,8 +76,8 @@ const openSkills=async page=>{await close(page);await click(page,'[data-idle-tab
     await openTower(page,25);await click(page,'[data-enter-tower="25"]');await step(page,30000);s=await save(page);assert.ok(s.player.level>5);assert.equal(s.player.idle.attributePoints,0);assert.equal(s.player.skillPoints,0);assert.ok(Object.values(s.player.idle.attributes).reduce((a,b)=>a+b)>0);
     await close(page);await click(page,'#load-btn');assert.equal((await save(page)).player.idle.autoAttributes,true);
     console.log('PASS opted-in automatic allocation on real XP level-up and persisted settings');
-    await seed(page,s=>{s.player.level=160;s.player.xp=0;});
-    const beforeRebirth=(await save(page)).player;await close(page);await click(page,'[data-idle-tab="char"]');await click(page,'#rebirth-btn');await click(page,'#confirm-rebirth');
+    await seed(page,s=>{s.player.level=200;s.player.xp=0;});
+    const beforeRebirth=(await save(page)).player;await close(page);await click(page,'[data-idle-tab="char"]');await click(page,'#rebirth-btn');assert.equal(await page.locator('#confirm-rebirth').isDisabled(),false);await click(page,'#confirm-rebirth');
     s=await save(page);assert.equal(s.player.level,1);assert.deepEqual(s.player.tower,beforeRebirth.tower);assert.equal(s.player.idle.autoAttributes,true);assert.equal(s.player.idle.autoSkillPoints,true);assert.deepEqual(s.player.inventory,beforeRebirth.inventory);
     await openTower(page,1);assert.equal(await page.locator('[data-enter-tower="1"]').isDisabled(),true);
     console.log('PASS tower progress, sigils, gear and auto preferences survive rebirth; entry still requires level five');

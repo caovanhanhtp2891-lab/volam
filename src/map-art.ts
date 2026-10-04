@@ -1,6 +1,7 @@
 import { drawScenerySprite } from "./scenery-sprites";
 import { drawLandscape, drawSceneryTemple, drawSceneryRock } from "./landscape-art";
 import { REGION_SCENES } from "./region-scenes";
+import { drawWuxiaLandmark, groundPattern } from "./wuxia-sprites";
 export { sceneryArtRevision as trainingArtRevision } from "./scenery-sprites";
 
 interface MapObstacle {
@@ -42,7 +43,7 @@ export function drawRegionWeather(ctx: CanvasRenderingContext2D, region: number,
 }
 
 // Static scenery is painted once at native resolution, then reused by the world
-// and minimap. This avoids image downloads and repeated geometry every frame.
+// and minimap. This avoids repeated texture work and geometry every frame.
 export function createMapArt(
   mode: "world" | "dungeon" | "bamboo",
   width: number,
@@ -56,15 +57,17 @@ export function createMapArt(
   context.scale(canvas.width / width, canvas.height / height);
   context.fillStyle = mode === "world" ? "#5d8058" : mode === "bamboo" ? "#35543e" : "#222b37";
   context.fillRect(0, 0, width, height);
-  drawLandscape(context, mode === "world" ? 3 : mode === "bamboo" ? 3 : 2, width, height, false);
+  drawLandscape(context, mode === "world" || mode === "bamboo" ? 3 : 2, width, height, mode === "bamboo");
+  if (mode === "bamboo") return canvas;
 
   if (mode !== "world") {
-    context.fillStyle = mode === "bamboo" ? "#8f9261" : "#3e4857";
+    const paving = groundPattern(context, 1);
+    context.fillStyle = paving ?? "#3e4857";
     context.fillRect(160, 500, 1450, 470);
-    context.strokeStyle = mode === "bamboo" ? "#b0b579" : "#697082";
+    context.strokeStyle = "#697082";
     context.lineWidth = 8;
     context.strokeRect(160, 500, 1450, 470);
-    context.strokeStyle = mode === "bamboo" ? "#7e8256" : "#35404f";
+    context.strokeStyle = "#35404f";
     context.lineWidth = 2;
     context.beginPath();
     for (let x = 160; x <= 1610; x += 96) {
@@ -75,22 +78,11 @@ export function createMapArt(
       context.moveTo(160, y);
       context.lineTo(1610, y);
     }
-    context.stroke();
-    if (mode === "bamboo") {
-      context.fillStyle = "#6f945c";
-      for (let x = 160; x < 1650; x += 90) {
-        context.fillRect(x, 365, 7, 110);
-        context.fillRect(x + 30, 1010, 7, 100);
-        context.beginPath();
-        context.ellipse(x + 5, 380, 32, 10, -0.4, 0, Math.PI * 2);
-        context.ellipse(x + 30, 1020, 32, 10, 0.4, 0, Math.PI * 2);
-        context.fill();
-      }
-    }
+    if (!paving) context.stroke();
     return canvas;
   }
 
-  context.strokeStyle = "#baa879";
+  context.strokeStyle = groundPattern(context, 1) ?? "#baa879";
   context.lineWidth = 60;
   context.lineJoin = "round";
   context.lineCap = "round";
@@ -116,7 +108,9 @@ export function createMapArt(
     context.stroke();
   }
 
-  for (const y of [195, 385]) drawSceneryTemple(context, 130, y + 65, .6, 3);
+  for (const [frame, y] of [[5, 195], [7, 385]])
+    if (!drawWuxiaLandmark(context, frame, 130, y, 235)) drawSceneryTemple(context, 130, y + 65, .6, 3);
+  drawWuxiaLandmark(context, 4, 360, 190, 260);
 
   for (const { x, y, w, h, type } of obstacles) {
     if (type === "rock") {

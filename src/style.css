@@ -2449,13 +2449,13 @@ h2 {
 .loot-notice { padding: 4px 5px; gap: 5px; background: #11141de0; }
 .loot-notice b { font-size: 9px; }
 .loot-notice small { font-size: 8px; }
-#mobile-auto { top: auto; left: 12px; right: auto; bottom: 128px; width: 43px; height: 43px; display: grid; align-content: center; justify-items: center; padding: 2px; border-radius: 50%; }
+#mobile-auto { top: auto; left: 10px; right: auto; bottom: 128px; width: 48px; height: 48px; display: grid; align-content: center; justify-items: center; padding: 2px; border-radius: 50%; z-index: 4; touch-action: manipulation; user-select: none; }
 #mobile-auto span { font-size: 18px; line-height: 20px; }
 #mobile-auto small { font-size: 7px; }
 .joystick { width: 74px; height: 74px; left: 10px; bottom: 42px; }
 .joystick-knob { width: 30px; height: 30px; background: #bba36d75; }
 .mobile-pickup { width: 28px; height: 28px; left: 93px; bottom: 56px; }
-.combat-bar { bottom: 8px; right: 7px; width: 154px; height: 172px; }
+.combat-bar { bottom: 8px; right: 7px; width: 154px; height: 172px; pointer-events: none; }
 .skill-bar { position: absolute; inset: 0; display: block; margin: 0; pointer-events: none; }
 .skill-button { position: absolute; width: 42px; height: 42px; border-width: 2px; padding: 2px; pointer-events: auto; }
 .skill-button .skill-glyph { width: 34px; height: 34px; }
@@ -3217,7 +3217,8 @@ h2 {
 .lucky-wheel > span { font-size: 9px; width: 42px; }
 
 /* Chat opens above the combat controls; its text uses DOM nodes, never HTML. */
-.arena-chat.chat-open { width: calc(100% - 14px); max-width: 460px; z-index: 4; }
+.arena-chat.chat-open { bottom: 180px; width: calc(100% - 14px); max-width: 460px; z-index: 4; }
+.arena-chat.chat-open #chat-messages { height: min(150px, max(26px, calc(100dvh - 500px))); }
 .chat-open #chat-toggle b { transform: rotate(180deg); }
 #chat-body { padding: 8px; border: 1px solid #998052; border-top: 0; border-radius: 0 0 5px 5px; background: #091610f5; color: #e8e3cd; box-shadow: 0 3px 14px #0008; }
 .chat-heading { display: flex; align-items: center; gap: 8px; font-size: 12px; }
@@ -3233,6 +3234,9 @@ h2 {
 #chat-form button { flex: none; min-width: 48px; padding: 5px; }
 #chat-help { display: block; margin-top: 5px; font-size: 10px; color: #c7bd9d; }
 @media (max-height: 450px) { #chat-messages { height: 66px; } #chat-help { display: none; } }
+@media (orientation: landscape) and (max-height: 450px) {
+  .arena-chat.chat-open { left: 108px; bottom: 8px; width: calc(100% - 285px); max-width: none; }
+}
 
 /* Two explicit martial paths, sized for the existing phone-first sheets. */
 .martial-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; }

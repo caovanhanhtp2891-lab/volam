@@ -3,6 +3,8 @@ import {
   sceneryTreeFrame,
   sceneryArtRevision,
 } from "./scenery-sprites.ts";
+import { drawWuxiaLandmark, groundPattern } from "./wuxia-sprites.ts";
+import { wuxiaScene, roadControlPoints, roadPoint } from "./wuxia-scenes.ts";
 // Native-resolution terrain. Ground grain, paths and landmarks are cached once,
 // so combat frames never upscale a small painted atlas or run a blur filter.
 export const LANDSCAPES = [
@@ -230,6 +232,7 @@ export function drawSceneryTemple(
   scale = 1,
   region = 0,
 ) {
+  if (drawWuxiaLandmark(c, wuxiaScene(region).landmark, x, y + 12, 350 * scale)) return;
   if (
     drawScenerySprite(
       c,
@@ -385,13 +388,21 @@ export function drawLandscape(
     random = sceneryRandom(region),
     scale = Math.max(0.25, Math.min(1.4, width / 1900)),
     snow = region >= 14,
-    desert = region === 12;
+    desert = region === 12,
+    scene = wuxiaScene(region),
+    texture = groundPattern(c, scene.ground),
+    roadTexture = groundPattern(c, scene.road);
   c.save();
   c.imageSmoothingEnabled = true;
   c.imageSmoothingQuality = "high";
   c.filter = "none";
   c.fillStyle = ground;
   c.fillRect(0, 0, width, height);
+  if (texture) {
+    c.fillStyle = texture; c.fillRect(0, 0, width, height);
+    c.globalAlpha = snow ? .16 : scene.ground === 1 ? .28 : .34;
+    c.fillStyle = ground; c.fillRect(0, 0, width, height); c.globalAlpha = 1;
+  }
   const shade = c.createLinearGradient(0, 0, width, height);
   shade.addColorStop(0, "#dfdf9c14");
   shade.addColorStop(0.5, "#0000");
@@ -399,7 +410,7 @@ export function drawLandscape(
   c.fillStyle = shade;
   c.fillRect(0, 0, width, height);
   // Tiny native strokes add crisp grain instead of enlargement noise.
-  for (let i = 0; i < Math.ceil((width * height) / 110); i++) {
+  for (let i = 0; i < Math.ceil((width * height) / (texture ? 650 : 110)); i++) {
     const x = random() * width,
       y = random() * height;
     c.fillStyle =
@@ -452,61 +463,21 @@ export function drawLandscape(
     for (const [w, color] of [
       [99, "#2c403750"],
       [92, road],
-      [65, snow ? "#c3d3cd" : desert ? "#d4b383" : "#a9a078"],
+      [82, roadTexture ?? (snow ? "#c3d3cd" : desert ? "#d4b383" : "#a9a078")],
     ] as const) {
       c.lineWidth = w * scale;
       c.strokeStyle = color;
       c.beginPath();
-      c.moveTo(-50, height * 0.5);
-      c.bezierCurveTo(
-        width * 0.22,
-        height * 0.36,
-        width * 0.61,
-        height * 0.61,
-        width + 50,
-        height * 0.43,
-      );
-      c.moveTo(width * 0.3, -50);
-      c.bezierCurveTo(
-        width * 0.43,
-        height * 0.31,
-        width * 0.57,
-        height * 0.72,
-        width * 0.4,
-        height + 50,
-      );
+      for (const vertical of [false, true]) {
+        const [a, b, d, e] = roadControlPoints(region, vertical);
+        c.moveTo(a.x * width, a.y * height);
+        c.bezierCurveTo(b.x * width, b.y * height, d.x * width, d.y * height, e.x * width, e.y * height);
+      }
       c.stroke();
     }
   }
   if (paths) {
-    const point = (t: number, vertical: boolean) => {
-      const u = 1 - t;
-      return vertical
-        ? {
-            x:
-              width *
-              (0.3 * u ** 3 +
-                1.29 * u * u * t +
-                1.71 * u * t * t +
-                0.4 * t ** 3),
-            y:
-              -50 * u ** 3 +
-              height * (0.93 * u * u * t + 2.16 * u * t * t) +
-              (height + 50) * t ** 3,
-          }
-        : {
-            x:
-              -50 * u ** 3 +
-              width * (0.66 * u * u * t + 1.83 * u * t * t) +
-              (width + 50) * t ** 3,
-            y:
-              height *
-              (0.5 * u ** 3 +
-                1.08 * u * u * t +
-                1.83 * u * t * t +
-                0.43 * t ** 3),
-          };
-    };
+    const point = (t: number, vertical: boolean) => roadPoint(region, width, height, t, vertical);
     for (let i = 0; i < Math.ceil((width * height) / 550); i++) {
       const t = random(),
         vertical = i % 2 === 0,
@@ -523,7 +494,7 @@ export function drawLandscape(
           ? "#f4fcf197"
           : "#a1b8b766"
         : i % 2
-          ? "#e8d7ac9c"
+          ? scene.road === 1 ? "#d1d3c273" : "#e8d7ac9c"
           : "#6b674d55";
       c.fillRect(x, y, (1 + random() * 4) * scale, (1 + random() * 2) * scale);
       if (i % 12 === 0) {
@@ -592,19 +563,24 @@ export function drawLandscape(
   }
   props.sort((a, b) => a.y - b.y);
   for (const prop of props) {
-    if (prop.kind === 0 || desert)
+    if (prop.kind === 0 || desert || region === 2)
       drawSceneryRock(c, prop.x, prop.y, prop.scale, snow);
-    else if ([2, 15].includes(region) && prop.kind % 2)
-      crystal(
-        c,
-        prop.x,
-        prop.y,
-        prop.scale,
-        region === 15 ? "#67c5ee" : "#65bcb1",
-      );
+    else if (region === 15 && prop.kind % 2)
+      drawSceneryRock(c, prop.x, prop.y, prop.scale, true);
     else tree(c, prop.x, prop.y, prop.scale, region, random);
   }
-  drawSceneryTemple(c, width * 0.24, height * 0.27, scale, region);
+  // The landmark is north of the fighting area so its roof never hides targets.
+  if (scene.courtyard) {
+    const x = width * .50, y = height * .46, rx = 190 * scale, ry = 90 * scale;
+    c.beginPath(); c.moveTo(x - rx, y); c.lineTo(x, y - ry); c.lineTo(x + rx, y); c.lineTo(x, y + ry); c.closePath();
+    c.fillStyle = roadTexture ?? "#7f8b7d"; c.fill();
+    c.strokeStyle = snow ? "#c9e1dd" : "#626b58"; c.lineWidth = 6 * scale; c.stroke();
+    c.strokeStyle = "#d7d3b67a"; c.lineWidth = 1; c.stroke();
+  }
+  drawSceneryTemple(c, width * .50, height * .30, scale, region);
+  drawWuxiaLandmark(c, scene.companion, width * .70, height * .79, 245 * scale);
+  if ([0, 1, 4, 7].includes(region)) drawWuxiaLandmark(c, 1, width * .21, height * .66, 290 * scale);
+  if ([3, 10].includes(region)) drawWuxiaLandmark(c, 3, width * .84, height * .46, 220 * scale);
   if (region === 12 || region === 13) {
     for (let i = 0; i < 5; i++) {
       const x = width * 0.64 + i * 31 * scale,
@@ -621,7 +597,8 @@ export function drawLandscape(
   const ax = width * 0.61,
     ay = height * 0.76;
   ellipse(c, ax + 6, ay + 6, 94 * scale, 50 * scale, "#193b3450");
-  ellipse(c, ax, ay, 87 * scale, 44 * scale, snow ? "#d2e3dc" : "#879a7a");
+  c.beginPath(); c.ellipse(ax, ay, 87 * scale, 44 * scale, 0, 0, TAU);
+  c.fillStyle = roadTexture ?? (snow ? "#d2e3dc" : "#879a7a"); c.fill();
   c.strokeStyle = snow ? "#f0ffff" : "#d0cdae";
   c.lineWidth = 2 * scale;
   c.beginPath();
@@ -645,6 +622,8 @@ export function landscapeThumbnail(region: number): string {
     canvas.height = 300;
     drawLandscape(canvas.getContext("2d")!, region, 480, 300);
     thumbnails.set(key, canvas.toDataURL("image/webp", 0.9));
+    // Atlas load invalidations must not retain thumbnails from older revisions.
+    for (const old of thumbnails.keys()) if (!old.endsWith(`:${sceneryArtRevision}`)) thumbnails.delete(old);
   }
   return `<i class="region-thumbnail" data-native-landscape="${region}" aria-hidden="true" style="background-image:url('${thumbnails.get(key)}');background-size:cover;background-position:center"></i>`;
 }

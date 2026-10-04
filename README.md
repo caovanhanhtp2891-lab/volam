@@ -3,6 +3,14 @@
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
 
+## Giang hồ · Sơn thủy · v0.30.0
+
+- **Sửa Auto:** khung chat không che nút ở màn hình dọc/ngang; vùng chạm Auto 48px, giữ nguyên phần tử khi đổi nhãn. Bật Auto từ thành sẽ trở lại luyện công/phiêu lưu đúng chế độ. Auto hủy lệnh đi/nhặt tay cũ, xóa phím và joystick bị kẹt; mất focus hoặc mất pointer capture cũng xóa đầu vào. Tìm mục tiêu trên toàn map, tránh đứng chờ khi quái ở xa hơn 520px. Lệnh di chuyển mới vẫn chuyển sang điều khiển tay.
+- **Cảnh quan 16 map:** nền đất rêu, đá lát, cát và tuyết có chi tiết; sơn đình/vách đá Hoa Sơn, mộ môn Tần Lăng, đạo quán Thanh Thành, trà quán/rừng phong, đồi trà, thiền viện, bến thuyền Hoàng Hà, dược viên, phế tích Sa Mạc, vọng lâu Lâm Du Quan và núi tuyết Trường Bạch. Thanh Khê Trấn, Cổ Mộ, Trúc Lâm, các bí cảnh/tháp và công thành cùng dùng nền/cảnh vật mới. Đây là hình mới lấy cảm hứng bối cảnh VLTK, không phải map gốc VNG.
+- **Giữ hiệu năng và dữ liệu:** vẽ nền ở kích thước thật một lần, cache tối đa hai map luyện/ một đại thế giới; cập nhật khi atlas tải xong, kể cả phụ bản và công thành. Minimap dùng cùng nền. Giữ tên/ID map, cấp mở, vị trí quái, va chạm, thưởng và tiến trình/trang bị cũ. Hai atlas WebP mới tổng khoảng 1,36 MiB.
+
+Kiểm tra: 248 kiểm tra logic, typecheck và build `/volam/`; `tests/auto-map-browser.cjs` dùng chạm thật cho Auto/chat, trở lại từ thành, di chuyển tay/đầu vào bị kẹt/quái xa, Auto trong phụ bản/tháp, sáu viewport, đủ 16 cảnh quan và quay lại phụ bản đã bị loại khỏi cache. Hồi quy chat, công thành/nhặt đồ/bot, map lớn/phụ bản, leo tháp/trùng sinh cấp 200 và giữ trang bị.
+
 ## Thập phái · Song tu · v0.29.0
 
 - **10 phái × 2 hướng × 3 chiêu:** Thiếu Lâm côn/đao, Thiên Vương thương/chùy, Đường Môn phi đao/tụ tiễn, Ngũ Độc đao/chưởng, Nga Mi kiếm/chưởng, Thúy Yên đơn đao/song đao, Cái Bang chưởng/bổng, Thiên Nhẫn đao/kích, Võ Đang kiếm/khí, Côn Lôn đao/kiếm. Tên chiêu và họ vũ khí được đối chiếu dữ liệu JX1 công khai; xem [bảng chiêu và nguồn tra cứu](docs/martial-paths.md).

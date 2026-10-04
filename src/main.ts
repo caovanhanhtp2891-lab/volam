@@ -628,6 +628,7 @@ let worldArt = createMapArt("world", WORLD_WIDTH, WORLD_HEIGHT, obstacles);
 const dungeonArts: Partial<Record<DungeonId, HTMLCanvasElement>> = {};
 const dungeonArtRevisions = new Map<DungeonId, number>();
 let territoryArt: HTMLCanvasElement | undefined;
+let territoryArtRevision = -1;
 
 const NPCS: Npc[] = [
   {
@@ -1942,6 +1943,7 @@ function refreshExplorationHud(): void {
 
 let luckyTab: LuckyGame = "wheel";
 let siegeArt: HTMLCanvasElement | undefined;
+let siegeArtRevision = -1;
 function openLuckyEvents(tab: LuckyGame = luckyTab): void {
   if (!game) return;
   if (game.mapMode !== "world" || game.goldenEncounter)
@@ -4119,14 +4121,17 @@ function selectAt(world: { x: number; y: number }): void {
       ? NPCS.find((candidate) => distance(world, candidate) <= 32)
       : undefined;
   if (npc) {
+    game.autoBattle = false;
     interactNpc(npc);
   } else {
+    game.autoBattle = false;
     game.targetId = null;
     game.moveTarget = {
       x: clamp(world.x, 40, WORLD_WIDTH - 40),
       y: clamp(world.y, 40, WORLD_HEIGHT - 40),
     };
   }
+  refreshUi(true);
 }
 
 function updateCombat(now: number): void {
@@ -4303,7 +4308,7 @@ function update(dt: number, now: number): void {
   )
     drinkPotion("mp");
   if (game.autoBattle && !currentTarget()) {
-    const target = nearestEnemy(game.dungeonId && (isBondDungeon(game.dungeonId) || isGemRealm(game.dungeonId)) ? Number.POSITIVE_INFINITY : 520);
+    const target = nearestEnemy();
     if (target) game.targetId = target.id;
   }
 
@@ -4600,13 +4605,20 @@ function drawWorld(now: number): void {
   ctx.save();
   ctx.translate(-game.cameraX, -game.cameraY);
   if (game.towerEncounter) {
-    territoryArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
+    if (!territoryArt || territoryArtRevision !== trainingArtRevision) {
+      territoryArt = createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT); territoryArtRevision = trainingArtRevision;
+    }
     ctx.drawImage(territoryArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#e6bfff"; ctx.font = "600 18px sans-serif";
     drawOutlinedText(`TRẤN THIÊN THÁP · TẦNG ${game.towerEncounter.floor} · ĐỢT ${game.towerEncounter.wave + 1}/2`, 660, 780);
   } else if (game.territoryEncounter) {
-    territoryArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
-    if (game.territoryEncounter.siege) { siegeArt ??= createSiegeArt(); ctx.drawImage(siegeArt, 0, 0); }
+    if (!territoryArt || territoryArtRevision !== trainingArtRevision) {
+      territoryArt = createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT); territoryArtRevision = trainingArtRevision;
+    }
+    if (game.territoryEncounter.siege) {
+      if (!siegeArt || siegeArtRevision !== trainingArtRevision) { siegeArt = createSiegeArt(); siegeArtRevision = trainingArtRevision; }
+      ctx.drawImage(siegeArt, 0, 0);
+    }
     else ctx.drawImage(territoryArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     if (game.territoryEncounter.siege && game.territoryEncounter.wave === 1) {
       const capture = game.territoryEncounter.siege.capture;
@@ -4626,13 +4638,12 @@ function drawWorld(now: number): void {
     if (!game.territoryEncounter.siege) drawOutlinedText(`${land.name.toLocaleUpperCase("vi")} · CÔNG THÀNH · ĐỢT ${game.territoryEncounter.wave + 1}/3`, 660, 780);
   } else if (game.mapMode === "dungeon") {
     const id = game.dungeonId!;
-    if (DUNGEONS[id].tier >= 2 && dungeonArtRevisions.get(id) !== trainingArtRevision) {
-      dungeonArts[id] = createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT);
+    if (!dungeonArts[id] || dungeonArtRevisions.get(id) !== trainingArtRevision) {
+      dungeonArts[id] = DUNGEONS[id].tier >= 2 ? createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT) : createMapArt(id === "bamboo" ? "bamboo" : "dungeon", WORLD_WIDTH, WORLD_HEIGHT);
       if (isGemRealm(id)) drawGemMine(dungeonArts[id]!.getContext("2d")!, WORLD_WIDTH, WORLD_HEIGHT, RARITY_COLORS[DUNGEONS[id].reward.rarity]);
       dungeonArtRevisions.set(id, trainingArtRevision);
     }
-    dungeonArts[id] ??= DUNGEONS[id].tier >= 2 ? createTerrainArt(DUNGEONS[id].region, WORLD_WIDTH, WORLD_HEIGHT) : createMapArt(id === "bamboo" ? "bamboo" : "dungeon", WORLD_WIDTH, WORLD_HEIGHT);
-    if (Object.keys(dungeonArts).length > 3) { const oldest = Object.keys(dungeonArts).find(key => key !== id) as DungeonId; delete dungeonArts[oldest]; }
+    if (Object.keys(dungeonArts).length > 3) { const oldest = Object.keys(dungeonArts).find(key => key !== id) as DungeonId; delete dungeonArts[oldest]; dungeonArtRevisions.delete(oldest); }
     ctx.drawImage(dungeonArts[id]!, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#d4c7ef";
     ctx.font = "600 14px 'DM Sans', sans-serif";
@@ -5426,7 +5437,8 @@ function refreshUi(force = false): void {
     game.autoBattle ? "Tắt tự động chiến đấu" : "Bật tự động chiến đấu",
   );
   const autoLabel = game.autoBattle ? "Tự động" : "Thủ công";
-  if (mobileAuto.querySelector("small")?.textContent !== autoLabel) mobileAuto.innerHTML = `<span>⚔</span><small>${autoLabel}</small>`;
+  const autoCaption = mobileAuto.querySelector("small")!;
+  if (autoCaption.textContent !== autoLabel) autoCaption.textContent = autoLabel;
   setText(
     "#mobile-map-name",
     game.goldenEncounter ? "HOÀNG KIM" : game.mapMode === "world"
@@ -7559,10 +7571,12 @@ function openMobileSheet(tab: PanelTab): void {
 }
 
 function resetJoystick(): void {
+  const pointer = joystickPointerId;
   joystickPointerId = null;
   touchInput.x = 0;
   touchInput.y = 0;
   joystickKnob.style.transform = "translate(-50%, -50%)";
+  if (pointer !== null && joystick.hasPointerCapture(pointer)) joystick.releasePointerCapture(pointer);
 }
 
 function updateJoystick(event: PointerEvent): void {
@@ -7598,6 +7612,7 @@ joystick.addEventListener("pointerup", (event) => {
   if (event.pointerId === joystickPointerId) resetJoystick();
 });
 joystick.addEventListener("pointercancel", resetJoystick);
+joystick.addEventListener("lostpointercapture", resetJoystick);
 mobilePickup.addEventListener("click", pickupNearby);
 
 document.addEventListener("keydown", (event) => {
@@ -7667,6 +7682,11 @@ document.addEventListener("keydown", (event) => {
 
 document.addEventListener("keyup", (event) => {
   keys.delete(event.key.toLowerCase());
+});
+
+window.addEventListener("blur", () => { keys.clear(); resetJoystick(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { keys.clear(); resetJoystick(); }
 });
 
 canvas.addEventListener("click", (event) => selectAt(screenToWorld(event)));
@@ -7822,14 +7842,29 @@ document
   });
 mobileAuto.addEventListener("click", () => {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
+  // Auto takes over from manual movement, including input left behind by a
+  // cancelled touch or an unfocused window. A new movement gesture still stops it.
+  keys.clear(); resetJoystick();
+  game.moveTarget = null;
+  game.combat.lootTarget = null;
   game.autoBattle = !game.autoBattle;
   if (game.autoBattle) {
-    const target = currentTarget() ?? nearestEnemy(game.dungeonId && (isBondDungeon(game.dungeonId) || isGemRealm(game.dungeonId)) ? Number.POSITIVE_INFINITY : 520);
+    if (game.mapMode === "world" && !game.goldenEncounter && game.player.idle.inTown) {
+      game.player.idle.inTown = false;
+      if (game.player.idle.enabled) prepareIdleWave();
+      else {
+        game.enemies = makeEnemies(); game.worldEnemies = game.enemies;
+        game.targetId = null;
+      }
+      persistGame();
+      addLog("Rời thành, tiếp tục chiến đấu tự động.");
+    }
+    const target = currentTarget() ?? nearestEnemy();
     if (target) game.targetId = target.id;
     addLog(
       target
-        ? "Đã bật Auto chiến đấu: tự áp sát và đánh mục tiêu gần."
-        : "Đã bật Auto chiến đấu: chưa tìm thấy quái gần đây.",
+        ? "Đã bật Auto chiến đấu: tự tìm và áp sát quái trên bản đồ."
+        : "Đã bật Auto chiến đấu: đang chờ quái xuất hiện.",
     );
   } else {
     game.targetId = null;

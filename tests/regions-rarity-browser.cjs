@@ -102,7 +102,7 @@ async function map(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.29.0",
+      "0.30.0",
     );
     await page.locator('[data-faction="gaibang"]').click();
     await page.locator("#join-sect").click();

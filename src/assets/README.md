@@ -78,3 +78,16 @@ Bảy phẩm chất giữ viền trắng/lục/lam/tím/vàng/cam/đỏ. Từ la
 Thứ tự ô: thông, trúc, phong đỏ, hoa anh đào; cổ tự, cổng đá, đá rêu, tinh thể; thông tuyết, cổ tự tuyết, di tích sa mạc, cây lá rộng. `scenery-sprites.ts` vẽ nhỏ hơn ảnh nguồn, lấy chân ở đáy ô. `landscape-art.ts` vẽ nền và đường đi ở độ phân giải bản đồ, thêm hạt sỏi/cỏ/đá/nước và riêng khoáng mạch cho map ngọc. Cache nền đổi revision khi atlas tải xong; nền thành cũng cập nhật sau khi tải. Minimap/thẻ vùng dùng lại phong cảnh. Atlas 16 ô cũ còn giữ để tương thích tài nguyên/kiểm tra; không kéo lên nền sân chơi.
 
 Ngọc dùng SVG mặt cắt sắc, màu theo loại và viền/ánh sáng theo phẩm chất trong `gems.ts`; không tải thêm atlas ngọc. `skill-radiance.ts` vẽ xung kích/mảnh vỡ theo thời gian và bọt độc, giới hạn số hạt và giảm chi tiết trong Gọn.
+
+## Sơn thủy v0.30.0
+
+Hai atlas được tạo riêng bằng OpenAI image generation ngày 04/10/2026, lấy cảm hứng bối cảnh kiếm hiệp Võ Lâm Truyền Kỳ. Không dùng sprite hoặc ảnh bản đồ chính thức. PNG nguồn được chuyển sang WebP; bản phát hành chỉ chứa hai WebP, tổng 1.427.924 byte (khoảng 1,36 MiB).
+
+| Atlas | Kích thước | Lưới | Dung lượng | Chất lượng WebP |
+| --- | --- | --- | ---: | ---: |
+| `wuxia-ground.webp` | 1254 × 1254 | 2 × 2 | 725.120 byte | 88 |
+| `wuxia-landmarks.webp` | 1254 × 1254 | 4 × 4, trong suốt | 702.804 byte | 92 |
+
+Nền theo thứ tự: cỏ rêu, sân lát đá, đất cát, tuyết băng. Cảnh vật theo hàng: sơn đình, vách đá/thông, mộ môn Tần Lăng, cầu gỗ; cổng đạo quán, trà quán, phong đỏ, nhà sơn cốc; đồi trà, thiền viện, bến thuyền, dược viên; di tích sa mạc, vọng lâu biên ải, thông tuyết, băng nham.
+
+`wuxia-scenes.ts` chọn nền, đường và cảnh vật cho 16 vùng; `wuxia-sprites.ts` cắt ô trực tiếp, tạo bốn tile nền 288 × 288 một lần. `landscape-art.ts` vẽ đường cong theo cùng tọa độ chuẩn hóa cho đường và sỏi ở sân đấu, map lớn và minimap. Nền được lưu đệm ở độ phân giải bản đồ; tải xong atlas tăng revision để thay cả nền thành, phụ bản, tháp và công thành. Không tạo ảnh nền theo từng khung hình. Ngân sách dưới 900 KiB mỗi atlas được kiểm tra trong unit test; `auto-map-browser.cjs` kiểm tra cảnh vật 16 vùng, bốn nền và việc dùng lại cache.

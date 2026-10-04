@@ -3,12 +3,11 @@ export const SCENERY_ATLAS_URL = new URL(
   import.meta.url,
 ).href;
 export let sceneryArtRevision = 0;
+export function invalidateSceneryArt(): void { sceneryArtRevision++; }
 const atlas = typeof Image === "undefined" ? null : new Image();
 if (atlas) {
   atlas.decoding = "async";
-  atlas.onload = () => {
-    sceneryArtRevision++;
-  };
+  atlas.onload = invalidateSceneryArt;
   atlas.src = SCENERY_ATLAS_URL;
 }
 // Each 362px cell is drawn smaller than its source, keeping leaves, roof tiles
