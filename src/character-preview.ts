@@ -2,11 +2,12 @@ import { drawAnimatedHero, type HeroAppearance } from "./combat-art";
 import { freshMotion } from "./combat";
 import { type MountAppearance } from "./mount-art";
 import { drawGearAura } from "./gear-effects";
-import { drawCultivationAura } from "./cultivation-art";
+import { drawCultivationAura, drawCultivationOrbit } from "./cultivation-art";
 import type { Cultivation } from "./cultivation";
 import type { FactionId } from "./idle";
 import { SECT_BY_FACTION } from "./sects";
 import { characterArtKey } from "./character-art";
+import { RIDER_SEAT } from "./actor-rig";
 import { drawMountedCharacter } from "./mounted-character-art";
 import { drawMilitaryDragons } from "./military-vfx";
 import type { MilitaryRankId } from "./military";
@@ -87,8 +88,16 @@ export function drawCharacterPreview(
   ctx.save();
   ctx.scale(2.2, 2.2);
   drawCultivationAura(ctx, character.cultivation, now, character.simpleEffects);
-  if (character.title) drawTitleEffect(ctx, character.title, now, character.simpleEffects);
-  if (character.militaryRank) drawMilitaryDragons(ctx, character.militaryRank, now, false, character.simpleEffects);
+  if (character.title)
+    drawTitleEffect(ctx, character.title, now, character.simpleEffects);
+  if (character.militaryRank)
+    drawMilitaryDragons(
+      ctx,
+      character.militaryRank,
+      now,
+      false,
+      character.simpleEffects,
+    );
   drawGearAura(ctx, character.appearance, now, character.simpleEffects);
   ctx.restore();
   ctx.save();
@@ -97,6 +106,16 @@ export function drawCharacterPreview(
     ctx.scale(2.7, 2.7);
     const motion = freshMotion();
     motion.stride = now / 250;
+    ctx.save();
+    ctx.translate(0, RIDER_SEAT.y);
+    drawCultivationOrbit(
+      ctx,
+      character.cultivation,
+      now,
+      false,
+      character.simpleEffects,
+    );
+    ctx.restore();
     drawMountedCharacter(
       ctx,
       character.factionId,
@@ -106,8 +125,25 @@ export function drawCharacterPreview(
       now,
       character.appearance,
     );
+    ctx.save();
+    ctx.translate(0, RIDER_SEAT.y);
+    drawCultivationOrbit(
+      ctx,
+      character.cultivation,
+      now,
+      true,
+      character.simpleEffects,
+    );
+    ctx.restore();
   } else {
     ctx.scale(4, 4);
+    drawCultivationOrbit(
+      ctx,
+      character.cultivation,
+      now,
+      false,
+      character.simpleEffects,
+    );
     drawAnimatedHero(
       ctx,
       character.factionId,
@@ -116,12 +152,25 @@ export function drawCharacterPreview(
       now,
       character.appearance,
     );
+    drawCultivationOrbit(
+      ctx,
+      character.cultivation,
+      now,
+      true,
+      character.simpleEffects,
+    );
   }
   ctx.restore();
   if (character.militaryRank) {
     ctx.save();
     ctx.scale(2.2, 2.2);
-    drawMilitaryDragons(ctx, character.militaryRank, now, true, character.simpleEffects);
+    drawMilitaryDragons(
+      ctx,
+      character.militaryRank,
+      now,
+      true,
+      character.simpleEffects,
+    );
     ctx.restore();
   }
   ctx.restore();

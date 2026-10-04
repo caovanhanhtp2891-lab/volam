@@ -61,7 +61,7 @@ const openMap = async (page, id) => { await close(page); await click(page, '.tod
     await seed(page, s => { delete s.player.military; s.player.botSettings = { enabled: false, assist: false }; s.player.level = 9; s.player.idle.inTown = true; });
     assert.deepEqual((await save(page)).player.military, { captured: [], seals: [], equipped: null });
     await click(page, '[data-idle-tab="char"]');
-    assert.equal(await page.locator(".paper-doll .equipment-slot").count(), 12);
+    assert.equal(await page.locator(".paper-doll .equipment-slot").count(), 13);
     assert.equal(await page.locator('[data-equipped-preview]').count(), 11);
     await openMap(page, "bien-thanh");
     assert.equal(await page.locator('[data-challenge-territory="bien-thanh"]').isDisabled(), true);

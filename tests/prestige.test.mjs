@@ -33,7 +33,7 @@ test('all title conditions unlock at maximal progress; only the selected title a
   const loaded=normalizeJourney(JSON.parse(JSON.stringify(p.journey)));assert.equal(wornTitle(loaded).id,'sky-sovereign');assert.deepEqual(progressionBonuses(loaded),after);
 });
 test('compact labels keep bounded sizes while prestige and rank colors remain distinct',()=>{
-  let old={fontSize:0,glow:0};for(const r of REALMS){const s=realmStyle(cultivationForPower(r.minPower));assert.ok(s.fontSize>=11&&s.fontSize<=14&&s.fontSize>=old.fontSize);assert.ok(s.glow>=old.glow);old=s}
+  let old={fontSize:0,glow:0};for(const r of REALMS){const s=realmStyle(cultivationForPower(r.minPower));assert.ok(s.fontSize>=13.75&&s.fontSize<=17.5&&s.fontSize>=old.fontSize);assert.ok(s.glow>=old.glow);old=s}
   const sorted=[...TITLES].sort((a,b)=>a.rarity-b.rarity);for(let i=1;i<sorted.length;i++)assert.ok(titleStyle(sorted[i]).fontSize>=titleStyle(sorted[i-1]).fontSize);
   assert.equal(new Set(MILITARY_RANKS.map(r=>r.color)).size,7);
   for(let i=1;i<MILITARY_RANKS.length;i++){const a=militaryStyle(MILITARY_RANKS[i-1].id),b=militaryStyle(MILITARY_RANKS[i].id);assert.ok(b.fontSize>a.fontSize&&b.glow>a.glow)}
@@ -58,8 +58,8 @@ test('label stack stays attached to its actor at every camera edge and moves by 
 test('fitting long badges respects available space without altering their prestige definition',()=>{
   const label={kind:'title',text:'A long achievement title to fit',style:titleStyle(TITLES.find(t=>t.rarity===5))},before=JSON.stringify(label);
   const ctx={font:'',measureText(text){return {width:text.length*parseFloat(this.font.match(/[\d.]+(?=px)/)[0])*.6}}};
-  const fit=fitPrestigeLabel(ctx,label,230);ctx.font=`800 ${fit.style.fontSize}px sans-serif`;
-  assert.ok(prestigeWidth(ctx,fit)<=230+.01);assert.equal(JSON.stringify(label),before);assert.ok(fit.style.fontSize>=10&&fit.style.fontSize<label.style.fontSize);
+  const fit=fitPrestigeLabel(ctx,label,290);ctx.font=`800 ${fit.style.fontSize}px sans-serif`;
+  assert.ok(prestigeWidth(ctx,fit)<=290+.01);assert.equal(JSON.stringify(label),before);assert.ok(fit.style.fontSize>=12.5&&fit.style.fontSize<label.style.fontSize);
 });
 
 test('prestige artwork paints colored text and small sparkles without a filled panel',()=>{

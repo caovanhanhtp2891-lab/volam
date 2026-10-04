@@ -10,15 +10,30 @@ export function drawCultivationAura(
   now: number,
   simple = false,
 ): void {
-  now = prestigeTime(now); simple = prestigeSimple(simple);
+  now = prestigeTime(now);
+  simple = prestigeSimple(simple);
   const {
     rank: realmRank,
     phaseIndex,
     realm: { color, accent },
   } = cultivation;
   if (realmRank === 0) {
-    ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = .3; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.ellipse(0, 19, 27, 9, 0, 0, TAU); ctx.stroke(); ctx.restore();
+    ctx.save();
+    ctx.translate(0, 19);
+    ctx.scale(1, 0.36);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.7;
+    ctx.globalAlpha = 0.7;
+    drawGlow(ctx, 0, 0, 35, color, 0.2);
+    ctx.beginPath();
+    ctx.arc(0, 0, 29, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24, -now / 1800, -now / 1800 + Math.PI * 1.4);
+    ctx.stroke();
+    ctx.restore();
     return;
   }
   const rank = realmRank - 1;
@@ -34,8 +49,9 @@ export function drawCultivationAura(
     const r = radius * (1 - i * 0.13);
     ctx.globalAlpha = 0.65 - i * 0.06;
     ctx.strokeStyle = i % 2 ? accent : color;
-    ctx.lineWidth = i === 0 ? 2.6 + rank * .08 : 1.7;
-    ctx.shadowColor = color; ctx.shadowBlur = simple ? 0 : 3 + rank * .35;
+    ctx.lineWidth = i === 0 ? 2.6 + rank * 0.08 : 1.7;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = simple ? 0 : 3 + rank * 0.35;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, TAU);
     ctx.stroke();
@@ -150,4 +166,63 @@ export function drawCultivationAura(
     }
     ctx.restore();
   }
+}
+
+// Separate front/back passes keep ribbons around the body without washing out
+// the face, weapons or overhead name plates.
+export function drawCultivationOrbit(
+  ctx: CanvasRenderingContext2D,
+  cultivation: Cultivation,
+  now: number,
+  front: boolean,
+  simple = false,
+): void {
+  now = prestigeTime(now);
+  simple = prestigeSimple(simple);
+  const {
+      rank,
+      realm: { color, accent },
+    } = cultivation,
+    radius = 25 + Math.min(16, rank) * 0.8;
+  ctx.save();
+  ctx.lineCap = "round";
+  const count = simple ? 1 : rank >= 8 ? 3 : 2;
+  for (let ring = 0; ring < count; ring++) {
+    const phase =
+      (now / (2400 + ring * 700)) * (ring % 2 ? -1 : 1) + ring * 2.1;
+    const offset = ring * 9;
+    ctx.strokeStyle = ring % 2 ? accent : color;
+    ctx.globalAlpha = front ? 0.42 : 0.3;
+    ctx.lineWidth = 1.2 + Math.min(rank, 16) * 0.04;
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i <= 40; i++) {
+      const a = phase + (i * TAU) / 40,
+        isFront = Math.sin(a) > 0;
+      const x = Math.cos(a) * radius,
+        y = -19 - offset + Math.sin(a) * 11 + Math.cos(a) * 8;
+      if (isFront !== front) {
+        started = false;
+        continue;
+      }
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    for (let i = 0; i < (simple ? 1 : 3); i++) {
+      const a = phase + (i * TAU) / 3;
+      if (Math.sin(a) > 0 !== front) continue;
+      drawGlow(
+        ctx,
+        Math.cos(a) * radius,
+        -19 - offset + Math.sin(a) * 11 + Math.cos(a) * 8,
+        3.5 + Math.min(rank, 16) * 0.12,
+        i % 2 ? accent : color,
+        0.72,
+      );
+    }
+  }
+  ctx.restore();
 }

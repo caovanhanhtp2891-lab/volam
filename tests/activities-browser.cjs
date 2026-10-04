@@ -122,7 +122,7 @@ async function startSiege(page, city = "hoang-thanh", size = 6) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.24.0",
+      "0.25.0",
     );
     await click(page, '[data-faction="gaibang"]');
     await click(page, "#join-sect");

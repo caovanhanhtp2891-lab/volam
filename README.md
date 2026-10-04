@@ -2,6 +2,18 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+
+## Tri kỷ · Linh quang · v0.25.0
+
+Tên **cảnh giới, danh hiệu và quân hàm** trên đầu tăng cỡ chữ **25%**, dùng nét chữ có viền tối sắc và ba hàng có khoảng cách; bỏ nhòe sáng trên chữ. Quân hàm đang mang hiện cùng danh hiệu và cảnh giới. Màn Nhân vật cũng tăng chữ tương ứng. Vòng sáng có dải linh quang xoay trước/sau thân và hạt sáng chuyển động, tăng độ cầu kỳ theo cảnh giới; khi cưỡi ngựa vòng thân theo vị trí người trên yên. Chế độ Gọn giảm số dải/hạt.
+
+**Hoạt động → Bí cảnh bắt vợ** (cũng có ở Hành trang → Phụ bản) mở **10 tầng** ở cấp **5, 12, 20, 35, 50, 70, 90, 110, 135, 155**. Mỗi tầng có phong cảnh riêng, 2–4 đợt hộ vệ và một mỹ nhân có hình ảnh, vũ khí, ngũ hành riêng. Auto tìm đủ mục tiêu trong thử luyện. Dọn hết đợt rồi vào **Hành trang → Phụ bản → Thử thu phục · Nhận thưởng** để thử thu phục và trở về đúng vị trí cũ. Cơ hội ban đầu từ **70% đến 20%** tùy tầng; mỗi lần thắng hụt tăng 5 điểm phần trăm, bảo đảm sau 5–10 lần thắng liên tiếp chưa thu phục, tùy tầng. Thua, rút lui và hết giờ không tính lượt thu phục. XP, bạc, đá, token và số món tăng theo tầng; tầng cấp 110+ bảo đảm trang bị đỏ. Mỗi lượt hoàn thành chỉ nhận thưởng và thử thu phục một lần.
+
+**Nhân vật → ô Tri kỷ → Mang theo** chọn một trong mười mỹ nhân đã thu phục: Linh Lan, Tử Yên, Bích Dao, Hồng Liên, Tuyết Nhi, Kim Vân, Nguyệt Anh, Lôi Tâm, Phượng Nghi, Thiên Cơ. Chỉ Tri kỷ đang mang cộng tấn công, phòng thủ, HP, MP, chí mạng và lực chiến; theo sau trên map, luyện ải, bí cảnh và công thành. Trợ chiến có lấy đà, chiêu bay và sát thương/ngũ hành/trạng thái tại lúc chạm. **Bích Dao** thêm hồi 8% HP tối đa mỗi 10 giây khi ở ngoài thành và hồi HP/MP theo chỉ số. Thu phục lại tăng Đồng tâm đến **5★**, mỗi bậc sau bậc đầu tăng 15% chỉ số cộng. Tháo ô ngừng trợ chiến và bỏ chỉ số cộng. Tri kỷ không chiếm ô túi, lưu riêng theo nhân vật và giữ sau trùng sinh.
+
+Save cũ được bổ sung ô trống, giữ cấp độ, trang bị và 12 bản ghi bí cảnh cũ. Atlas mỹ nhân WebP ~863 KB. Kiểm tra bằng `pnpm test`, `pnpm typecheck`, build `--base=/volam/` và `tests/companions-browser.cjs`: chiến đấu thật, thu phục/hụt/mốc bảo đảm, nhận lặp, đồ đỏ, trở về map lớn, mang/tháo, chiêu trúng và hồi HP, ba dòng chữ, giao diện điện thoại, tải lại và trùng sinh. Kiểm tra hồi quy bản đồ/bí cảnh cũ, 20 mẫu đứng/cưỡi, quân hàm, 23 cảnh giới, sự kiện và công thành.
+
+
 ## Thần binh · Bách luyện · v0.24.0
 
 - Thanh máu **quái, boss và BOT đồ sát màu đỏ**; đồng đội/trợ chiến màu xanh, BOT trung lập màu vàng. Trạng thái thù địch ưu tiên hơn trạng thái đồng đội. Thanh máu nhân vật của mình giữ màu xanh.

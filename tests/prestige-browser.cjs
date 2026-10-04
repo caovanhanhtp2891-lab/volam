@@ -39,7 +39,7 @@ const hash=(p,selector)=>p.locator(selector).evaluate(c=>{const d=c.getContext('
     for(const rank of MILITARY_RANKS){await click(p,`[data-wear-seal="${rank.id}"]`);await close(p);await step(p,200);assert.equal(await p.locator('#preview-military-rank').textContent(),`Ấn · ${rank.name}`);colors.push(await p.locator('#preview-military-rank').evaluate(el=>getComputedStyle(el).color));rankFrames.push(await hash(p,'#character-preview'));await p.screenshot({path:`${captures}/rank-${rank.id}.png`});await click(p,'#military-seal-slot')}
     assert.equal(new Set(colors).size,7);assert.equal(new Set(rankFrames).size,7);await close(p);await click(p,'[data-idle-tab="log"]');await step(p,100);
     let labels=await p.evaluate(()=>window.prestigeDraws.slice(-3));assert.ok(labels[0].text.includes('Hoàng Đế'));assert.ok(labels[1].text.includes('Trấn Thiên Chí Tôn'));assert.ok(labels[2].text.includes('Vô Cực'));assert.ok(labels[0].y<labels[1].y&&labels[1].y<labels[2].y);
-    for(const label of labels)assert.ok(parseFloat(label.font.match(/[\d.]+(?=px)/)[0])>=10 && parseFloat(label.font.match(/[\d.]+(?=px)/)[0])<=14);
+    for(const label of labels)assert.ok(parseFloat(label.font.match(/[\d.]+(?=px)/)[0])>=12.5 && parseFloat(label.font.match(/[\d.]+(?=px)/)[0])<=17.5);
     await p.screenshot({path:`${captures}/prestige-world.png`});
     console.log('PASS 28 distinct previews, actual wear/claim/swap, seven rank colors, layered name order and compact fonts');
     const stable=await save(p);await click(p,'#load-btn');await step(p,100);assert.equal((await save(p)).player.journey.activeTitle,'sky-sovereign');assert.equal((await save(p)).player.military.equipped,'hoang-de');assert.equal((await save(p)).player.maxHp,stable.player.maxHp);

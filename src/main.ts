@@ -8,6 +8,10 @@ import { SPECIES, MONSTERS, faunaOf, monsterForStage, type SpeciesId } from "./b
 import { monsterMarkup, monsterSize, drawMonster } from "./monster-art";
 import { EXPLORATION_WIDTH, EXPLORATION_HEIGHT, freshExploration, validExploration, normalizeExploration, explorationZones, explorationSpawns, canExplore, zoneAt, type ExplorationProgress } from "./exploration";
 import { createExplorationArt } from "./exploration-art";
+import { COMPANIONS, COMPANION_IDS, freshCompanions, validCompanions, normalizeCompanions, equipCompanion, companionBonuses, captureChance, settleCompanionVictory, isCompanionId, type CompanionId, type CompanionProgress } from "./companions";
+import { BOND_DUNGEONS, isBondDungeon, type BondDungeonId } from "./companion-realms";
+import { drawCompanion, companionMarkup } from "./companion-art";
+import { createCompanionActor, moveCompanion, companionStrike, type CompanionActor } from "./companion-battle";
 import { freshLuckyProgress, validLuckyProgress, normalizeLuckyProgress, playLuckyEvent, type LuckyGame, type LuckyProgress } from "./lucky-events";
 import { luckyMarkup, updateLuckyPresentation } from "./lucky-ui";
 import { freshLootSettings, normalizeLootSettings, validLootSettings, acceptsLoot, autoDiscardItems, type LootSettings } from "./loot-settings";
@@ -64,7 +68,7 @@ import { GEAR_VARIANTS, GEAR_SETS, SET_IDS, EQUIPMENT_SLOTS, SET_THRESHOLDS, var
 import { BASIC_HORSE_PRICE, mountSpeedBonus, ridingSpeed, normalizeMounted } from "./mount";
 import type { MountAppearance } from "./mount-art";
 import { drawMountedCharacter } from "./mounted-character-art";
-import { actorCastOffset } from "./actor-rig";
+import { actorCastOffset, RIDER_SEAT } from "./actor-rig";
 import { skillUsesFlight, flightSpeed } from "./skill-flight";
 import { drawEnemyStatus } from "./enemy-status-art";
 import { drawGearAura } from "./gear-effects";
@@ -77,10 +81,10 @@ import {
 } from "./battle-vfx";
 import { APP_VERSION } from "./release";
 import { REALMS, combatPower, strengthScore, powerFromScore, cultivationForPower } from "./cultivation";
-import { drawCultivationAura } from "./cultivation-art";
+import { drawCultivationAura, drawCultivationOrbit } from "./cultivation-art";
 import {
   BAG_CAPACITY,
-  DUNGEONS,
+  DUNGEONS as REGULAR_DUNGEONS,
   freshDungeonClears, normalizeDungeonClears, dungeonDropRarity,
   POTIONS,
   MAX_POTIONS,
@@ -92,7 +96,7 @@ import {
   recoverPendingItems,
   canEnterDungeon,
   type PotionKind,
-  type DungeonId,
+  type DungeonId as RegularDungeonId,
 } from "./progression";
 
 import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, skillReachLabel, type Sect as School, type SectId as SchoolId, type SkillDefinition, type EffectMotif } from "./sects";
@@ -110,6 +114,8 @@ import { allocateAttribute, allocateSkill, recommendAttributes, recommendSkills,
 
 type SectId = "kim" | "hoa" | "thuy";
 type Sect = School & { skills: [string, string]; ultimate: string };
+type DungeonId = RegularDungeonId | BondDungeonId;
+const DUNGEONS = { ...REGULAR_DUNGEONS, ...BOND_DUNGEONS };
 type ItemSlot =
   | "weapon"
   | "armor"
@@ -173,7 +179,7 @@ interface Player {
   bossDefeated: boolean;
   questRewardClaimed: boolean;
   dungeonTokens: number;
-  dungeonClears: Record<DungeonId, number>;
+  dungeonClears: Record<RegularDungeonId, number>;
   potions: Record<PotionKind, number>;
   potionCooldown: number;
   pendingItems: Item[];
@@ -190,6 +196,7 @@ interface Player {
   sieges: SiegeProgress;
   exploration: ExplorationProgress;
   tower: TowerProgress;
+  companions: CompanionProgress;
 }
 
 interface Npc {
@@ -204,6 +211,7 @@ interface Npc {
 
 interface Enemy {
   rogueUntil?: number;
+  companionId?: CompanionId;
   monsterId?: SpeciesId;
   ranged?: boolean;
   home?: { x: number; y: number };
@@ -357,6 +365,7 @@ interface FloatingText {
 
 interface BotHit { sourceId: string; targetId: string; side: "ally" | "enemy"; profile: BotTemplate; skill?: SkillKey; from: { x: number; y: number }; startedAt: number; duration: number; projectile: boolean; damage: number; reach: number }
 interface GameState {
+  companion?: CompanionActor;
   bots: BotActor[];
   botContext: string;
   botHits: BotHit[];
@@ -861,6 +870,7 @@ function makeDungeonEnemies(id: DungeonId, wave: number): Enemy[] {
       spawn.level,
       spawn.color,
     );
+    if ("companionId" in spawn && spawn.companionId) { enemy.companionId = spawn.companionId; enemy.monsterId = undefined; enemy.element = COMPANIONS[spawn.companionId].element; }
     if (spawn.species) {
       enemy.monsterId = spawn.species;
       enemy.element = MONSTERS[spawn.species].element;
@@ -933,7 +943,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     preferences: normalizePreferences(),
     journey: normalizeJourney(),
     military: freshMilitary(),
-    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), lootSettings: freshLootSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(),
+    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), lootSettings: freshLootSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(), companions: freshCompanions(),
     tower: freshTower(),
     facingX: 1,
     facingY: 0,
@@ -1263,8 +1273,8 @@ function equipmentAttack(): number { return equipmentBonuses().attack; }
 function equipmentDefense(): number { return equipmentBonuses().defense; }
 function characterBonuses(): GearStats {
   if (!game) return emptyStats();
-  const stats = progressionBonuses(game.player.journey), seal = militaryBonuses(game.player.military);
-  for (const key of Object.keys(stats) as GearStat[]) stats[key] += seal[key];
+  const stats = progressionBonuses(game.player.journey), seal = militaryBonuses(game.player.military), bond = companionBonuses(game.player.companions);
+  for (const key of Object.keys(stats) as GearStat[]) stats[key] += seal[key] + bond[key];
   return stats;
 }
 function combinedStats(gear = equipmentBonuses(), bonus = characterBonuses()): GearStats {
@@ -1284,7 +1294,7 @@ function openCombatStats(): void {
     hpRegen: "Tự hồi sinh lực mỗi giây, tối đa 100.000/giây.",
     mpRegen: "Cộng thêm vào hồi nội lực cơ bản 70/giây. Tối đa 30.000/giây.",
   };
-  openUtility("Chỉ số chiến đấu nâng cao", `<p class="dim">Giá trị đang có hiệu lực từ trang bị, thuộc tính bộ, danh hiệu và ấn quân hàm.</p><div class="combat-stat-details">${(Object.keys(mods) as (keyof typeof mods)[]).map(key => `<article data-combat-stat="${key}"><div><b>${STAT_LABELS[key]}</b><strong>${key === "critDamage" ? "+" : ""}${formatNumber(displayedStat(key, mods[key]))}${statUnit(key)}</strong></div><small>${descriptions[key]}</small></article>`).join("")}</div>`);
+  openUtility("Chỉ số chiến đấu nâng cao", `<p class="dim">Giá trị đang có hiệu lực từ trang bị, thuộc tính bộ, danh hiệu, ấn quân hàm và Tri kỷ.</p><div class="combat-stat-details">${(Object.keys(mods) as (keyof typeof mods)[]).map(key => `<article data-combat-stat="${key}"><div><b>${STAT_LABELS[key]}</b><strong>${key === "critDamage" ? "+" : ""}${formatNumber(displayedStat(key, mods[key]))}${statUnit(key)}</strong></div><small>${descriptions[key]}</small></article>`).join("")}</div>`);
 }
 
 function effectiveAttack(): number {
@@ -1455,6 +1465,229 @@ function makeTerritoryEnemies(id: TerritoryId, wave: number): Enemy[] {
     return enemy;
   });
 }
+function openCompanions(): void {
+  if (!game) return;
+  const p = game.player.companions,
+    active = p.equipped ? COMPANIONS[p.equipped] : null;
+  const blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  openUtility(
+    "Tri kỷ · Bí cảnh bắt vợ",
+    `<div class="companion-summary">${active ? companionMarkup(active.id) : '<span class="empty-companion">❀</span>'}<div><b>${active ? `Đang mang: ${active.name}` : "Ô Tri kỷ đang trống"}</b><small>Đã thu phục ${p.owned.length}/10 mỹ nhân · Chỉ một Tri kỷ đang mang cộng chỉ số và trợ chiến.</small><p>${active ? statsText(companionBonuses(p)) : "Thắng thử luyện để có cơ hội thu phục; chọn Mang theo để đồng hành."}</p></div></div><div class="btnrow"><button class="mini-button" data-remove-companion ${!active || blocked ? "disabled" : ""}>Tháo Tri kỷ</button><button class="mini-button" data-open-bond-realms>10 tầng bí cảnh bắt vợ</button></div><div class="companion-collection">${COMPANION_IDS.map(
+      (id) => {
+        const def = COMPANIONS[id],
+          owned = p.owned.includes(id),
+          worn = p.equipped === id,
+          stars = p.affinity[id] ?? 0,
+          bonuses = owned ? companionBonuses({...p,equipped:id}) : def.bonuses;
+        return `<article class="companion-card ${owned ? "owned" : ""}" data-companion-card="${id}" style="--companion-color:${def.color}">${companionMarkup(id)}<div><b>${def.name}</b><small>${ELEMENTS[def.element].name} · ${owned ? `Đồng tâm ${"★".repeat(stars)}${"☆".repeat(5 - stars)}` : `Chưa thu phục · Tầng ${def.frame + 1}`}</small><p>${def.role === "heal" ? "Hồi HP mỗi 10 giây và đánh hỗ trợ" : def.skill + " · Trợ chiến"}</p><small>${statsText(bonuses)}</small><div class="btnrow"><button class="mini-button" data-equip-companion="${id}" ${!owned || worn || blocked ? "disabled" : ""}>${worn ? "Đang mang" : "Mang theo"}</button><button class="mini-button" data-bond-enter="bond-${id}" ${blocked || game!.player.level < def.level ? "disabled" : ""}>${game!.player.level < def.level ? `Cần cấp ${def.level}` : "Vào bí cảnh"}</button></div></div></article>`;
+      },
+    ).join(
+      "",
+    )}</div><p class="dim">Thu phục lại mỹ nhân đã có tăng một bậc Đồng tâm, tối đa 5★; mỗi bậc tăng 15% chỉ số cộng. Tri kỷ giữ sau trùng sinh và không chiếm ô túi.</p>`,
+  );
+}
+function openBondRealms(): void {
+  if (!game) return;
+  const p = game.player.companions,
+    blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  openUtility(
+    "Bí cảnh bắt vợ · 10 tầng kỳ duyên",
+    `<p class="dim">Vượt các đợt hộ vệ và thắng mỹ nhân để thử thu phục. Mỗi lần thắng chưa thu phục tăng 5 điểm % cơ hội; có mốc bảo đảm. Thua, hết giờ hoặc rời sớm không tính lượt thắng.</p><button class="mini-button" data-open-companions>Ô Tri kỷ · Bộ sưu tập</button><div class="bond-realms">${Object.values(
+      BOND_DUNGEONS,
+    )
+      .map((d) => {
+        const def = COMPANIONS[d.companionId],
+          failures = p.failures[def.id] ?? 0;
+        return `<article class="bond-realm" data-bond-card="${d.id}" style="--companion-color:${def.color}"><div class="bond-scene">${regionThumbnail(d.region)}${companionMarkup(def.id)}</div><b>Tầng ${def.frame + 1} · ${d.name}</b><small>${def.name} · Cấp ${d.minLevel}+ · ${d.waves.length} đợt · ${Math.floor(d.timeLimit / 60)}:${String(d.timeLimit % 60).padStart(2, "0")}</small><p>Thu phục ${Math.round(captureChance(p, def.id) * 100)}% · Bảo đảm trong ${def.pity - failures} lần thắng nữa · Đã thắng ${p.victories[def.id] ?? 0} lần.</p><small>+${d.reward.xp} XP · +${d.reward.gold} bạc · ${d.reward.itemCount} đồ ${d.reward.rarity}</small><button class="outline-button" data-bond-enter="${d.id}" ${blocked || game!.player.level < d.minLevel ? "disabled" : ""}>${blocked ? "Rời trận hiện tại" : game!.player.level < d.minLevel ? `Cần cấp ${d.minLevel}` : `Khiêu chiến ${def.name}`}</button></article>`;
+      })
+      .join("")}</div>`,
+  );
+}
+function changeCompanion(id: CompanionId | null): void {
+  if (
+    !game ||
+    game.mapMode !== "world" ||
+    game.goldenEncounter ||
+    !equipCompanion(game.player.companions, id)
+  )
+    return;
+  game.companion = undefined;
+  syncStats();
+  persistGame();
+  refreshUi(true);
+  openCompanions();
+  showToast(
+    id
+      ? `${COMPANIONS[id].name} đã đồng hành. Chỉ số và trợ chiến được kích hoạt.`
+      : "Đã tháo Tri kỷ.",
+  );
+}
+function tickCompanion(dt: number, now: number): void {
+  if (!game) return;
+  const id = game.player.companions.equipped;
+  if (!id) {
+    game.companion = undefined;
+    return;
+  }
+  const def = COMPANIONS[id],
+    p = game.player,
+    context = `${game.mapMode}-${game.dungeonId}-${game.territoryEncounter?.id}-${Boolean(game.goldenEncounter)}-${p.exploration.active}-${p.exploration.region}`;
+  let actor = game.companion;
+  if (!actor || actor.id !== id)
+    actor = game.companion = createCompanionActor(id, p, context, now);
+  if (actor.context !== context || distance(actor, p) > 650) {
+    actor.x = p.x - 70;
+    actor.y = p.y + 20;
+    actor.context = context;
+    actor.hit = undefined;
+    actor.motion = freshMotion();
+  }
+  const canFight =
+    !(game.mapMode === "world" && p.idle.inTown) && !game.dungeonCleared;
+  if (actor.hit) {
+    const hit = actor.hit,
+      target = game.enemies.find((e) => e.id === hit.targetId && !e.dead);
+    if (!canFight || !target) actor.hit = undefined;
+    else if (now >= hit.startedAt + hit.duration) {
+      actor.hit = undefined;
+      const {damage, statusMultiplier} = companionStrike(hit.damage, effectiveAttack(), enemyDefense(target), hit.level, def.element, target.element);
+      target.hp = Math.max(0, target.hp - damage);
+      target.hitFlash = 0.16;
+      applySkillStatus(
+        target,
+        SCHOOL_KITS[def.school].kit.skill1,
+        statusMultiplier,
+        now,
+        def.school,
+      );
+      addSkillEffect({
+        x: target.x,
+        y: target.y - 20,
+        radius: 32,
+        color: def.color,
+        kind: SCHOOL_KITS[def.school].kit.skill1.motif,
+        sect: def.school,
+        skill: "skill1",
+        phase: "impact",
+        duration: 450,
+      });
+      if (p.preferences.damageNumbers)
+        addFloatingText(
+          target.x,
+          target.y - 50,
+          `-${formatNumber(damage)} · Tri kỷ`,
+          def.color,
+          12,
+        );
+      if (target.hp <= 0) killEnemy(target);
+    }
+  }
+  const target = canFight
+    ? ((currentTarget() && distance(currentTarget()!, p) < 430 ? currentTarget() : undefined) ??
+      game.enemies
+        .filter((e) => !e.dead && distance(e, p) < 430)
+        .sort((a, b) => distance(a, actor!) - distance(b, actor!))[0])
+    : undefined;
+  const goal =
+    target && distance(actor, target) > 260
+      ? target
+      : { x: p.x - 70, y: p.y + 25 };
+  if (now >= actor.motion.actionAt + actor.motion.actionDuration)
+    moveCompanion(
+      actor,
+      goal,
+      dt,
+      now,
+      (x, y) => isBlocked(x, y, 16),
+      { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+      p.speed * 1.15,
+    );
+  if (
+    target &&
+    distance(actor, target) < 340 &&
+    now >= actor.attackReadyAt &&
+    !actor.hit
+  ) {
+    actor.attackReadyAt = now + 2200;
+    actor.motion.facingX = target.x - actor.x;
+    actor.motion.facingY = target.y - actor.y;
+    Object.assign(actor.motion, {
+      action: "cast",
+      actionAt: now,
+      actionDuration: 650,
+    });
+    actor.hit = {
+      targetId: target.id,
+      from: { x: actor.x, y: actor.y - 35 },
+      startedAt: now + 140,
+      duration: 480,
+      damage: Math.max(
+        toCombat(35),
+        toCombat(def.bonuses.attack) *
+          (1 + ((p.companions.affinity[id] ?? 1) - 1) * 0.15) +
+          effectiveAttack() * 0.22,
+      ),
+      level: p.level,
+    };
+  }
+  if (
+    canFight &&
+    def.role === "heal" &&
+    now >= actor.healReadyAt &&
+    p.hp < p.maxHp
+  ) {
+    actor.healReadyAt = now + 10000;
+    const amount = Math.min(p.maxHp - p.hp, Math.ceil(p.maxHp * 0.08));
+    p.hp += amount;
+    addFloatingText(p.x, p.y - 40, `+${formatNumber(amount)} · ${def.name}`, def.color, 13);
+    addSkillEffect({
+      x: p.x,
+      y: p.y,
+      radius: 46,
+      color: def.color,
+      kind: "heal",
+      duration: 800,
+    });
+  }
+}
+function drawCompanionActor(now: number): void {
+  if (!game?.companion) return;
+  const actor = game.companion,
+    def = COMPANIONS[actor.id];
+  ctx.save();
+  ctx.translate(actor.x, actor.y);
+  ctx.fillStyle = "#0005";
+  ctx.beginPath();
+  ctx.ellipse(0, 9, 17, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawCompanion(ctx, actor.id, actor.motion, now);
+  ctx.restore();
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.font = "700 11px sans-serif";
+  ctx.fillStyle = def.color;
+  drawOutlinedText(`${def.name} · Tri kỷ`, actor.x, actor.y - 98);
+  ctx.restore();
+}
+function drawCompanionFlight(now: number): void {
+  if (!game?.companion?.hit) return;
+  const actor = game.companion,
+    hit = actor.hit!,
+    def = COMPANIONS[actor.id],
+    target = game.enemies.find((e) => e.id === hit.targetId && !e.dead);
+  if (!target || now < hit.startedAt) return;
+  drawSkillFlight(
+    ctx,
+    hit.from,
+    { x: target.x, y: target.y - 22 },
+    Math.min(1, (now - hit.startedAt) / hit.duration),
+    def.school,
+    "skill1",
+    now,
+    game.player.preferences.skillEffects,
+  );
+}
+
 const explorationArts = new Map<string, HTMLCanvasElement>();
 function exploring(): boolean {
   return Boolean(
@@ -2464,7 +2697,7 @@ function enterDungeon(id: DungeonId): void {
     addLog("Bạn đang ở trong phụ bản.");
     return;
   }
-  if (!canEnterDungeon(id, game.player.level, game.player.dungeonClears)) {
+  if (!(isBondDungeon(id) ? game.player.level >= dungeon.minLevel : canEnterDungeon(id, game.player.level, game.player.dungeonClears))) {
     addLog(
       `Cần cấp ${dungeon.minLevel}${dungeon.prerequisite ? ` và hoàn thành ${DUNGEONS[dungeon.prerequisite].name}` : ""} để vào ${dungeon.name}.`,
     );
@@ -2524,7 +2757,7 @@ function advanceDungeonWave(): void {
     game.targetId = null;
     game.moveTarget = null;
     addLog(
-      `${dungeon.name} hoàn thành! Mở Phụ bản để nhận thưởng. Đồ chưa nhặt sẽ được thu hồi.`,
+      `${dungeon.name} hoàn thành! ${isBondDungeon(dungeon.id) ? "Mở Phụ bản → Thử thu phục · Nhận thưởng." : "Mở Phụ bản để nhận thưởng."} Đồ chưa nhặt sẽ được thu hồi.`,
     );
     return;
   }
@@ -2597,7 +2830,11 @@ function claimDungeonReward(): void {
   const dungeon = DUNGEONS[game.dungeonId];
   // Set the guard before awarding anything; repeated clicks cannot claim twice.
   game.dungeonRewardClaimed = true;
-  player.dungeonClears[dungeon.id] += 1;
+  let bondMessage = "";
+  if (isBondDungeon(dungeon.id)) {
+    const bond = BOND_DUNGEONS[dungeon.id], result = settleCompanionVictory(player.companions,bond.companionId);
+    if (result) { const def=COMPANIONS[result.id]; bondMessage=result.captured ? `${result.first?"Thu phục thành công":"Tăng Đồng tâm"}: ${def.name} · ${result.affinity}★${result.guaranteed?" · Mốc bảo đảm":""}. Vào ô Tri kỷ để Mang theo.` : `Thắng ${def.name}; chưa thu phục được. Cơ hội lần tới ${Math.round(captureChance(player.companions,result.id)*100)}%.`; }
+  } else player.dungeonClears[dungeon.id] += 1;
   player.dungeonTokens += dungeon.reward.tokens;
   player.gold += dungeon.reward.gold;
   player.refiningStones += dungeon.reward.stones;
@@ -2616,8 +2853,10 @@ function claimDungeonReward(): void {
     addLog(
       `${player.pendingItems.length} món đang chờ trong Túi đồ → Đồ chờ nhận, không bị mất khi túi đầy.`,
     );
+  if (bondMessage) { syncStats(); addLog(bondMessage); }
   leaveDungeon();
   persistGame();
+  if (bondMessage) showToast(bondMessage);
 }
 
 function drinkPotion(kind: PotionKind): void {
@@ -3163,7 +3402,7 @@ function killEnemy(enemy: Enemy): void {
   const chance =
     enemy.kind === "boss" ? 1 : enemy.kind === "elite" ? 0.92 : 0.32;
   if (Math.random() <= chance) {
-    const forced = game.mapMode === "dungeon" && game.dungeonId ? dungeonDropRarity(game.dungeonId, enemy.kind, enemy.level) : rollEquipmentRarity(enemy.level, enemy.kind);
+    const forced = game.mapMode === "dungeon" && game.dungeonId ? dungeonDropRarity(isBondDungeon(game.dungeonId) ? (DUNGEONS[game.dungeonId].minLevel >= 110 ? "frost" : DUNGEONS[game.dungeonId].minLevel >= 70 ? "inferno" : DUNGEONS[game.dungeonId].minLevel >= 35 ? "forest" : "wolfden") : game.dungeonId, enemy.kind, enemy.level) : rollEquipmentRarity(enemy.level, enemy.kind);
     game.loot.push({
       id: `loot-${enemy.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       x: enemy.x + randomBetween(-12, 12),
@@ -3824,6 +4063,7 @@ function update(dt: number, now: number): void {
     lastLootMaintenance = now;
     if (discardAutomaticLoot()) { persistGame(); refreshUi(true); }
   }
+  tickCompanion(dt, now);
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
       player.x - VIEW_WIDTH / 2,
@@ -3880,7 +4120,7 @@ function update(dt: number, now: number): void {
   )
     drinkPotion("mp");
   if (game.autoBattle && !currentTarget()) {
-    const target = nearestEnemy(520);
+    const target = nearestEnemy(game.dungeonId && isBondDungeon(game.dungeonId) ? Number.POSITIVE_INFINITY : 520);
     if (target) game.targetId = target.id;
   }
 
@@ -4000,7 +4240,7 @@ function update(dt: number, now: number): void {
       if (d < 520 && enemy.bossCooldown <= 0) {
         const dungeonBoss = game.mapMode !== "world";
         const enraged = dungeonBoss && enemy.hp <= enemy.maxHp * 0.5;
-        const attackName = enemy.monsterId && MONSTERS[enemy.monsterId].boss ? MONSTERS[enemy.monsterId].skill : game.territoryEncounter ? "Phá Quân" : game.dungeonId === "tomb" ? "Địa Chấn" : "Liệt Trảo";
+        const attackName = enemy.companionId ? COMPANIONS[enemy.companionId].skill : enemy.monsterId && MONSTERS[enemy.monsterId].boss ? MONSTERS[enemy.monsterId].skill : game.territoryEncounter ? "Phá Quân" : game.dungeonId === "tomb" ? "Địa Chấn" : "Liệt Trảo";
         game.telegraphs.push({
           x: player.x,
           y: player.y,
@@ -4261,6 +4501,7 @@ function drawWorld(now: number): void {
     )
       drawLoot(loot, now);
   const actors = [
+    ...(game.companion ? [{y:game.companion.y,draw:()=>drawCompanionActor(now)}] : []),
     ...game.enemies
       .filter((enemy) => !enemy.dead)
       .map((enemy) => ({ y: enemy.y, draw: () => drawEnemy(enemy, now) })),
@@ -4278,6 +4519,7 @@ function drawWorld(now: number): void {
   for (const projectile of game.combat.projectiles)
     drawProjectile(projectile, now);
   drawBotFlights(now);
+  drawCompanionFlight(now);
   for (const pickup of game.combat.pickups) drawPickupFlight(pickup, now);
   for (const telegraph of game.telegraphs) drawTelegraph(telegraph, now);
   for (const floatingText of game.floatingTexts)
@@ -4575,6 +4817,7 @@ function drawPickupFlight(
 }
 
 function drawEnemySprite(enemy: Enemy, now: number): void {
+  if (enemy.companionId) { drawCompanion(ctx, enemy.companionId, game?.combat.enemyMotions.get(enemy.id) ?? freshMotion(), now, true); return; }
   if (enemy.structure) { drawSiegeStructure(ctx, enemy.structure, enemy.hp / enemy.maxHp, now); return; }
   if (enemy.botProfile) {
     const p = enemy.botProfile, motion = game?.combat.enemyMotions.get(enemy.id) ?? freshMotion();
@@ -4771,7 +5014,7 @@ function drawEnemy(enemy: Enemy, now: number): void {
   ctx.restore();
   const barWidth =
     enemy.kind === "boss" ? 160 : enemy.kind === "elite" ? 84 : 62;
-  const labelY = enemy.y - (enemy.structure ? enemy.structure === "gate" ? 105 : 125 : enemy.botProfile ? 88 : enemy.monsterId ? monsterSize(enemy.monsterId, enemy.kind === "elite").height + 4 : enemy.radius * 2.6 + 12);
+  const labelY = enemy.y - (enemy.structure ? enemy.structure === "gate" ? 105 : 125 : enemy.botProfile ? 88 : enemy.companionId ? 124 : enemy.monsterId ? monsterSize(enemy.monsterId, enemy.kind === "elite").height + 4 : enemy.radius * 2.6 + 12);
   drawBar(
     enemy.x - barWidth / 2,
     labelY,
@@ -4866,10 +5109,16 @@ function drawPlayer(player: Player, now: number): void {
   const rank = militaryRankOf(player.military.equipped);
   drawCultivationAura(ctx, cultivation, now, simple);
   if (rank) drawMilitaryDragons(ctx, rank.id, now, false, simple);
+  ctx.save(); ctx.translate(0, player.mounted ? RIDER_SEAT.y : 0);
+  drawCultivationOrbit(ctx, cultivation, now, false, simple);
+  ctx.restore();
   drawGearAura(ctx, currentHeroAppearance(), now, player.preferences.skillEffects === "simple");
   const title = wornTitle(player.journey);
   if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now, simple);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
+  ctx.save(); ctx.translate(0, player.mounted ? RIDER_SEAT.y : 0);
+  drawCultivationOrbit(ctx, cultivation, now, true, simple);
+  ctx.restore();
   if (rank) drawMilitaryDragons(ctx, rank.id, now, true, simple);
   ctx.restore();
   const ridingOffset = player.mounted ? 36 : 0;
@@ -4894,7 +5143,7 @@ function drawPlayer(player: Player, now: number): void {
   if (title && player.preferences.titleVisible) labels.push({ kind: "title", text: `${title.glyph} ${title.name}`, style: titleStyle(title) });
   labels.push({ kind: "realm", text: cultivation.label, style: realmStyle(cultivation) });
   const bottom = player.y - HERO_SIZE.height - 15 - ridingOffset;
-  const fitted = labels.map(label => fitPrestigeLabel(ctx, label, Math.min(230, VIEW_WIDTH - 18)));
+  const fitted = labels.map(label => fitPrestigeLabel(ctx, label, Math.min(290, VIEW_WIDTH - 18)));
   const widths = fitted.map(label => prestigeWidth(ctx, label));
   const placements = placePrestigeLabels(fitted, widths, player.x, bottom);
   for (const placement of placements) drawPrestigeLabel(ctx, placement.label, placement.x, placement.y, placement.width, now, simple);
@@ -5299,14 +5548,14 @@ function renderInventory(): void {
         .padStart(2, "0");
       inventoryContent.innerHTML = game.dungeonCleared
         ? `
-        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>${dungeon.name} hoàn thành</strong><p>Nhận thưởng để trở về vị trí trước khi vào bí cảnh. Tất cả đồ chưa nhặt sẽ được thu hồi; túi đầy sẽ chuyển vào Đồ chờ nhận.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">Nhận thưởng phụ bản</button></div>
+        <div class="dungeon-state cleared"><span class="dungeon-glyph">✓</span><strong>${dungeon.name} hoàn thành</strong><p>${isBondDungeon(dungeon.id) ? `Thắng ${COMPANIONS[BOND_DUNGEONS[dungeon.id].companionId].name}! Thu phục ${Math.round(captureChance(player.companions,BOND_DUNGEONS[dungeon.id].companionId)*100)}% (mốc bảo đảm vẫn có hiệu lực).<br>` : ""}Nhận thưởng để trở về vị trí trước khi vào bí cảnh. Tất cả đồ chưa nhặt sẽ được thu hồi; túi đầy sẽ chuyển vào Đồ chờ nhận.</p><button class="outline-button dungeon-btn" data-dungeon-action="claim">${isBondDungeon(dungeon.id) ? "Thử thu phục · Nhận thưởng" : "Nhận thưởng phụ bản"}</button></div>
       `
         : `
         <div class="dungeon-state"><span class="dungeon-glyph">◇</span><strong>${dungeon.name}</strong><p>Đợt ${game.dungeonWave + 1}/${dungeon.waves.length} · Còn ${game.enemies.filter((enemy) => !enemy.dead).length} quái.<br>${dungeon.mechanic}</p><div class="dungeon-timer">${minutes}:${seconds}</div><p>Ngã xuống, hết giờ hoặc rời sớm: không nhận thưởng hoàn thành.</p><button class="outline-button dungeon-btn" data-dungeon-action="leave">Rời phụ bản</button></div>
       `;
     } else {
-      inventoryContent.innerHTML = `<p class="panel-notice">12 bí cảnh · Cấp 3–155 · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
-        DUNGEONS,
+      inventoryContent.innerHTML = `<button class="outline-button" data-open-bond-realms>❀ Bí cảnh bắt vợ · 10 tầng Tri kỷ</button><p class="panel-notice">12 bí cảnh · Cấp 3–155 · Chuẩn bị bình tại Tiệm. Phần thưởng cấp một lần cho mỗi lượt hoàn thành, chưa có giới hạn ngày ở bản local.</p>${Object.values(
+        REGULAR_DUNGEONS,
       )
         .map((dungeon) => {
           const unlocked = canEnterDungeon(
@@ -5842,6 +6091,7 @@ function refreshIdleUi(): void {
     player.equipment,
     player.level,
     player.military.equipped,
+    player.companions,
   ]);
   if (characterRenderKey !== characterKey) {
     characterRenderKey = characterKey;
@@ -5880,6 +6130,9 @@ function refreshIdleUi(): void {
       .join("");
     const rank = militaryRankOf(player.military.equipped);
     document.getElementById("equipment-grid")!.insertAdjacentHTML("beforeend", `<button id="military-seal-slot" class="equipment-slot military-seal-slot ${rank ? "equipped" : "empty-slot"}" data-open-military style="--rarity-color:${rank?.color ?? "#8a754b"};grid-column:3;grid-row:6" title="Ấn quân hàm: ${rank?.name ?? "trống"}" aria-label="Ấn quân hàm: ${rank?.name ?? "trống"}">${militarySealMarkup(player.military.equipped)}<small>${rank?.name ?? "Ấn quân hàm"}</small></button>`);
+    const bond = player.companions.equipped ? COMPANIONS[player.companions.equipped] : null;
+    document.getElementById("equipment-grid")!.insertAdjacentHTML("beforeend", `<button id="companion-slot" class="equipment-slot companion-slot ${bond?"equipped":"empty-slot"}" data-open-companions style="--rarity-color:${bond?.color??"#cc90bd"};grid-column:1/-1;grid-row:7" aria-label="Tri kỷ: ${bond?.name??"trống"}">${bond?companionMarkup(bond.id):'<span class="empty-companion">❀</span>'}<div><b>TRI KỶ</b><small>${bond?`${bond.name} · ${player.companions.affinity[bond.id]}★ · Đang trợ chiến`:"Ô trống · Chạm để thu phục mỹ nhân"}</small></div></button>`);
+
   }
 }
 function hydrateSettings(): void {
@@ -6113,6 +6366,8 @@ function validateSave(value: unknown): {
     throw new Error("save-invalid");
   if (!validExploration(player.exploration)) throw new Error("save-invalid");
   player.exploration = normalizeExploration(player.exploration);
+  if (!validCompanions(player.companions)) throw new Error("save-invalid");
+  player.companions = normalizeCompanions(player.companions);
   const savedWidth = player.exploration.active ? EXPLORATION_WIDTH : 1900, savedHeight = player.exploration.active ? EXPLORATION_HEIGHT : 1200;
   if (player.x > savedWidth || player.y > savedHeight)
     throw new Error("save-invalid");
@@ -6332,6 +6587,13 @@ function bindIdleUi(): void {
   document.querySelector(".app-shell")!.addEventListener("click", event => {
     const target = event.target as HTMLElement;
     if (target.closest("[data-open-exploration]")) openExplorationAtlas();
+    if (target.closest("[data-open-companions]")) openCompanions();
+    const companionButton=target.closest<HTMLButtonElement>("[data-equip-companion]");
+    if(companionButton&&!companionButton.disabled&&isCompanionId(companionButton.dataset.equipCompanion))changeCompanion(companionButton.dataset.equipCompanion);
+    const bondButton=target.closest<HTMLButtonElement>("[data-bond-enter]");
+    if(bondButton&&!bondButton.disabled&&isBondDungeon(bondButton.dataset.bondEnter)){closeUtility();enterDungeon(bondButton.dataset.bondEnter);}
+    if(target.closest("[data-remove-companion]"))changeCompanion(null);
+    if (target.closest("[data-open-bond-realms]")) openBondRealms();
     if (target.closest("[data-open-bestiary]")) openBestiary();
     if (target.closest("[data-exit-exploration]")) exitExploration();
     const eventButton = target.closest<HTMLElement>("[data-open-events]");
@@ -6863,7 +7125,7 @@ function bindIdleUi(): void {
     .addEventListener("click", () =>
       openUtility(
         "Hành tẩu giang hồ",
-        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô và một ô ấn quân hàm, 7 phẩm chất, tối đa 14 dòng chỉ số và cường hóa đến +${MAX_ENHANCEMENT}. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Tranh đoạt lãnh thổ</h3><p>Từ cấp 10 có thể công Biên Thành. Chiếm lần lượt 9 thành, dọn 3 đợt trong 4 phút. Chiến công mở 7 chức vị, từ Hương Trưởng đến Thái Thú, Thừa Tướng và Hoàng Đế. Nhận sắc phong rồi mang ấn trong Nhân vật; chỉ ấn đang mang cộng chỉ số.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
+        `<div class="guide-list"><h3>Chiến đấu tự động</h3><p>Nhân vật tự tìm quái, xoay chiêu, dùng bình HP và nhặt đồ. Bấm Tự động để bật/tắt. Dùng WASD, joystick hoặc chạm mặt đất để tự điều khiển.</p><h3>Vượt ải & luyện công</h3><p>Mỗi ải có 4 đợt. Ải 10 có trùm. Vượt ải mở ải kế tiếp; Luyện công lặp lại ải hiện tại. Quái mạnh hơn theo cấp. Ngũ hành khắc chế tăng 25% hoặc giảm 20% sát thương.</p><h3>Nhân vật & trang bị</h3><p>Lên cấp nhận 5 điểm tiềm năng và 1 điểm võ học. Trang bị có 11 ô, một ô ấn quân hàm và ô Tri kỷ, 7 phẩm chất, tối đa 14 dòng chỉ số và cường hóa đến +${MAX_ENHANCEMENT}. Thuốc hồi 40%, dùng chung hồi chiêu 8 giây. Đồ quá sức chứa giữ ở Đồ chờ nhận.</p><h3>Tranh đoạt lãnh thổ</h3><p>Từ cấp 10 có thể công Biên Thành. Chiếm lần lượt 9 thành, dọn 3 đợt trong 4 phút. Chiến công mở 7 chức vị, từ Hương Trưởng đến Thái Thú, Thừa Tướng và Hoàng Đế. Nhận sắc phong rồi mang ấn trong Nhân vật; chỉ ấn đang mang cộng chỉ số.</p><h3>Phiêu lưu & phụ bản</h3><p>Rừng Trúc giữ các NPC và nhiệm vụ cũ. Cổ Mộ mở cấp 3; Trúc Lâm mở cấp 5 sau khi hoàn thành Cổ Mộ.</p><h3>Tri kỷ</h3><p>Giang hồ → Bí cảnh bắt vợ có 10 tầng từ cấp 5 đến 155. Thắng hộ vệ và mỹ nhân, rồi vào Hành trang → Phụ bản → Thử thu phục · Nhận thưởng. Mỗi lần thắng hụt tăng 5 điểm % cơ hội, có mốc bảo đảm. Nhân vật → ô Tri kỷ → Mang theo để tăng chỉ số, đi theo và trợ chiến; Bích Dao có thêm hồi HP. Thu phục trùng tăng Đồng tâm tối đa 5★. Tri kỷ giữ sau trùng sinh.</p><h3>Lưu tiến trình</h3><p>Tự lưu mỗi 10 giây và khi giao dịch. Có 3 nhân vật riêng, file sao lưu và thưởng luyện công vắng mặt tối đa 4 giờ. Tiến trình local lưu trên trình duyệt này.</p></div>`,
       ),
     );
   document.getElementById("campfire-btn")!.addEventListener("click", () => { const fire = nearestCampfire(); if (fire) restAtCampfire(fire); });
@@ -7295,7 +7557,7 @@ mobileAuto.addEventListener("click", () => {
   if (!game) return showToast("Hãy gia nhập môn phái trước.");
   game.autoBattle = !game.autoBattle;
   if (game.autoBattle) {
-    const target = currentTarget() ?? nearestEnemy(520);
+    const target = currentTarget() ?? nearestEnemy(game.dungeonId && isBondDungeon(game.dungeonId) ? Number.POSITIVE_INFINITY : 520);
     if (target) game.targetId = target.id;
     addLog(
       target

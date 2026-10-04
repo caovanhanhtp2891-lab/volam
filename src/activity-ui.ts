@@ -1,4 +1,5 @@
 const icons = {
+  companion: '<path d="M20 8c-9-12-22 6 0 24C42 14 29-4 20 8z"/><path d="M8 34h24"/>',
   dungeon: '<path d="M8 29V15l12-8 12 8v14h-8V19h-8v10z"/><path d="M4 31h32M12 13V7m16 6V7"/>',
   tower: '<path d="M13 34V11h14v23M10 11l10-7 10 7M10 19h20M10 27h20M8 35h24M18 35v-5h4v5"/>',
   siege: '<path d="M6 32V15h7v6h5V15h5v6h5V15h6v17zM17 32v-7h6v7M20 15V5m0 0h12l-3 4 3 4H20"/>',
@@ -18,6 +19,7 @@ export function activityHubMarkup(): string {
   return `<div class="activity-intro"><small>HÀNH TẨU GIANG HỒ</small><h2>Hoạt động</h2><p>Chọn thử thách, săn thưởng và khám phá.</p></div>
     <section class="activity-group"><h3>Chinh phục <small>Trang bị · Chiến công</small></h3><div class="activity-grid todo-card">
       ${tile("dungeon", "Phụ bản", "Bí cảnh · Thủ lĩnh · Đồ quý", 'data-idle-open="dungeon"', "#a89aff")}
+      ${tile("companion", "Bí cảnh bắt vợ", "10 tầng · Thu phục mỹ nhân", "data-open-bond-realms", "#eda8d2")}
       ${tile("tower", "Leo tháp", "100 tầng · Bộ Trấn Thiên", "data-open-tower", "#bb9af5")}
       ${tile("siege", "Công thành chiến", "Phá cổng · Giữ cờ · Đội BOT", "data-open-siege", "#f2b975")}
       ${tile("boss", "Săn boss", "Hoàng Kim · Lịch xuất hiện", "data-open-golden-boss", "#f4c969")}
@@ -25,6 +27,7 @@ export function activityHubMarkup(): string {
     </div></section>
     <section class="activity-group"><h3>Du ngoạn <small>Bản đồ · Đồng hành</small></h3><div class="activity-grid">
       ${tile("map", "Khám phá bản đồ", "16 vùng · Bốn khu mỗi map", "data-open-exploration", "#82d6ba")}
+      ${tile("companion", "Tri kỷ", "Mang theo · Chỉ số · Trợ chiến", "data-open-companions", "#b4e6d3")}
       ${tile("bot", "Đồng hành BOT", "Tổ đội · Tuần tra · Đồ sát", "data-open-bots", "#80bedf")}
       ${tile("book", "Sổ quái", "32 loài · Chiêu thức · Đồ rơi", "data-open-bestiary", "#bed087")}
     </div></section>

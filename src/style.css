@@ -1969,7 +1969,7 @@ h2 {
 }
 .paper-doll {
   position: relative;
-  height: 332px;
+  height: 387px;
   max-width: 390px;
   margin: 0 auto;
   background: radial-gradient(ellipse at 50% 85%, #9d7d3326, transparent 65%);
@@ -1992,8 +1992,12 @@ h2 {
 }
 .paper-doll-center > span {
   margin-top: 5px;
-  font-size: 10px;
-  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 2px 5px;
+  background: #081412;
+  border-radius: 4px;
+  white-space: normal;
   text-align: center;
 }
 .paper-doll-center > canvas {
@@ -2006,7 +2010,7 @@ h2 {
   inset: 6px 0 8px;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) 48px;
-  grid-template-rows: repeat(6, 48px);
+  grid-template-rows: repeat(7, 48px);
   gap: 5px;
   margin: 0;
   pointer-events: none;
@@ -2286,7 +2290,7 @@ h2 {
     font-size: 15px;
   }
   .paper-doll-center > span {
-    font-size: 9px;
+    font-size: 11.25px;
   }
   .classic-body {
     padding-left: 7px;
@@ -2597,7 +2601,7 @@ h2 {
 .sect-character-art { height: auto; aspect-ratio: 244.6 / 321.5; }
 .military-seal-art { display: block; width: 64px; height: 64px; flex: 0 0 auto; }
 .paper-doll .military-seal-slot .military-seal-art { width: 36px; height: 36px; }
-.paper-doll .military-seal-slot small { font-size: 8px; white-space: nowrap; }
+.paper-doll .military-seal-slot small { font-size: 10px; white-space: nowrap; }
 .military-summary { display: flex; align-items: center; gap: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid #84714b; background: linear-gradient(120deg, #282d22, #141c18); }
 .military-summary > .military-seal-art { width: 84px; height: 84px; }
 .military-summary div { display: flex; flex-direction: column; gap: 6px; }
@@ -3096,3 +3100,43 @@ h2 {
 .gear-art.enhanced-max .gear-high-forge { stroke: #fff0c4; }
 @media (prefers-reduced-motion: reduce) { .gear-high-forge { animation: none !important; } }
 [data-effects="simple"] .gear-high-forge { animation: none; }
+
+.companion-art { display: block; width: 96px; height: 96px; flex: 0 0 auto; background-repeat: no-repeat; }
+.empty-companion { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 auto; color: #efbddf; font-size: 34px; }
+.companion-summary { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #b0799655; border-radius: 10px; background: #10221f; }
+.companion-summary > div { min-width: 0; }
+.companion-summary b, .companion-summary small { display: block; }
+.companion-summary small { color: #bdc9c0; line-height: 1.5; margin-top: 5px; }
+.companion-summary p { font-size: 12px; margin-bottom: 0; }
+.companion-collection, .bond-realms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.companion-card { display: flex; align-items: center; gap: 7px; padding: 10px 6px; border: 1px solid #798b7955; border-radius: 8px; background: #0d201d; }
+.companion-card.owned { border-color: var(--companion-color); }
+.companion-card > div { min-width: 0; }
+.companion-card b, .bond-realm > b { display: block; color: var(--companion-color); font-size: 15px; }
+.companion-card small, .bond-realm > small { display: block; font-size: 11px; line-height: 1.6; color: #d2dcd3; }
+.companion-card p, .bond-realm p { font-size: 12px; line-height: 1.5; margin: 6px 0; }
+.companion-card .btnrow { flex-wrap: wrap; }
+.bond-realm { overflow: hidden; border: 1px solid var(--companion-color); border-radius: 9px; padding: 10px; background: #0e211e; }
+.bond-realm > button { margin-top: 8px; width: 100%; }
+.bond-scene { position: relative; height: 128px; overflow: hidden; margin: -10px -10px 10px; background: #142923; }
+.bond-scene > .region-thumbnail { width: 100%; height: 100%; display: block; }
+.bond-scene > .companion-art { position: absolute; right: 6px; bottom: -3px; width: 133px; height: 133px; filter: drop-shadow(0 1px 3px #041714); }
+.paper-doll .companion-slot { width: 100%; height: 48px; display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 0 8px; text-align: left; background: linear-gradient(90deg, #302032, #10251e); }
+.paper-doll .companion-slot > .companion-art, .paper-doll .companion-slot > .empty-companion { width: 46px; height: 46px; }
+.paper-doll .companion-slot > div { min-width: 0; }
+.paper-doll .companion-slot b, .paper-doll .companion-slot small { position: static; display: block; width: auto; white-space: normal; background: none; text-shadow: none; }
+.paper-doll .companion-slot b { color: #f7d1e8; font-size: 12px; line-height: 17px; }
+.paper-doll .companion-slot small { font-size: 11px; line-height: 16px; color: #eee0ed; }
+#realm-name { font-size: 20px; }
+#worn-title-label { font-size: 15px; font-weight: 800; text-shadow: none; }
+@media (max-width: 600px) { .companion-collection, .bond-realms { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 350px) { .companion-card > .companion-art, .companion-summary > .companion-art { width: 80px; height: 80px; } }
+
+/* Crisp labels keep the existing transparent prestige design. */
+.prestige-badge { text-shadow: 0 1px 0 #071018; animation: none !important; }
+#realm-name { font-size: 25px; text-shadow: none; }
+#worn-title-label { font-size: 16.25px; text-shadow: none; }
+.military-rank b { font-size: 21.25px; text-shadow: none; }
+.title-name { font-size: 20px; text-shadow: none; }
+.title-card[data-prestige-tier="5"] .title-name { font-size: 18.75px; text-shadow: none; }
+.title-preview > b { font-size: 26.25px; text-shadow: none; }
