@@ -1,3 +1,4 @@
+import { prestigeSimple, prestigeTime } from "./prestige-art";
 import { drawGlow } from "./battle-vfx";
 import type { Cultivation } from "./cultivation";
 
@@ -7,7 +8,9 @@ export function drawCultivationAura(
   ctx: CanvasRenderingContext2D,
   cultivation: Cultivation,
   now: number,
+  simple = false,
 ): void {
+  now = prestigeTime(now); simple = prestigeSimple(simple);
   const {
     rank: realmRank,
     phaseIndex,
@@ -21,7 +24,7 @@ export function drawCultivationAura(
   const rank = realmRank - 1;
   const radius = 34 + rank * 1.8 + phaseIndex * 0.4;
   const rotation = now / (11000 - rank * 200);
-  const rings = 1 + Math.floor(rank / 4);
+  const rings = Math.min(simple ? 2 : 6, 1 + Math.floor(rank / 4));
   ctx.save();
   ctx.translate(0, 19);
   ctx.scale(1, 0.36);
@@ -31,7 +34,8 @@ export function drawCultivationAura(
     const r = radius * (1 - i * 0.13);
     ctx.globalAlpha = 0.65 - i * 0.06;
     ctx.strokeStyle = i % 2 ? accent : color;
-    ctx.lineWidth = i === 0 ? 2.2 : 1.4;
+    ctx.lineWidth = i === 0 ? 2.6 + rank * .08 : 1.7;
+    ctx.shadowColor = color; ctx.shadowBlur = simple ? 0 : 3 + rank * .35;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, TAU);
     ctx.stroke();
@@ -46,6 +50,7 @@ export function drawCultivationAura(
       ctx.restore();
     }
   }
+  ctx.shadowBlur = 0;
   ctx.globalAlpha = 0.85;
   if (rank >= 3) {
     // Trigram seals grow into a rotating lotus formation at higher realms.
@@ -93,7 +98,7 @@ export function drawCultivationAura(
     ctx.stroke();
     ctx.restore();
   }
-  const motes = 3 + Math.floor(rank / 2);
+  const motes = Math.min(simple ? 4 : 14, 3 + Math.floor(rank / 2));
   for (let i = 0; i < motes; i++) {
     const a = rotation * (i % 2 ? -2 : 2) + (i * TAU) / motes;
     const x = Math.cos(a) * radius,
@@ -129,7 +134,7 @@ export function drawCultivationAura(
     }
   }
   ctx.restore();
-  if (rank >= 5) {
+  if (rank >= 5 && !simple) {
     ctx.save();
     for (let i = 0; i < Math.min(10, rank - 2); i++) {
       const t = (now / (2300 - rank * 35) + i * 0.17) % 1;

@@ -2,6 +2,34 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Vinh danh · Long ấn · v0.21.0
+
+- Nhãn trên nhân vật xếp **quân hàm đang mang → danh hiệu đang đeo → cảnh giới → tên/cấp**. Chữ cảnh giới tăng từ 16 đến 21 đơn vị Canvas theo bậc; danh hiệu 16–24; quân hàm 18–25,8. Viền nền tối, chữ chuyển sắc, viền kép và tinh quang tăng ở bậc cao. Nhãn tự co và dịch trong vùng nhìn thấy để tránh bản đồ, bảng nhiệm vụ và thanh nhân vật; không cắt tên trên điện thoại. Giao diện Nhân vật dùng cùng màu và thứ tự.
+- **28 danh hiệu**, giữ 12 danh hiệu cũ và thêm 16 danh hiệu. Có năm độ quý: Thường, Hiếm, Quý, Truyền Thuyết, Chí Tôn. Bậc cao có trận sáng, vòng phù, tinh quang và thêm các hình rồng/phượng/kiếm trận/tinh hà/mây/thiên quang. Xem trước không đeo hoặc nhận chỉ số; chỉ một danh hiệu đang đeo cộng chỉ số.
+- Ấn có **bảy màu riêng**, Hương Trưởng xanh ngọc, Huyện Lệnh xanh lam, Thái Thú tím, Tổng Đốc cam, Đại Tướng Quân đỏ hồng, Thừa Tướng xanh thiên thanh và Hoàng Đế vàng. **Mang ấn** trong Nhân vật → ô Ấn quân hàm để hiện tên và rồng; nhận ấn chưa tự mang. Rồng có đầu/sừng/râu, vảy, móng và thân uốn, bay xuyên trước/sau nhân vật. Mỗi bậc tăng kích thước, quỹ đạo bay và độ sáng; từ Đại Tướng Quân có song long. Tháo ấn bỏ tên và rồng quân hàm.
+- Hiệu ứng xuất hiện trong sân đấu và hình Nhân vật, kể cả khi cưỡi ngựa. **Hiệu ứng Gọn** giảm vòng/hạt, còn một rồng và ít đoạn thân; tùy chọn giảm chuyển động của thiết bị dừng chuyển động các hiệu ứng vinh danh. Công tắc tên/hiệu ứng danh hiệu vẫn hoạt động riêng. Danh hiệu, ấn và chỉ số cũ giữ nguyên khi lưu/tải/trùng sinh; thành tích đủ điều kiện mở thêm danh hiệu mới, không tự đeo.
+
+| Danh hiệu mới | Độ quý | Điều kiện |
+| --- | --- | --- |
+| Thiếu Niên Anh Kiệt | Hiếm | Từng đạt cấp 20 |
+| Chưởng Môn Đương Đại | Truyền Thuyết | Từng đạt cấp 100 |
+| Thiên Chiến Hiệp Khách | Quý | 1.000 quái |
+| Vạn Chiến Võ Thánh | Truyền Thuyết | 10.000 quái |
+| Tinh Anh Khắc Tinh | Quý | 50 tinh anh |
+| Tru Ma Chiến Thần | Chí Tôn | 500 tinh anh |
+| Bách Ma Trảm Tướng | Truyền Thuyết | 100 boss |
+| Thần Ma Bất Bại | Chí Tôn | 1.000 boss |
+| Bất Diệt Chân Nhân | Chí Tôn | 10 lần trùng sinh |
+| Vạn Kiếp Chí Tôn | Chí Tôn | 20 lần trùng sinh |
+| Hộ Tháp Anh Hùng | Hiếm | Tầng tháp 10 |
+| Lăng Tiêu Chiến Tướng | Truyền Thuyết | Tầng tháp 50 |
+| Trấn Thiên Chí Tôn | Chí Tôn | Tầng tháp 100 |
+| Tam Thành Bá Chủ | Quý | 3 lãnh thổ |
+| Cửu Châu Nhất Thống | Chí Tôn | 9 lãnh thổ |
+| Bách Luyện Bí Cảnh | Truyền Thuyết | Tổng 100 lượt hoàn thành phụ bản |
+
+Kiểm tra dữ liệu: `pnpm test`. Kiểm tra hình/nhãn/28 mẫu/7 quân hàm/đeo-tháo/lưu-tải/Gọn/giảm chuyển động/sáu kích thước: `node --experimental-strip-types tests/prestige-browser.cjs` với biến Playwright/Chromium/URL như bên dưới. Hình xuất vào `/tmp/volam-prestige/`.
+
 ## Leo tháp và phân bổ điểm (v0.20.0)
 
 - Mở **Trấn Thiên Tháp** từ nút **Leo tháp** trong hoạt động Giang hồ, yêu cầu cấp 5. Có 100 tầng, cần vượt tầng trước để mở tầng sau; có thể đánh lại tầng đã vượt. Mỗi trận 2 đợt trong 3 phút; tầng bội 10 có thủ lĩnh. Quái tăng từ cấp 6 đến 155, tăng sinh lực, công và phòng theo tầng.
@@ -199,7 +227,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.20.0 · Trấn Thiên Tháp & Tiềm năng** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.21.0 · Vinh danh · Long ấn** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -230,7 +258,7 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 - **Khác → Hiển thị** bật/tắt số sát thương, minimap, tên danh hiệu và hiệu ứng danh hiệu. Ẩn tên/hiệu ứng không tháo danh hiệu hoặc mất chỉ số. Tùy chọn lưu theo từng ô nhân vật; đổi khi đã rời phụ bản để không mất cài đặt do checkpoint của lượt chưa lưu.
 - **Nhân vật → Trùng sinh** xem trước rồi xác nhận khi đạt cấp 160 và đã rời phụ bản/boss Hoàng Kim. Mỗi lần về cấp 1/XP 0, trở lại thành tại ải 1 và nhận vĩnh viễn **+80 công, +50 phòng, +600 HP, +120 MP, +4 tốc**. Chỉ số theo cấp được tính lại từ cấp 1; điểm tiềm năng, võ học đã nâng, đồ/cường hóa, bạc/đá, vật phẩm chờ nhận, thành tích/danh hiệu và các ải đã mở đều giữ. Các chiêu vẫn cần cấp 3/5 để dùng lại. Đồ dưới đất được thu hồi, kể cả vào hàng chờ khi túi đầy.
 - Trùng sinh tạo bản sao lưu trước, kiểm tra lại cấp/số lần khi xác nhận, chặn nhấn lặp; không thực hiện nếu không tạo được backup. Bonus tính từ số lần trùng sinh, không cộng lại vào dữ liệu gốc mỗi lần sync/reload. Không làm mới lượt thưởng ngày hoặc lượt boss Hoàng Kim.
-- **Nhân vật → Danh hiệu** có 12 danh hiệu, xem trước hiệu ứng, tiến độ mở, đeo/tháo. Chỉ danh hiệu đang đeo cộng chỉ số thật và lực chiến; các danh hiệu đã mở không cộng chồng. Thành tích hạ quái/tinh anh/boss và cấp cao nhất giữ qua trùng sinh. Save cũ nhận cài đặt x1, 0 trùng sinh, không tự đeo danh hiệu; mở các điều kiện đã biết từ tiến trình cũ.
+- **Nhân vật → Danh hiệu** có 28 danh hiệu, xem trước hiệu ứng, tiến độ mở, đeo/tháo. Chỉ danh hiệu đang đeo cộng chỉ số thật và lực chiến; các danh hiệu đã mở không cộng chồng. Thành tích hạ quái/tinh anh/boss và cấp cao nhất giữ qua trùng sinh. Save cũ nhận cài đặt x1, 0 trùng sinh, không tự đeo danh hiệu; mở các điều kiện đã biết từ tiến trình cũ.
 
 | Danh hiệu | Điều kiện mở | Chỉ số khi đeo | Hiệu ứng vector |
 | --- | --- | --- | --- |

@@ -62,7 +62,7 @@ test("title thresholds unlock exactly once, remain earned after reset and do not
   const player = fighter(); assert.deepEqual(unlockTitles(player).map(t => t.id), ["novice"]);
   player.journey.kills = 99; assert.deepEqual(unlockTitles(player), []);
   player.journey.kills = 100; player.level = 50;
-  assert.deepEqual(unlockTitles(player).map(t => t.id), ["hunter", "master"]);
+  assert.deepEqual(unlockTitles(player).map(t => t.id), ["hunter", "master", "young-hero"]);
   player.level = 1; player.journey.kills = 0;
   assert.deepEqual(unlockTitles(player), []); assert.ok(player.journey.unlockedTitles.includes("master")); assert.equal(player.journey.activeTitle, "");
 });
@@ -85,11 +85,12 @@ test("only the worn unlocked title grants bonuses, and swapping or removing chan
   player.journey.activeTitle = "golden"; assert.equal(wornTitle(player.journey), undefined); assert.deepEqual(progressionBonuses(player.journey), base);
   player.journey.activeTitle = ""; assert.deepEqual(progressionBonuses(player.journey), base);
 });
-test("twelve titles have distinct visual motifs and open all conditions including repeated rebirth", () => {
-  assert.equal(TITLES.length, 12); assert.equal(new Set(TITLES.map(t => t.motif)).size, 12);
+test("expanded title collection retains every original unlock condition and saved title", () => {
+  assert.equal(TITLES.length, 28); assert.equal(new Set(TITLES.map(t => t.motif)).size, 18);
   const player = fighter(); player.level = 160; Object.assign(player.journey, { kills: 100, elites: 5, bosses: 10, rebirths: 5 });
   player.dungeonClears = { tomb: 1, bamboo: 1 }; player.goldenClears = ["golden"]; player.inventory = [{ enhance: 10 }];
-  assert.equal(unlockTitles(player).length, 12);
+  unlockTitles(player);
+  for (const title of TITLES.slice(0, 12)) assert.ok(player.journey.unlockedTitles.includes(title.id));
   const restored = { ...player, journey: normalizeJourney(JSON.parse(JSON.stringify(player.journey))) };
-  assert.deepEqual(unlockTitles(restored), []); assert.equal(restored.journey.unlockedTitles.length, 12);
+  assert.deepEqual(unlockTitles(restored), []); assert.deepEqual(restored.journey.unlockedTitles, player.journey.unlockedTitles);
 });

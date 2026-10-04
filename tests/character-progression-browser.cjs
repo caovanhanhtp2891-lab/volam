@@ -47,7 +47,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.20.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.21.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;
@@ -130,10 +130,10 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
       for (const selector of ['#title-effect-preview','#utility-close']) { const box=await page.locator(selector).boundingBox(); assert.ok(box.y>=0 && box.y+box.height<=844, 'preview and close remain on screen while the list scrolls'); }
       hashes.push(await page.locator('#title-effect-preview').evaluate(canvas=>{const data=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let hash=2166136261;for(let i=0;i<data.length;i+=4)hash=Math.imul(hash^data[i]^data[i+1]^data[i+2]^data[i+3],16777619);return hash;}));
     }
-    assert.equal(new Set(hashes).size,12); assert.equal(await page.locator('[data-wear-title="eternal"]').isDisabled(),true);
+    assert.equal(new Set(hashes).size,TITLES.length); assert.equal(await page.locator('[data-wear-title="eternal"]').isDisabled(),true);
     await page.screenshot({path:'/tmp/volam-titles-v070.png'});
     await page.locator('#remove-title').click(); assert.equal((await read(page)).player.maxHp,baseHp); assert.equal((await read(page)).player.journey.activeTitle,''); await page.locator('#utility-close').click();
-    console.log("PASS wearing one title adds real stats; removal restores them; actual name/effects can be hidden independently; 12 previews draw distinct pixels");
+    console.log("PASS wearing one title adds real stats; removal restores them; actual name/effects can be hidden independently; 28 previews draw distinct pixels");
 
     for (const visible of [true,false]) {
       await seed(page,s=>{Object.assign(s.player,{level:100,xp:0,attack:10000,defense:10000,x:560,y:330,questRewardClaimed:true});Object.assign(s.player.idle,{enabled:false,inTown:false,autoSkills:false,autoLoot:false});s.groundLoot=[];s.campfires=[];delete s.wildElite;});

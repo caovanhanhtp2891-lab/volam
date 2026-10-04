@@ -8,6 +8,10 @@ import type { FactionId } from "./idle";
 import { SECT_BY_FACTION } from "./sects";
 import { characterArtKey } from "./character-art";
 import { drawMountedCharacter } from "./mounted-character-art";
+import { drawMilitaryDragons } from "./military-vfx";
+import type { MilitaryRankId } from "./military";
+import { drawTitleEffect } from "./title-art";
+import type { TitleDefinition } from "./character-progression";
 
 let pedestal: HTMLCanvasElement | undefined;
 function portraitPedestal(): HTMLCanvasElement {
@@ -64,6 +68,8 @@ export function drawCharacterPreview(
     cultivation: Cultivation;
     horse?: MountAppearance;
     simpleEffects?: boolean;
+    militaryRank?: MilitaryRankId;
+    title?: TitleDefinition;
   },
   now: number,
 ): void {
@@ -80,9 +86,12 @@ export function drawCharacterPreview(
   ctx.translate(180, 280);
   ctx.save();
   ctx.scale(2.2, 2.2);
-  drawCultivationAura(ctx, character.cultivation, now);
+  drawCultivationAura(ctx, character.cultivation, now, character.simpleEffects);
+  if (character.title) drawTitleEffect(ctx, character.title, now, character.simpleEffects);
+  if (character.militaryRank) drawMilitaryDragons(ctx, character.militaryRank, now, false, character.simpleEffects);
   drawGearAura(ctx, character.appearance, now, character.simpleEffects);
   ctx.restore();
+  ctx.save();
   if (character.horse) {
     ctx.translate(0, 18);
     ctx.scale(2.7, 2.7);
@@ -97,17 +106,23 @@ export function drawCharacterPreview(
       now,
       character.appearance,
     );
-    ctx.restore();
-    return;
+  } else {
+    ctx.scale(4, 4);
+    drawAnimatedHero(
+      ctx,
+      character.factionId,
+      character.sex,
+      freshMotion(),
+      now,
+      character.appearance,
+    );
   }
-  ctx.scale(4, 4);
-  drawAnimatedHero(
-    ctx,
-    character.factionId,
-    character.sex,
-    freshMotion(),
-    now,
-    character.appearance,
-  );
+  ctx.restore();
+  if (character.militaryRank) {
+    ctx.save();
+    ctx.scale(2.2, 2.2);
+    drawMilitaryDragons(ctx, character.militaryRank, now, true, character.simpleEffects);
+    ctx.restore();
+  }
   ctx.restore();
 }

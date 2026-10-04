@@ -17,8 +17,8 @@ export const MILITARY_RANKS = [
   { id: "huyen-lenh", name: "Huyện Lệnh", glyph: "令", merit: 200, lands: 2, color: "#85c9e5", crest: "mountain", bonuses: { attack: 10, defense: 8, hp: 120, mp: 30 } },
   { id: "thai-thu", name: "Thái Thú", glyph: "守", merit: 380, lands: 3, color: "#bba2ed", crest: "spear", bonuses: { attack: 20, defense: 15, hp: 200, mp: 50, crit: 3 } },
   { id: "tong-doc", name: "Tổng Đốc", glyph: "督", merit: 1000, lands: 5, color: "#e2a981", crest: "blade", bonuses: { attack: 35, defense: 25, hp: 300, mp: 70, armorPen: 4 } },
-  { id: "dai-tuong-quan", name: "Đại Tướng Quân", glyph: "將", merit: 1500, lands: 6, color: "#e9ba68", crest: "spear", bonuses: { attack: 50, defense: 35, hp: 450, mp: 100, attackSpeed: 6, critDamage: 10 } },
-  { id: "thua-tuong", name: "Thừa Tướng", glyph: "相", merit: 3000, lands: 8, color: "#eed995", crest: "taiji", bonuses: { attack: 70, defense: 50, hp: 600, mp: 160, damageReduction: 6, mpRegen: 4 } },
+  { id: "dai-tuong-quan", name: "Đại Tướng Quân", glyph: "將", merit: 1500, lands: 6, color: "#ff7990", crest: "spear", bonuses: { attack: 50, defense: 35, hp: 450, mp: 100, attackSpeed: 6, critDamage: 10 } },
+  { id: "thua-tuong", name: "Thừa Tướng", glyph: "相", merit: 3000, lands: 8, color: "#80efff", crest: "taiji", bonuses: { attack: 70, defense: 50, hp: 600, mp: 160, damageReduction: 6, mpRegen: 4 } },
   { id: "hoang-de", name: "Hoàng Đế", glyph: "帝", merit: 4300, lands: 9, color: "#ffe083", crest: "dragon", bonuses: { attack: 100, defense: 75, hp: 900, mp: 200, critDamage: 20, armorPen: 8, lifeSteal: 4 } },
 ] as const;
 export type MilitaryRankId = (typeof MILITARY_RANKS)[number]["id"];

@@ -97,8 +97,10 @@ import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSki
 import { drawSectEffect, drawSkillFlight, drawSkillReach, skillIconMarkup } from "./sect-effects";
 import { SKILL_PALETTES } from "./skill-art";
 import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
-import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
+import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, TITLE_RARITIES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
 import { drawTitleEffect } from "./title-art";
+import { drawMilitaryDragons } from "./military-vfx";
+import { realmStyle, titleStyle, militaryStyle, prestigeWidth, fitPrestigeLabel, placePrestigeLabels, drawPrestigeLabel, type PrestigeLabel } from "./prestige-art";
 import { TERRITORIES, MILITARY_RANKS, freshMilitary, normalizeMilitary, validMilitary, militaryMerit, militaryRankOf, territoryOf, canChallengeTerritory, captureTerritory, canClaimRank, claimMilitaryRank, wearMilitarySeal, militaryBonuses, type TerritoryId, type MilitaryRankId, type MilitaryProgress } from "./military";
 import { militarySealMarkup } from "./military-art";
 import { TOWER_FLOORS, TOWER_MIN_LEVEL, TOWER_SET, TOWER_EXCHANGE_COST, freshTower, validTower, normalizeTower, towerFloor, canEnterTower, towerReward, completeTowerFloor, spendTowerSigils, type TowerProgress } from "./tower";
@@ -4786,16 +4788,50 @@ function drawHeroSprite(
   ctx.restore();
 }
 
+let prestigeHudKey = "";
+let prestigeHudRects: { left: number; right: number; top: number; bottom: number }[] = [];
+let prestigeHudTop = 10;
+function playerPrestigeBounds(top: number, bottom: number) {
+  const expanded = document.querySelector(".app-shell")!.classList.contains("arena-expanded");
+  const key = `${VIEW_WIDTH}:${VIEW_HEIGHT}:${game!.player.preferences.minimap}:${document.getElementById("arena-quest-toggle")!.getAttribute("aria-expanded")}:${expanded}`;
+  if (key !== prestigeHudKey) {
+    prestigeHudKey = key;
+    const rect = canvas.getBoundingClientRect(), scaleX = VIEW_WIDTH / rect.width, scaleY = VIEW_HEIGHT / rect.height;
+    prestigeHudRects = [".mobile-map-card", ".arena-quest"].flatMap(selector => {
+      const element = document.querySelector<HTMLElement>(selector)!;
+      if (element.classList.contains("hidden")) return [];
+      const box = element.getBoundingClientRect();
+      return [{ left: (box.left - rect.left) * scaleX, right: (box.right - rect.left) * scaleX, top: (box.top - rect.top) * scaleY, bottom: (box.bottom - rect.top) * scaleY }];
+    });
+    const header = document.getElementById("hero-status")!.getBoundingClientRect();
+    prestigeHudTop = Math.max(10, (header.bottom - rect.top) * scaleY + 8);
+  }
+  const height = bottom - top;
+  const relativeTop = Math.max(prestigeHudTop, Math.min(VIEW_HEIGHT - 10 - height, top - game!.cameraY));
+  const relativeBottom = relativeTop + height;
+  let left = 9, right = VIEW_WIDTH - 9;
+  for (const rect of prestigeHudRects) {
+    if (rect.top >= relativeBottom || rect.bottom <= relativeTop) continue;
+    if ((rect.left + rect.right) / 2 < VIEW_WIDTH / 2) left = Math.max(left, rect.right + 12);
+    else right = Math.min(right, rect.left - 12);
+  }
+  return { left: game!.cameraX + left, right: game!.cameraX + right, top: game!.cameraY + prestigeHudTop, bottom: game!.cameraY + VIEW_HEIGHT - 10 };
+}
+
 function drawPlayer(player: Player, now: number): void {
   const sect = playerSect(player);
   const cultivation = cultivationForPower(currentCombatPower());
   ctx.save();
   ctx.translate(player.x, player.y);
-  drawCultivationAura(ctx, cultivation, now);
+  const simple = player.preferences.skillEffects === "simple";
+  const rank = militaryRankOf(player.military.equipped);
+  drawCultivationAura(ctx, cultivation, now, simple);
+  if (rank) drawMilitaryDragons(ctx, rank.id, now, false, simple);
   drawGearAura(ctx, currentHeroAppearance(), now, player.preferences.skillEffects === "simple");
   const title = wornTitle(player.journey);
-  if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now);
+  if (title && player.preferences.titleEffects) drawTitleEffect(ctx, title, now, simple);
   drawHeroSprite(sect, player.facingX, player.facingY, now);
+  if (rank) drawMilitaryDragons(ctx, rank.id, now, true, simple);
   ctx.restore();
   const ridingOffset = player.mounted ? 36 : 0;
   drawBar(
@@ -4814,30 +4850,17 @@ function drawPlayer(player: Player, now: number): void {
     player.x,
     player.y - (HERO_SIZE.height + 3) - ridingOffset,
   );
-  ctx.font = "700 10px 'DM Sans', sans-serif";
-  const labelWidth = ctx.measureText(cultivation.label).width + 16;
-  const labelX = clamp(
-    player.x,
-    game!.cameraX + labelWidth / 2 + 6,
-    game!.cameraX + VIEW_WIDTH - labelWidth / 2 - 6,
-  );
-  const labelY = Math.max(player.y - (HERO_SIZE.height + 22) - ridingOffset, game!.cameraY + 45);
-  ctx.fillStyle = "rgba(9,19,22,.85)";
-  ctx.beginPath();
-  ctx.roundRect(labelX - labelWidth / 2, labelY - 12, labelWidth, 17, 4);
-  ctx.fill();
-  ctx.strokeStyle = cultivation.realm.color;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = cultivation.realm.color;
-  drawOutlinedText(cultivation.label, labelX, labelY);
-  if (title && player.preferences.titleVisible) {
-    ctx.font = "600 9px sans-serif";
-    const width = ctx.measureText(`${title.glyph} ${title.name}`).width;
-    const x = clamp(player.x, game!.cameraX + width / 2 + 6, game!.cameraX + VIEW_WIDTH - width / 2 - 6);
-    ctx.fillStyle = title.color;
-    drawOutlinedText(`${title.glyph} ${title.name}`, x, Math.max(labelY - 23, game!.cameraY + 18));
-  }
+  const labels: PrestigeLabel[] = [];
+  if (rank) labels.push({ kind: "military", text: `Ấn · ${rank.name}`, style: militaryStyle(rank.id) });
+  if (title && player.preferences.titleVisible) labels.push({ kind: "title", text: `${title.glyph} ${title.name}`, style: titleStyle(title) });
+  labels.push({ kind: "realm", text: cultivation.label, style: realmStyle(cultivation) });
+  const bottom = player.y - HERO_SIZE.height - 15 - ridingOffset;
+  const height = labels.reduce((sum, label) => sum + label.style.height + 5, -5);
+  const bounds = playerPrestigeBounds(bottom - height, bottom);
+  const fitted = labels.map(label => fitPrestigeLabel(ctx, label, bounds.right - bounds.left));
+  const widths = fitted.map(label => prestigeWidth(ctx, label));
+  const placements = placePrestigeLabels(fitted, widths, player.x, bottom, bounds);
+  for (const placement of placements) drawPrestigeLabel(ctx, placement.label, placement.x, placement.y, placement.width, now, simple);
   ctx.textAlign = "left";
 }
 
@@ -5673,7 +5696,10 @@ function refreshIdleUi(): void {
   const cultivation = cultivationForPower(currentCombatPower());
   const title = wornTitle(player.journey);
   text("worn-title-label", title?.name ?? "Chưa đeo danh hiệu");
-  document.getElementById("worn-title-label")!.style.color = title?.color ?? "";
+  const wornTitleLabel = document.getElementById("worn-title-label")!;
+  wornTitleLabel.style.color = title?.color ?? "";
+  wornTitleLabel.dataset.prestigeTier = String(title?.rarity ?? 1);
+  wornTitleLabel.style.setProperty("--prestige-color", title?.color ?? "#c0cbb7");
   text("title-count", `Đã mở ${player.journey.unlockedTitles.length}/${TITLES.length} · Chỉ cộng danh hiệu đang đeo`);
   text("rebirth-label", `Trùng sinh ${player.journey.rebirths} lần`);
   text("rebirth-status", player.level === MAX_LEVEL ? "Đã đủ cấp · Về cấp 1, nhận chỉ số vĩnh viễn" : `Cần cấp ${MAX_LEVEL} · Hiện tại ${player.level}`);
@@ -5687,7 +5713,19 @@ function refreshIdleUi(): void {
   refreshMountUi();
   refreshSetUi();
   text("preview-player-name", player.name);
-  text("preview-player-realm", cultivation.label);
+  const equippedRank = militaryRankOf(player.military.equipped);
+  for (const [id, value, style] of [
+    ["preview-military-rank", equippedRank ? `Ấn · ${equippedRank.name}` : "", equippedRank ? militaryStyle(equippedRank.id) : undefined],
+    ["preview-title-label", title && player.preferences.titleVisible ? `${title.glyph} ${title.name}` : "", title ? titleStyle(title) : undefined],
+    ["preview-player-realm", cultivation.label, realmStyle(cultivation)],
+  ] as const) {
+    const label = document.getElementById(id)!;
+    label.textContent = value; label.classList.toggle("hidden", !value);
+    label.dataset.prestigeTier = String(style?.tier ?? 1);
+    label.style.setProperty("--prestige-color", style?.color ?? "#e9dba5");
+    label.style.setProperty("--prestige-font", `${style?.fontSize ?? 16}px`);
+    label.style.setProperty("--prestige-glow", `${style?.glow ?? 0}px`);
+  }
   document.getElementById("preview-player-realm")!.style.color =
     cultivation.realm.color;
   document
@@ -5820,7 +5858,7 @@ function hydrateSettings(): void {
 function updateTitles(): void {
   if (!game) return;
   const unlocked = unlockTitles(game.player);
-  if (unlocked.length) addLog(`Mở danh hiệu: ${unlocked.map(title => title.name).join(", ")}. Xem tại Nhân vật → Danh hiệu.`);
+  if (unlocked.length) addLog(`Mở danh hiệu: ${unlocked.slice(0, 3).map(title => title.name).join(", ")}${unlocked.length > 3 ? ` và ${unlocked.length - 3} danh hiệu khác` : ""}. Xem tại Nhân vật → Danh hiệu.`);
 }
 function bonusText(bonus: Partial<GearStats>): string {
   return (Object.keys(STAT_LABELS) as GearStat[]).filter(key => bonus[key]).map(key => `+${formatNumber(bonus[key]!)}${statUnit(key)} ${STAT_LABELS[key]}`).join(" · ");
@@ -5832,10 +5870,10 @@ function openTitles(preview = game?.player.journey.activeTitle ?? ""): void {
   updateTitles();
   previewTitleId = TITLES.some(title => title.id === preview) ? preview : "novice";
   const shown = TITLES.find(title => title.id === previewTitleId)!;
-  openUtility("Danh hiệu giang hồ", `<div class="title-preview" style="--title-color:${shown.color}"><canvas id="title-effect-preview" width="220" height="90" aria-label="${shown.effect}"></canvas><b>${shown.glyph} ${shown.name}</b><small>${shown.effect} · ${bonusText(shown.bonuses)}</small></div><p class="dim">Đeo một danh hiệu để nhận chỉ số và hiệu ứng. Danh hiệu đã mở được giữ sau trùng sinh. Có thể tắt tên/hiệu ứng trong Cài đặt.</p><button id="remove-title" class="mini-button" ${!game.player.journey.activeTitle || game.mapMode !== "world" ? "disabled" : ""}>Tháo danh hiệu</button><div class="title-list">${TITLES.map(title => {
+  openUtility("Danh hiệu giang hồ", `<div class="title-preview" data-prestige-tier="${shown.rarity}" style="--title-color:${shown.color};--prestige-color:${shown.color}"><canvas id="title-effect-preview" width="260" height="120" aria-label="${shown.effect}"></canvas><b>${shown.glyph} ${shown.name}</b><small>${TITLE_RARITIES[shown.rarity]} · ${shown.effect} · ${bonusText(shown.bonuses)}</small></div><p class="dim">Đeo một danh hiệu để nhận chỉ số và hiệu ứng. Danh hiệu đã mở được giữ sau trùng sinh. Có thể tắt tên/hiệu ứng trong Cài đặt.</p><button id="remove-title" class="mini-button" ${!game.player.journey.activeTitle || game.mapMode !== "world" ? "disabled" : ""}>Tháo danh hiệu</button><div class="title-list">${TITLES.map(title => {
     const owned = game!.player.journey.unlockedTitles.includes(title.id), active = game!.player.journey.activeTitle === title.id;
     const current = Math.min(title.target, titleProgress(title, game!.player));
-    return `<div class="title-card ${active ? "worn" : ""}" style="--title-color:${title.color}"><button class="title-name" data-preview-title="${title.id}" aria-pressed="${previewTitleId === title.id}"><span>${title.glyph}</span><b>${title.name}</b></button><small>${title.requirement} · ${owned ? "Đã mở" : `${formatNumber(current)}/${title.target}`}</small><p>${bonusText(title.bonuses)}</p><small>${title.effect}</small><button class="mini-button" data-wear-title="${title.id}" ${!owned || active || game!.mapMode !== "world" ? "disabled" : ""}>${active ? "Đang đeo" : owned ? "Đeo danh hiệu" : "Chưa mở"}</button></div>`;
+    return `<div class="title-card ${active ? "worn" : ""}" data-prestige-tier="${title.rarity}" style="--title-color:${title.color};--prestige-color:${title.color}"><button class="title-name" data-preview-title="${title.id}" aria-pressed="${previewTitleId === title.id}"><span>${title.glyph}</span><b>${title.name}</b></button><small>${TITLE_RARITIES[title.rarity]} · ${title.requirement} · ${owned ? "Đã mở" : `${formatNumber(current)}/${title.target}`}</small><p>${bonusText(title.bonuses)}</p><small>${title.effect}</small><button class="mini-button" data-wear-title="${title.id}" ${!owned || active || game!.mapMode !== "world" ? "disabled" : ""}>${active ? "Đang đeo" : owned ? "Đeo danh hiệu" : "Chưa mở"}</button></div>`;
   }).join("")}</div>${game.mapMode !== "world" ? '<p class="dim">Rời phụ bản trước khi đổi danh hiệu.</p>' : ""}`, "titles");
   document.querySelector(".title-list")!.scrollTop = scrollTop;
 }
@@ -5894,8 +5932,8 @@ function drawTitlePreview(now: number): void {
   const title = TITLES.find(title => title.id === previewTitleId);
   if (!preview || !title || document.getElementById("utility-overlay")!.classList.contains("hidden")) return;
   const context = preview.getContext("2d")!;
-  context.clearRect(0, 0, preview.width, preview.height); context.save(); context.translate(110, 53);
-  drawTitleEffect(context, title, now);
+  context.clearRect(0, 0, preview.width, preview.height); context.save(); context.translate(130, 70);
+  drawTitleEffect(context, title, now, game?.player.preferences.skillEffects === "simple");
   context.fillStyle = title.color; context.font = "24px Georgia"; context.textAlign = "center"; context.fillText(title.glyph, 0, 0); context.restore();
 }
 function openUtility(title: string, content: string, layout: "default" | "titles" = "default"): void {
@@ -7254,6 +7292,8 @@ function frame(now: number): void {
           cultivation: cultivationForPower(currentCombatPower()),
           horse: game.player.mounted ? currentMountAppearance() : undefined,
           simpleEffects: game.player.preferences.skillEffects === "simple",
+          militaryRank: militaryRankOf(game.player.military.equipped)?.id,
+          title: game.player.preferences.titleEffects ? wornTitle(game.player.journey) : undefined,
         },
         now,
       );
