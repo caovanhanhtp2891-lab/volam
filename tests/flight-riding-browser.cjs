@@ -53,7 +53,8 @@ async function cast(page, skill) {
 }
 (async () => {
   const { FACTIONS } = await import("../src/idle.ts");
-  const { SECTS, SECT_BY_FACTION } = await import("../src/sects.ts");
+  const { SECT_BY_FACTION } = await import("../src/sects.ts");
+  const { martialPath } = await import("../src/martial-paths.ts");
   const browser = await chromium.launch({
     executablePath: process.env.VOLAM_CHROMIUM_PATH || "/usr/bin/chromium",
     headless: true,
@@ -155,7 +156,7 @@ async function cast(page, skill) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.30.0",
+      "0.31.0",
     );
     await click(page, '[data-sect="thuy-yen"]');
     await click(page, "#join-sect");
@@ -169,11 +170,13 @@ async function cast(page, skill) {
       ["wudu", "skill1"],
       ["gaibang", "ultimate"],
     ]) {
-      const definition = SECTS[SECT_BY_FACTION[faction]].kit[skill];
+      const route = martialPath(SECT_BY_FACTION[faction]);
+      const definition = route.kit[skill];
       const before = await seed(page, (s) => {
         Object.assign(s.player, {
           factionId: faction,
           sect: FACTIONS.find((f) => f.id === faction).archetype,
+          martialPath: route.id,
           level: 5,
           mp: 50000,
           rage: 100,
@@ -237,7 +240,8 @@ async function cast(page, skill) {
           before.enemies[1].hp,
           "lightning has not reached second enemy",
         );
-        await step(page, 150);
+        // JX1-derived lightning speed is 720 px/s on every chain segment.
+        await step(page, 225);
         const second = await saved(page);
         assert.ok(second.enemies[1].hp < before.enemies[1].hp);
         assert.equal(
@@ -329,6 +333,7 @@ async function cast(page, skill) {
           Object.assign(s.player, {
             factionId: faction.id,
             sect: faction.archetype,
+            martialPath: martialPath(SECT_BY_FACTION[faction.id]).id,
             sex,
             mounted: false,
             equipment: { horse },
@@ -448,7 +453,7 @@ async function cast(page, skill) {
       viewport: { width: 1200, height: 900 },
     });
     await gallery.setContent(
-      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.30.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
+      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.31.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
     );
     await gallery.screenshot({
       path: path.join(captures, "all-20-riding-poses.png"),

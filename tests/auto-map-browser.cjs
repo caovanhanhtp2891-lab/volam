@@ -74,7 +74,7 @@ const ownership = s => JSON.stringify([s.player.level, s.player.gold, s.player.e
     p.on('pageerror', e => errors.push(e.message));
     p.on('response', r => { if (r.url().startsWith(url) && r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     await p.goto(url, { waitUntil: 'networkidle' });
-    assert.equal(await p.locator('html').getAttribute('data-version'), '0.30.0');
+    assert.equal(await p.locator('html').getAttribute('data-version'), '0.31.0');
     await p.locator('#join-sect').tap(); await step(p);
     await seed(p, s => {
       Object.assign(s.player, { attack: 1, defense: 10000, hp: 100000 });

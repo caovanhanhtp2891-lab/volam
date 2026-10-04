@@ -3,6 +3,14 @@
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
 
+## Thập phái · Võ học JX1 · v0.31.0
+
+- **Tra cứu nguồn người dùng gửi:** đối chiếu đủ 60 chiêu trong [phucnb/JXLinux-8.1.11](https://github.com/phucnb/JXLinux-8.1.11), bảng skill/missile và script 10 phái; lưu ID và kiểu phát để tra lại. [Chi tiết nguồn và bảng chiêu](docs/martial-paths.md).
+- **Chiêu có cách xuất riêng:** mưa ám khí Đường Môn, ma diệm/mưa lửa Thiên Nhẫn, tam kiếm Nga Mi, ngũ băng đao Thúy Yên, đa long/bổng hỏa Cái Bang, kiếm lôi Võ Đang và thiên lôi Côn Lôn. Phân biệt chiêu bay, giáng tại vùng địch, cận chiến và hộ thể; hiệu ứng trúng riêng cho chém/băng/lửa/độc/lôi/quang. Mưa và lôi luôn giáng từ trên xuống, không xoay nghiêng theo mục tiêu. Hiệu ứng vẽ mới dựa trên dữ liệu JX1; thông số được cân bằng cho game idle.
+- **Tạo nhân vật:** 10 phái trong lưới gọn, hai hướng võ công hiện rõ, dấu chọn, xem thử cả ba chiêu với mục tiêu, nút bắt đầu ghi đúng phái/vũ khí. Chạm hoặc dùng phím mũi tên; lưu đúng hướng đã chọn và trang bị khởi đầu khớp hướng dùng vũ khí. Giữ điểm, trang bị và tiến trình của file cũ.
+
+Kiểm tra: 251 kiểm tra logic, typecheck/build `/volam/`, `martial-paths-browser.cjs` thi triển thật 60 chiêu, `jx1-creation-browser.cjs` chạm thật 20 hướng và xem thử 60 chiêu ở 320/390/ngang/desktop; hồi quy Auto, chat và hiệu ứng/cưỡi ngựa.
+
 ## Giang hồ · Sơn thủy · v0.30.0
 
 - **Sửa Auto:** khung chat không che nút ở màn hình dọc/ngang; vùng chạm Auto 48px, giữ nguyên phần tử khi đổi nhãn. Bật Auto từ thành sẽ trở lại luyện công/phiêu lưu đúng chế độ. Auto hủy lệnh đi/nhặt tay cũ, xóa phím và joystick bị kẹt; mất focus hoặc mất pointer capture cũng xóa đầu vào. Tìm mục tiêu trên toàn map, tránh đứng chờ khi quái ở xa hơn 520px. Lệnh di chuyển mới vẫn chuyển sang điều khiển tay.

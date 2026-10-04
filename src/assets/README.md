@@ -91,3 +91,9 @@ Hai atlas được tạo riêng bằng OpenAI image generation ngày 04/10/2026,
 Nền theo thứ tự: cỏ rêu, sân lát đá, đất cát, tuyết băng. Cảnh vật theo hàng: sơn đình, vách đá/thông, mộ môn Tần Lăng, cầu gỗ; cổng đạo quán, trà quán, phong đỏ, nhà sơn cốc; đồi trà, thiền viện, bến thuyền, dược viên; di tích sa mạc, vọng lâu biên ải, thông tuyết, băng nham.
 
 `wuxia-scenes.ts` chọn nền, đường và cảnh vật cho 16 vùng; `wuxia-sprites.ts` cắt ô trực tiếp, tạo bốn tile nền 288 × 288 một lần. `landscape-art.ts` vẽ đường cong theo cùng tọa độ chuẩn hóa cho đường và sỏi ở sân đấu, map lớn và minimap. Nền được lưu đệm ở độ phân giải bản đồ; tải xong atlas tăng revision để thay cả nền thành, phụ bản, tháp và công thành. Không tạo ảnh nền theo từng khung hình. Ngân sách dưới 900 KiB mỗi atlas được kiểm tra trong unit test; `auto-map-browser.cjs` kiểm tra cảnh vật 16 vùng, bốn nền và việc dùng lại cache.
+
+## Võ học JX1 v0.31.0
+
+Không thêm atlas bitmap. `martial-visuals.ts` giữ 60 kiểu trình bày riêng dựa trên bảng skill/missile và script 10 phái của `phucnb/JXLinux-8.1.11` tại commit `ff20fda5a34332b8d4b6c31b1c6c6d7f8227c764`; dữ liệu đối chiếu gọn nằm trong `jx1-skill-reference.ts`, nguồn và phương pháp ở `docs/martial-paths.md`. Đọc dữ liệu để thiết kế lại, không chép script hoặc sprite của kho tham khảo vào bản phát hành.
+
+`martial-effects.ts` vẽ tám kiểu xuất chiêu (đơn luồng, quét, tỏa quạt, xoắn, mưa, bùng, hộ thể, lôi giáng) và sáu họ hiệu ứng trúng. Mưa/lôi theo trục đứng của thế giới; chiêu bay/cận chiến mới xoay theo mục tiêu. Luồng/hạt tối đa tám ở Đầy đủ, hai–ba ở Gọn; dùng quầng sáng cache có sẵn, không tạo gradient/blur/texture theo khung hình. Icon có nét mưa/lôi/vòng hộ thể theo đúng kiểu chiêu. Xem thử lúc tạo nhân vật và trong Võ công cùng dùng renderer thực chiến với ba pha tụ lực/ra chiêu/trúng hoặc hộ thể.

@@ -1,2 +1,2 @@
-export const APP_VERSION = "0.30.0";
-export const RELEASE_NAME = "Giang hồ · Sơn thủy";
+export const APP_VERSION = "0.31.0";
+export const RELEASE_NAME = "Thập phái · Võ học JX1";

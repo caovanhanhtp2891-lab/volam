@@ -1,9 +1,11 @@
 import type { MartialArt, SectId, SkillKey, EffectMotif } from "./sects.ts";
 import { SKILL_PALETTES, type SkillPalette } from "./skill-art.ts";
+import { martialVisual, type MartialVisual } from "./martial-visuals.ts";
+import { drawGlow } from "./battle-vfx.ts";
 const TAU = Math.PI * 2;
 export function martialPalette(art: MartialArt, sect: SectId): SkillPalette {
   const base = SKILL_PALETTES[sect];
-  if (art === "dog-staff") return { ...base, color: "#ccdb70", accent: "#65b685", light: "#fffbd2" };
+  if (art === "dog-staff") return { ...base, color: "#ffbf59", accent: "#eb7438", light: "#fff3b0" };
   if (art === "wind-saber") return { ...base, color: "#8ee2c7", accent: "#f2d17c", light: "#effff7" };
   if (art === "ice-swords") return { ...base, color: "#b4e5ff", accent: "#ffaace", light: "#f4ffff" };
   if (art === "ice-twins") return { ...base, accent: "#d5a8ff" };
@@ -75,8 +77,8 @@ export interface MartialEffect {
   x: number; y: number; radius: number; sect: SectId; art: MartialArt; kind?: EffectMotif; skill?: SkillKey;
   phase?: "cast" | "release" | "impact"; angle?: number; quality?: "full" | "simple";
 }
-// The same weapon geometry is used for release, flight and contact. All counts
-// and extents are bounded; simple mode changes only rendering, never combat.
+// Release and flight share weapon geometry; contact uses its own elemental
+// burst. All counts/extents are bounded; simple mode never changes combat.
 function body(c: CanvasRenderingContext2D, art: MartialArt, key: SkillKey | undefined, r: number, palette: SkillPalette, time: number, simple: boolean, flight = false, kind?: EffectMotif) {
   const ult = key === "ultimate", second = key === "skill2", count = simple ? 2 : ult ? 5 : 3;
   if (art === "saber" && kind === "bell") {
@@ -127,27 +129,149 @@ function body(c: CanvasRenderingContext2D, art: MartialArt, key: SkillKey | unde
     c.beginPath(); c.moveTo(-r * .55, r * .2); c.bezierCurveTo(-r, -r, r, r, r * .55, -r * .2); stroke(c, palette, 7);
   }
 }
-export function drawMartialEffect(c: CanvasRenderingContext2D, e: MartialEffect, progress: number, persistent = false): void {
-  const p = Math.max(0, Math.min(1, progress)); if (!persistent && (p <= 0 || p >= 1)) return;
-  const palette = martialPalette(e.art, e.sect), simple = e.quality === "simple", impact = e.phase === "impact";
-  const r = Math.max(8, Math.min(impact ? 62 : 240, e.radius)) * (persistent ? 1 : impact ? .35 + .65 * Math.sqrt(p) : .55 + .45 * p);
-  c.save(); c.translate(e.x, e.y); c.rotate(e.angle ?? 0); c.lineCap = "round"; c.lineJoin = "round";
-  c.globalAlpha *= persistent ? .7 : Math.min(1, p / .08, (1 - p) / .22);
-  if (e.phase === "cast") {
-    c.beginPath(); c.ellipse(0, 8, r * .8, r * .32, 0, 0, TAU); stroke(c, palette, 1.5);
-    body(c, e.art, e.skill, r * .45, palette, p, simple, false, e.kind);
-  } else {
-    body(c, e.art, e.skill, r * (impact ? .65 : .85), palette, p, simple, false, e.kind);
-    if (impact || persistent || e.art === "hammer") {
-      c.beginPath(); c.ellipse(0, 7, r * (.45 + p * .7), r * (.2 + p * .28), 0, 0, TAU); stroke(c, palette, impact ? 3 * (1 - p) + 1 : 1.2);
+// Contact is an explosion of the skill's element, not another full weapon at
+// the enemy. It runs only when gameplay confirms a hit.
+function contact(c: CanvasRenderingContext2D, v: MartialVisual, r: number, p: SkillPalette, time: number, simple: boolean) {
+  const count = simple ? 3 : 8, expand = .4 + time * .8;
+  if (v.contact === "slash") {
+    c.save(); c.rotate(-.7 + time * .3); crescent(c, r * (1 - time * .3), p); c.restore();
+  } else if (v.contact === "radiance") {
+    lotus(c, r * .62, p, time, simple ? 3 : 6);
+  } else if (v.contact === "venom") {
+    c.beginPath();
+    for (let i = 0; i < count; i++) {
+      const a = i * TAU / count;
+      const x = Math.cos(a) * r * .45, y = Math.sin(a) * r * .25;
+      c.moveTo(x + r * .28, y); c.arc(x, y, r * .28, 0, TAU);
     }
-    if (impact) for (let i = 0; i < (simple ? 3 : 9); i++) { const a = i * 2.399963, d = r * (.3 + p * .8); c.save(); c.translate(Math.cos(a) * d, Math.sin(a) * d * .6); c.rotate(a + p); c.beginPath(); if (e.art.includes("ice")) { c.moveTo(-5, 0); c.lineTo(0, -2); c.lineTo(7, 0); c.lineTo(0, 2); c.closePath(); } else c.arc(0, 0, 1.5 + (1 - p) * 1.5, 0, TAU); c.fillStyle = i % 2 ? palette.accent : palette.light; c.fill(); c.restore(); }
+    c.fillStyle = p.color + "55"; c.fill(); stroke(c, p, 1.2);
+  } else if (v.contact === "flame") {
+    for (let i = 0; i < (simple ? 2 : 4); i++) {
+      c.save(); c.translate((i - 1.5) * r * .27, r * .15); flame(c, r * (.5 + i % 2 * .2), p, time + i); c.restore();
+    }
+  } else if (v.contact === "lightning") {
+    for (let i = 0; i < (simple ? 2 : 4); i++) { c.save(); c.rotate(i * Math.PI / 2 + .4); thunder(c, r * .7, p, time); c.restore(); }
   }
+  for (let i = 0; i < count; i++) {
+    const a = i * 2.399963, d = r * expand;
+    c.save(); c.translate(Math.cos(a) * d, Math.sin(a) * d * .62 - time * 6); c.rotate(a + time);
+    c.beginPath();
+    if (v.contact === "shards") {
+      c.moveTo(-r * .23, 0); c.lineTo(0, -r * .07); c.lineTo(r * .32, 0); c.lineTo(0, r * .07); c.closePath();
+    } else if (v.contact === "venom") c.arc(0, 0, 2 + (1 - time) * 2, 0, TAU);
+    else { c.moveTo(-r * .12, 0); c.lineTo(r * .2, 0); }
+    c.fillStyle = i % 2 ? p.accent : p.light;
+    if (v.contact === "shards" || v.contact === "venom") c.fill();
+    else { c.strokeStyle = c.fillStyle; c.lineWidth = 2; c.stroke(); }
+    c.restore();
+  }
+  c.beginPath(); c.ellipse(0, 7, r * expand, r * expand * .4, 0, 0, TAU); stroke(c, p, 1.5);
+}
+function presentation(c: CanvasRenderingContext2D, e: MartialEffect, v: MartialVisual, r: number, p: SkillPalette, time: number, simple: boolean) {
+  const count = Math.min(simple ? 3 : 8, v.streams);
+  if (v.pattern === "rain") {
+    for (let i = 0; i < count; i++) {
+      const x = (i / Math.max(1, count - 1) - .5) * r * 1.4;
+      const y = Math.sin(i * 2.4) * r * .23;
+      const fall = Math.min(1, time * 1.65 - i % 3 * .07);
+      const height = Math.max(0, 1 - fall) * r * 1.4;
+      c.save(); c.translate(x, y - height); c.rotate(Math.PI * .32);
+      c.beginPath(); c.moveTo(-r * .6, 0); c.lineTo(0, 0); stroke(c, p, 2.5);
+      if (e.art === "fire-rain") { c.rotate(-Math.PI / 2); flame(c, r * .21, p, time + i); }
+      else if (e.art === "bolts") pole(c, r * .19, p, true);
+      else crescent(c, r * .2, p);
+      c.restore();
+      if (fall > .7) {
+        c.beginPath(); c.ellipse(x, y + 4, r * .18 * fall, r * .07 * fall, 0, 0, TAU); stroke(c, p, 1.2);
+      }
+    }
+  } else if (v.pattern === "storm") {
+    if (e.art === "qi") { c.save(); c.scale(1, .48); taiji(c, r * .75, p, time); c.restore(); }
+    for (let i = 0; i < count; i++) {
+      c.save(); c.translate((i - (count - 1) / 2) * r * .35, Math.sin(i * 2.4) * r * .18);
+      thunder(c, r * (.55 + Math.sin(time * 13 + i) * .08), p, time + i, true);
+      c.beginPath(); c.ellipse(0, r * .6, r * .24, r * .09, 0, 0, TAU); stroke(c, p, 1.6);
+      if (e.art === "sword-array") { c.rotate(Math.PI / 2); sword(c, r * .38, p); }
+      c.restore();
+    }
+  } else if (v.pattern === "guard") {
+    c.save(); c.scale(1, .6); body(c, e.art, e.skill, r * .75, p, time, simple, false, e.kind); c.restore();
+    c.beginPath(); c.ellipse(0, -r * .2, r * .72, r, 0, Math.PI, TAU); stroke(c, p, 2.5);
+    for (let i = 0; i < count; i++) {
+      const a = i * TAU / count + time;
+      c.beginPath(); c.ellipse(Math.cos(a) * r * .8, 8 + Math.sin(a) * r * .3, 4, 2, a, 0, TAU);
+      c.fillStyle = p.light; c.fill();
+    }
+  } else if (v.pattern === "sweep" || v.pattern === "spiral") {
+    for (let i = 0; i < count; i++) {
+      c.save(); c.rotate(i * TAU / count + time * 2.4);
+      if (v.pattern === "spiral") c.translate(r * .45, 0);
+      if (e.art === "dart" || e.art.includes("saber") || e.art === "ice-twins") crescent(c, r * .6, p);
+      else pole(c, r * .85, p, e.art === "fire-spear", e.art === "fire-spear");
+      c.restore();
+    }
+    c.beginPath(); c.ellipse(0, 8, r * .9, r * .42, 0, .2 + time, Math.PI * 1.8 + time); stroke(c, p, 2);
+  } else if (v.pattern === "burst") {
+    body(c, e.art, e.skill, r * .68, p, time, simple, false, e.kind);
+    for (let i = 0; i < (simple ? 1 : 3); i++) {
+      const wave = (time + i * .22) % 1;
+      c.save(); c.globalAlpha *= (1 - wave) * .7;
+      c.beginPath(); c.ellipse(0, 8, r * (.25 + wave), r * (.1 + wave * .43), 0, 0, TAU); stroke(c, p, 2); c.restore();
+    }
+    if (v.contact === "flame" || v.contact === "venom") for (let i = 0; i < count; i++) {
+      c.save(); const a = i * TAU / count; c.translate(Math.cos(a) * r * .65, Math.sin(a) * r * .35);
+      if (v.contact === "flame") flame(c, r * .3, p, time + i);
+      else { c.beginPath(); c.arc(0, Math.sin(time * 8 + i) * 5, r * .08, 0, TAU); stroke(c, p, 1.2); }
+      c.restore();
+    }
+  } else if (v.pattern === "fan") {
+    for (let i = 0; i < count; i++) {
+      c.save(); c.rotate((i - (count - 1) / 2) * Math.min(.35, 1.3 / Math.max(1, count - 1)));
+      if (e.art === "dragon-palm") dragon(c, r * .63, p, time + i * .1, simple);
+      else if (e.art === "spear" || e.art === "dog-staff") pole(c, r * .83, p, e.art === "spear");
+      else if (e.art.includes("sword")) sword(c, r * .75, p);
+      else crescent(c, r * .7, p);
+      c.restore();
+    }
+  } else body(c, e.art, e.skill, r * .85, p, time, simple, false, e.kind);
+}
+export function drawMartialEffect(c: CanvasRenderingContext2D, e: MartialEffect, progress: number, persistent = false): void {
+  const time = Math.max(0, Math.min(1, progress)); if (!persistent && (time <= 0 || time >= 1)) return;
+  const p = martialPalette(e.art, e.sect), v = martialVisual(e.art, e.skill), simple = e.quality === "simple", impact = e.phase === "impact";
+  const r = Math.max(8, Math.min(impact ? 62 : 240, e.radius)) * (persistent ? 1 : impact ? .35 + .65 * Math.sqrt(time) : .55 + .45 * time);
+  c.save(); c.translate(e.x, e.y);
+  // Point rain/lightning and radial fields use world up; only directed attacks
+  // rotate toward the victim, so falling skills never turn sideways.
+  if (v.delivery === "melee" || v.delivery === "travel" || impact) c.rotate(e.angle ?? 0);
+  c.lineCap = "round"; c.lineJoin = "round";
+  c.globalAlpha *= persistent ? .65 : Math.min(1, time / .08, (1 - time) / .22);
+  if (!simple && typeof document !== "undefined") drawGlow(c, 0, 5, Math.min(80, r * .8), p.color, impact ? .3 : .15);
+  if (impact) contact(c, v, r, p, time, simple);
+  else if (e.phase === "cast") {
+    c.beginPath(); c.ellipse(0, 8, r * .8, r * .32, 0, 0, TAU); stroke(c, p, 1.5);
+    body(c, e.art, e.skill, r * .45, p, time, simple, false, e.kind);
+  } else presentation(c, e, v, r, p, time, simple);
   c.restore();
 }
 export function drawMartialProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, art: MartialArt, key: SkillKey | undefined, now: number, simple: boolean, kind?: EffectMotif) {
-  const palette = martialPalette(art, sect), r = key === "ultimate" ? 24 : 17;
+  const p = martialPalette(art, sect), v = martialVisual(art, key);
+  const count = key ? Math.min(simple ? 2 : 8, v.streams) : 1;
+  const r = key === "ultimate" ? 24 : 19;
   c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
-  c.beginPath(); c.moveTo(-r * 2.3, 0); c.lineTo(0, 0); stroke(c, palette, 2);
-  body(c, art, key, r, palette, now / 900, simple, true, kind); c.restore();
+  for (let i = 0; i < count; i++) {
+    c.save(); const spread = i - (count - 1) / 2;
+    const wave = v.pattern === "spiral" ? Math.sin(now / 130 + i * TAU / count) * 9 : spread * 7;
+    c.translate(-Math.abs(spread) * 5, wave); c.rotate(v.pattern === "fan" ? spread * .05 : 0);
+    c.beginPath(); c.moveTo(-r * 2.3, 0); c.lineTo(0, 0); stroke(c, p, 2);
+    if (art === "dragon-palm") dragon(c, r * 1.15, p, now / 900 + i * .1, simple);
+    else if (art === "fire-rain") { c.rotate(Math.PI / 2); flame(c, r, p, now / 900); }
+    else if (art === "dog-staff" || art === "fire-spear") pole(c, r, p, art === "fire-spear", art === "fire-spear");
+    else if (art === "bolts") pole(c, r * .8, p, true);
+    else if (art === "dart" || art.includes("saber") || art === "ice-twins") crescent(c, r, p);
+    else if (art.includes("sword")) sword(c, r, p);
+    else body(c, art, key, r, p, now / 900, simple, true, kind);
+    if (!simple && v.contact === "lightning" && art !== "thunder" && art !== "qi") thunder(c, r * .65, p, now / 900);
+    c.restore();
+  }
+  c.restore();
 }

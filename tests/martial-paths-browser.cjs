@@ -26,7 +26,7 @@ async function target(p,e){const at=await p.evaluate(e=>{const c=document.queryS
     proto.translate=function(x,y){if(this.nextCamera){window.cam={x:-x,y:-y};this.nextCamera=false}return translate.call(this,x,y)};
    });
    const p=await ctx.newPage();p.on('pageerror',e=>errors.push(`${sect}/${route.id}: ${e.message}`));p.on('response',r=>{if(r.url().startsWith(url)&&r.status()>=400)errors.push(`${r.status()} ${r.url()}`)});
-   await p.goto(url,{waitUntil:'networkidle'});assert.equal(await p.locator('html').getAttribute('data-version'),'0.30.0',errors.join('\n'));
+   await p.goto(url,{waitUntil:'networkidle'});assert.equal(await p.locator('html').getAttribute('data-version'),'0.31.0',errors.join('\n'));
    await click(p,`[data-faction="${faction}"]`);assert.equal(await p.locator('[data-select-path]').count(),2);
    await click(p,`[data-select-path="${route.id}"]`);assert.match(await p.locator('#sect-detail').textContent(),new RegExp(route.kit.ultimate.name));await click(p,'#join-sect');await step(p);
    assert.equal((await save(p)).player.martialPath,route.id);

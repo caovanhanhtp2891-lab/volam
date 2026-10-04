@@ -3249,3 +3249,31 @@ h2 {
 .martial-current { border: 1px solid #6b6041; border-radius: 9px; padding: 10px; margin-bottom: 9px; }
 .martial-current p { font-size: 12px; margin: 6px 0; color: #c7c2b3; }
 @media(max-width:360px) { .martial-choice { padding: 7px 5px; gap: 4px; } .martial-choice svg { width: 29px; height: 29px; flex-basis: 29px; } .martial-choice small { font-size: 9px; } }
+
+/* Both weapon routes remain above the creation preview, including on phones. */
+.creation-identity { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); gap: 8px; margin: 8px 0; }
+.creation-identity .form-row { display: grid; gap: 4px; min-width: 0; }
+.creation-identity input, .creation-identity select { width: 100%; min-width: 0; min-height: 32px; }
+.creation-heading { font: 600 12px Georgia,serif; margin: 8px 0; color: #e4ce94; }
+.sect-dialog .sect-cards { grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; }
+.sect-dialog .sect-card { display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 2px; padding: 5px 1px; min-height: 68px; }
+.sect-dialog .sect-card strong { font-size: 10px; white-space: normal; }
+.sect-dialog .sect-card small, .sect-dialog .sect-emblem { display: none; }
+.sect-dialog .sect-character-art { width: 29px; height: 33px; }
+.sect-dialog .sect-detail { padding: 8px; margin-top: 10px; }
+.sect-dialog .martial-choice { min-height: 68px; border-radius: 4px; position: relative; }
+.sect-dialog .martial-choice[aria-pressed="true"]::after { content: "✓"; color: #ffe2a0; position: absolute; top: 2px; right: 4px; font-size: 12px; }
+.creation-path-summary { font-size: 10px; line-height: 1.45; margin: 5px 0 8px; color: #b9caae; }
+.creation-path-summary b { color: #ffe5a2; }
+.sect-dialog #sect-preview { width: 100%; height: auto; max-height: 145px; margin: 7px auto; border: 1px solid #435e41; border-radius: 3px; }
+.creation-skill-summary { display: grid; gap: 3px; font-size: 10px; line-height: 1.4; margin: 5px 0; color: #c8d3bc; }
+.creation-skill-summary b { color: #ffe5a2; }
+.creation-skill-summary small { color: #cbb879; font-size: 9px; }
+.creation-footer { position: sticky; bottom: -13px; padding: 7px 0 2px; background: #17281b; z-index: 1; }
+.creation-footer #join-sect { position: static; min-height: 44px; margin: 0; }
+.creation-footer #selection-load { width: 100%; margin-top: 6px; }
+@media (max-height: 500px) and (orientation: landscape) {
+  .sect-dialog .sect-cards { grid-template-columns: repeat(10,minmax(0,1fr)); }
+  .sect-dialog .sect-card { min-height: 54px; }
+  .sect-dialog #sect-preview { max-height: 110px; }
+}

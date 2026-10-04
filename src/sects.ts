@@ -12,6 +12,7 @@ export const SECT_BY_FACTION: Record<string, SectId> = {
 };
 
 export interface SkillDefinition {
+  visual?: import("./martial-visuals.ts").MartialVisual;
   sectId?: SectId;
   pathId?: string;
   art?: MartialArt;

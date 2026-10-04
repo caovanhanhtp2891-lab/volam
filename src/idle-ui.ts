@@ -83,7 +83,13 @@ export function idleShell(): string {
     </main>
     <nav class="bottom-nav" aria-label="Menu chính"><button class="active" data-idle-tab="log" aria-label="Hoạt động; mở danh sách hoạt động" aria-haspopup="true" aria-expanded="false"><span>⚑</span>Hoạt động</button><button data-idle-tab="char"><span>♙</span>Nhân vật<i id="attribute-dot"></i></button><button data-idle-tab="skill"><span>⚔</span>Võ công<i id="skill-dot"></i></button><button data-idle-tab="inv"><span>▣</span>Hành trang</button><button data-idle-tab="more"><span>⚙</span>Cài đặt</button></nav>
     <div id="mobile-sheet-backdrop" class="hidden"></div>
-    <div id="sect-overlay" class="sect-overlay"><div class="sect-dialog ornamental"><div class="dialog-eyebrow">GIANG HỒ DỊ TRUYỆN</div><h1>Chọn môn phái</h1><p class="dialog-lead">Kim khắc Mộc · Mộc khắc Thổ · Thổ khắc Thủy · Thủy khắc Hỏa · Hỏa khắc Kim.</p><div class="card"><label class="form-row">Tên nhân vật <input id="hero-name-input" maxlength="16" placeholder="Tân thủ"></label><label class="form-row">Giới tính <select id="hero-sex-input"><option value="auto">Theo môn phái</option><option value="male">Nam</option><option value="female">Nữ</option></select></label></div><div id="sect-cards" class="sect-cards"></div><div id="sect-detail" class="sect-detail"></div><button class="outline-button" id="join-sect">Gia nhập</button><button class="outline-button hidden" id="selection-load">Tiếp tục nhân vật đã lưu</button></div></div>
+    <div id="sect-overlay" class="sect-overlay" role="dialog" aria-modal="true" aria-labelledby="creation-title"><div class="sect-dialog ornamental">
+      <div class="dialog-eyebrow">GIANG HỒ DỊ TRUYỆN</div><h1 id="creation-title">Tạo nhân vật · Chọn võ công</h1>
+      <div class="card creation-identity"><label class="form-row">Tên nhân vật <input id="hero-name-input" maxlength="16" placeholder="Tân thủ"></label><label class="form-row">Giới tính <select id="hero-sex-input"><option value="auto">Theo môn phái</option><option value="male">Nam</option><option value="female">Nữ</option></select></label></div>
+      <h2 class="creation-heading">1 · Chọn môn phái</h2><div id="sect-cards" class="sect-cards"></div>
+      <div id="sect-detail" class="sect-detail"></div>
+      <div class="creation-footer"><button class="outline-button" id="join-sect">Bắt đầu hành tẩu</button><button class="outline-button hidden" id="selection-load">Tiếp tục nhân vật đã lưu</button></div>
+    </div></div>
     <div id="utility-overlay" class="utility-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="utility-title"><div class="utility-dialog ornamental" tabindex="-1"><button id="utility-close" class="dialog-close" aria-label="Đóng hộp thoại">×</button><h2 id="utility-title"></h2><div id="utility-content"></div></div></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>`;

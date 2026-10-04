@@ -1,4 +1,5 @@
 import { MARTIAL_PATHS, martialPath, martialSect, martialSkillNamed, validMartialPath } from "./martial-paths";
+import { martialFlightSpeed } from "./martial-visuals";
 import { drawGemMine } from "./landscape-art";
 import { HEALTH_COLORS, playerHealthRelation } from "./health-bars";
 import { COMBAT_SCALE_VERSION, toCombat, toCore, displayedStat, migrateCombatScale, scaledOutgoingDamage, scaledIncomingDamage } from "./combat-scale";
@@ -335,6 +336,7 @@ interface Projectile {
   theme: Element;
 }
 interface PendingStrike {
+  areaCenter?: { x: number; y: number; radius: number };
   sect?: SchoolId;
   definition?: SkillDefinition;
   range?: number;
@@ -918,6 +920,12 @@ function makeDungeonEnemies(id: DungeonId, wave: number): Enemy[] {
 function createGame(sectId: SectId, factionId?: FactionId): GameState {
   const faction = factionOf(factionId, sectId);
   const sect = SCHOOL_KITS[SECT_BY_FACTION[faction.id]];
+  const chosenPath = martialPath(sect.id, selectedMartialPaths[sect.id]);
+  const starterWeapon = createStarterItem("weapon", sectId, sect.name);
+  if (chosenPath.weapon) {
+    starterWeapon.variant = chosenPath.weapon;
+    starterWeapon.name = `${sect.name} Tân ${chosenPath.weaponLabel}`;
+  }
   const player: Player = {
     ...PLAYER_START,
     name:
@@ -934,7 +942,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
         ? "female"
         : "male",
     factionId: faction.id,
-    martialPath: martialPath(sect.id, selectedMartialPaths[sect.id]).id,
+    martialPath: chosenPath.id,
     idle: normalizeIdle(),
     radius: HERO_SIZE.radius,
     sect: sectId,
@@ -958,7 +966,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     skillRanks: { skill1: 1, skill2: 0, ultimate: 0 },
     inventory: [],
     equipment: {
-      weapon: createStarterItem("weapon", sectId, sect.name),
+      weapon: starterWeapon,
       armor: createStarterItem("armor", sectId, sect.name),
     },
     gold: 80,
@@ -3335,17 +3343,19 @@ function castSkill(key: SkillKey, automatic = false): void {
         launchProjectile(enemy, multiplier * falloff, definition.name);
         const projectile = game.combat.projectiles[game.combat.projectiles.length - 1];
         projectile.definition = definition; projectile.skill = key; projectile.art = definition.art;
+        if (definition.visual) projectile.duration = flightDuration(projectile.from, { x: enemy.x, y: enemy.y - 24 }, martialFlightSpeed(definition.visual));
         projectile.visualLeader = index === 0 && hit === 0;
         if (definition.shape === "chain" && index > 0 && previousFlight) {
           const previous = selection.targets[index - 1];
           projectile.visualFrom = { x: previous.x, y: previous.y - 24 };
-          projectile.duration = flightDuration(projectile.visualFrom, { x: enemy.x, y: enemy.y - 24 }, flightSpeed(sect.id));
+          projectile.duration = flightDuration(projectile.visualFrom, { x: enemy.x, y: enemy.y - 24 }, definition.visual ? martialFlightSpeed(definition.visual) : flightSpeed(sect.id));
           projectile.startedAt = previousFlight.startedAt + previousFlight.duration;
         }
         previousFlight = projectile;
         projectile.startedAt += hit * 70;
       } else {
-        game.combat.strikes.push({ sect: sect.id, target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : 150) + hit * 70, definition, range: definition.range, healing });
+        game.combat.strikes.push({ sect: sect.id, target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : definition.visual?.delivery === "ground" ? 380 : 150) + hit * 70, definition, range: definition.range, healing,
+          areaCenter: definition.visual?.delivery === "ground" ? { ...selection.center, radius: definition.radius } : undefined });
       }
     }
   }
@@ -3364,7 +3374,8 @@ function castSkill(key: SkillKey, automatic = false): void {
   const reach = automatic ? undefined : { x: player.x, y: player.y, definition };
   const hand = actorCastOffset(sect.id, player.sex, game.combat.motion.facingX, player.mounted);
   addSkillEffect({ ...visual, reach, x: player.x + (ranged ? hand.x : 0), y: player.y + (ranged ? hand.y : -24), radius: 30, phase: "cast", duration: ranged ? 300 : 170 });
-  if (!ranged) addSkillEffect({ ...visual, phase: "release", delay: 110 });
+  if (!ranged) addSkillEffect({ ...visual, y: visual.y - 24, phase: "release", delay: 110,
+    duration: definition.visual?.delivery === "ground" ? 420 : visual.duration });
   if (definition.zone && !ranged) {
     game.zones.push({ ...visual, definition, ...selection.center, radius: definition.radius, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
     if (game.zones.length > 6) game.zones.shift();
@@ -4148,7 +4159,9 @@ function updateCombat(now: number): void {
       if (
         game.enemies.includes(strike.target) &&
         !strike.target.dead &&
-        withinReach(game.player, strike.target, strike.range ?? 180, strike.target.radius)
+        (strike.areaCenter
+          ? distance(strike.target, strike.areaCenter) <= strike.areaCenter.radius + strike.target.radius
+          : withinReach(game.player, strike.target, strike.range ?? 180, strike.target.radius))
       )
       {
         if (strike.definition) applySkillStatus(strike.target, strike.definition, strike.multiplier, now, strike.sect);
@@ -5841,7 +5854,7 @@ function playerSect(player: Player): Sect {
 }
 
 function martialChoiceMarkup(id: SchoolId, chosen: string, action: "select" | "preview"): string {
-  return `<div class="martial-choices" role="group" aria-label="Hai hướng võ công">${MARTIAL_PATHS[id].map(p => `<button class="martial-choice" data-${action}-path="${p.id}" aria-pressed="${p.id === chosen}" style="--path-color:${SCHOOL_KITS[id].color}">${skillIconMarkup(p.kit.ultimate, "ultimate", SCHOOL_KITS[id].color)}<span><b>${p.name}</b><small>${p.weaponLabel} · Tầm đánh thường ${p.basicRange}</small></span></button>`).join("")}</div>`;
+  return `<div class="martial-choices" role="${action === "select" ? "radiogroup" : "group"}" aria-label="Hai hướng võ công ${SCHOOL_KITS[id].name}">${MARTIAL_PATHS[id].map(p => `<button class="martial-choice" data-${action}-path="${p.id}" aria-pressed="${p.id === chosen}" ${action === "select" ? `role="radio" aria-checked="${p.id === chosen}" tabindex="${p.id === chosen ? 0 : -1}"` : ""} style="--path-color:${SCHOOL_KITS[id].color}">${skillIconMarkup(p.kit.ultimate, "ultimate", SCHOOL_KITS[id].color)}<span><b>${p.name}</b><small>${p.weaponLabel} · Tầm đánh thường ${p.basicRange}</small></span></button>`).join("")}</div>`;
 }
 function canChangeMartialPath(): boolean {
   return Boolean(game && game.mapMode === "world" && game.player.idle.inTown && !game.goldenEncounter && !actionLocked() && Object.values(game.player.cooldowns).every(cd => cd <= 0));
@@ -7466,18 +7479,35 @@ function selectionSex(id: SchoolId): CharacterSex {
 }
 function renderSectDetail(): void {
   const school = martialSect(SECT_BY_FACTION[selectedFaction], selectedMartialPaths[SECT_BY_FACTION[selectedFaction]]), definition = school.kit[previewSkill];
+  const chosen = martialPath(school.id, selectedMartialPaths[school.id]);
   for (const button of sectCards.querySelectorAll<HTMLButtonElement>("[data-faction]")) button.setAttribute("aria-pressed", String(button.dataset.faction === selectedFaction));
-  document.querySelector("#sect-detail")!.innerHTML = `<strong>${school.name} · ${school.title}</strong>${martialChoiceMarkup(school.id, martialPath(school.id, selectedMartialPaths[school.id]).id, "select")}<div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><b>${definition.name}</b><span>${definition.description}</span><small class="skill-range">${skillReachLabel(definition)}</small><small>${formatNumber(toCombat(definition.mp))} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
+  document.querySelector("#sect-detail")!.innerHTML = `<h2 class="creation-heading">2 · Chọn hướng ${school.name}</h2>${martialChoiceMarkup(school.id, chosen.id, "select")}<p class="creation-path-summary" aria-live="polite"><b>Đã chọn: ${chosen.name}</b> · ${chosen.description}</p><div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}<\/div><canvas id="sect-preview" width="320" height="160" data-path="${chosen.id}" data-preview-slot="${previewSkill}" data-delivery="${definition.visual?.delivery}" aria-label="Xem thử ${definition.name}"></canvas><p class="creation-skill-summary"><b>${definition.name}</b><span>${definition.description}</span><small>${skillReachLabel(definition)} · ${formatNumber(toCombat(definition.mp))} MP · Hồi ${definition.cooldown}s</small></p>`;
   previewCanvas = document.querySelector<HTMLCanvasElement>("#sect-preview");
-  document.querySelector("#join-sect")!.textContent = `Gia nhập ${school.name} · ${school.title}`;
+  document.querySelector("#join-sect")!.textContent = `Bắt đầu · ${school.name} · ${chosen.weaponLabel}`;
 }
 function drawSectPreview(now: number): void {
   if (!previewCanvas || sectOverlay.classList.contains("hidden")) return;
   const pc = previewCanvas.getContext("2d")!, school = martialSect(SECT_BY_FACTION[selectedFaction], selectedMartialPaths[SECT_BY_FACTION[selectedFaction]]), definition = school.kit[previewSkill];
-  pc.clearRect(0, 0, 128, 86);
-  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: school.color, sect: school.id, kind: definition.motif, art: definition.art, skill: previewSkill }, (now % 1800) / 1800);
-  pc.save(); pc.translate(56, 76); const chosen = martialPath(school.id, selectedMartialPaths[school.id]);
+  const chosen = martialPath(school.id, selectedMartialPaths[school.id]), time = (now % 2400) / 2400;
+  const actor = { x: 78, y: 114 }, victim = { x: 240, y: 114 };
+  const ranged = skillUsesFlight(definition), ground = definition.visual?.delivery === "ground";
+  const base = { color: school.color, sect: school.id, kind: definition.motif, art: definition.art, skill: previewSkill, angle: 0 };
+  pc.clearRect(0, 0, 320, 160);
+  pc.fillStyle = "#263d2d"; pc.fillRect(0, 0, 320, 160);
+  pc.beginPath(); pc.ellipse(160, 117, 130, 24, 0, 0, Math.PI * 2); pc.fillStyle = "#4e634536"; pc.fill();
+  pc.save(); pc.translate(victim.x, victim.y + 23); drawSprite(pc, "bandit", -19, -40, 38, 42); pc.restore();
+  pc.fillStyle = "#111b17"; pc.fillRect(victim.x - 20, victim.y - 28, 40, 3);
+  pc.fillStyle = "#e36768"; pc.fillRect(victim.x - 20, victim.y - 28, time > .66 && definition.damage > 0 ? 26 : 40, 3);
+  pc.save(); pc.translate(actor.x, actor.y + 23);
   drawAnimatedHero(pc, selectedFaction, selectionSex(school.id), freshMotion(), now, { weaponVariant: chosen.weapon, unarmed: !chosen.weapon, weaponColor: school.color, armorColor: "", auraColor: school.color, tier: 0, enhancement: 0 }); pc.restore();
+  if (time < .2) drawSectEffect(pc, { ...base, ...actor, radius: 24, phase: "cast" }, time / .2);
+  else if (time < .66) {
+    const progress = (time - .2) / .46;
+    if (ranged) drawSkillFlight(pc, actor, victim, progress, school.id, previewSkill, now, "full", definition.art, definition.motif);
+    else drawSectEffect(pc, { ...base, ...(ground ? victim : actor), radius: ground ? 67 : 83, phase: "release" }, progress);
+  } else if (time < .95) drawSectEffect(pc, { ...base, ...(definition.damage > 0 ? victim : actor), radius: definition.damage > 0 ? 38 : 70, phase: definition.damage > 0 ? "impact" : "release" }, (time - .66) / .29);
+  pc.fillStyle = "#dce6c4"; pc.font = "11px sans-serif"; pc.textAlign = "center";
+  pc.fillText(time < .2 ? "Tụ lực" : time < .66 ? "Ra chiêu" : definition.damage > 0 ? "Trúng địch" : "Hộ thể", 160, 152);
 }
 
 let artPreviewSkill: SkillKey = "skill1";
@@ -7539,7 +7569,8 @@ function drawSkillArtPreview(now: number): void {
   if (p < .2) drawSectEffect(c, { ...base, ...(ranged ? origin : actor), radius: 28, phase: "cast" }, p / .2);
   if (ranged && p >= .15 && p < .55) drawSkillFlight(c, origin, victim, (p - .15) / .4, sect.id, artPreviewSkill, now, quality, skill.art, skill.motif);
   if (!ranged && p >= .2 && p < .55) {
-    drawSectEffect(c, { ...base, x: actor.x + dash, y: actor.y, radius: skill.shape === "line" ? 130 : Math.min(110, Math.max(60, skill.radius * .7)), phase: "release" }, (p - .2) / .35);
+    const center = skill.visual?.delivery === "ground" ? victim : { x: actor.x + dash, y: actor.y };
+    drawSectEffect(c, { ...base, ...center, radius: skill.shape === "line" ? 130 : Math.min(110, Math.max(60, skill.radius * .7)), phase: "release" }, (p - .2) / .35);
   }
   if (p >= .55 && p < .96) {
     // Pure defensive / healing skills finish around the caster; no false enemy hit.
@@ -7909,6 +7940,16 @@ document.querySelector("#sect-detail")!.addEventListener("click", event => {
   if (selection) { selectedMartialPaths[SECT_BY_FACTION[selectedFaction]] = selection.dataset.selectPath; previewSkill = "skill1"; renderSectDetail(); return; }
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-preview-skill]");
   if (button) { previewSkill = button.dataset.previewSkill as SkillKey; renderSectDetail(); }
+});
+document.querySelector("#sect-detail")!.addEventListener("keydown", event => {
+  const key = (event as KeyboardEvent).key;
+  if (!(event.target as HTMLElement).closest("[data-select-path]") || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
+  event.preventDefault(); event.stopPropagation();
+  const id = SECT_BY_FACTION[selectedFaction], paths = MARTIAL_PATHS[id];
+  const current = martialPath(id, selectedMartialPaths[id]).id;
+  const next = key === "Home" ? paths[0] : key === "End" ? paths[1] : paths.find(p => p.id !== current)!;
+  selectedMartialPaths[id] = next.id; renderSectDetail();
+  document.querySelector<HTMLButtonElement>(`#sect-detail [data-select-path="${next.id}"]`)!.focus();
 });
 renderSectCards();
 refreshUi(true);
