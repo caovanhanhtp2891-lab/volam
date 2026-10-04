@@ -57,7 +57,8 @@ const openMap = async (page, id) => { await close(page); await click(page, '.tod
     await page.locator("#hero-sex-input").selectOption("female");
     for (const faction of FACTIONS) assert.equal(await page.locator(`[data-faction="${faction.id}"] [data-character-art]`).getAttribute("data-character-art"), `${SECT_BY_FACTION[faction.id]}-female`);
     await page.locator('[data-faction="gaibang"]').click(); await page.locator("#join-sect").click();
-    await seed(page, s => { delete s.player.military; s.player.level = 9; s.player.idle.inTown = true; });
+    // Isolate the hero atlas checks from the other character tiles drawn by ambient bots.
+    await seed(page, s => { delete s.player.military; s.player.botSettings = { enabled: false, assist: false }; s.player.level = 9; s.player.idle.inTown = true; });
     assert.deepEqual((await save(page)).player.military, { captured: [], seals: [], equipped: null });
     await click(page, '[data-idle-tab="char"]');
     assert.equal(await page.locator(".paper-doll .equipment-slot").count(), 12);

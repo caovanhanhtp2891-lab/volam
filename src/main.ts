@@ -3,6 +3,11 @@ import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
 import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
+import { freshLuckyProgress, validLuckyProgress, normalizeLuckyProgress, playLuckyEvent, type LuckyGame, type LuckyProgress } from "./lucky-events";
+import { luckyMarkup, updateLuckyPresentation } from "./lucky-ui";
+import { BOT_TEMPLATES, createBot, chooseBotTarget, moveBot, freshBotSettings, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
+import { freshSiegeProgress, validSiegeProgress, normalizeSiegeProgress, beginSiege, settleSiege, siegeBlocked, siegeTravelGoal, SIEGE_PHASES, type SiegeProgress, type SiegeOutcome } from "./siege";
+import { createSiegeArt, drawSiegeStructure } from "./siege-art";
 import { idleShell } from "./idle-ui";
 import {
   FACTIONS,
@@ -167,6 +172,9 @@ interface Player {
   preferences: GamePreferences;
   journey: Journey;
   military: MilitaryProgress;
+  lucky: LuckyProgress;
+  botSettings: BotSettings;
+  sieges: SiegeProgress;
 }
 
 interface Npc {
@@ -180,6 +188,8 @@ interface Npc {
 }
 
 interface Enemy {
+  botProfile?: BotTemplate;
+  structure?: "gate" | "banner";
   wildElite?: boolean;
   element?: Element;
   id: string;
@@ -324,7 +334,11 @@ interface FloatingText {
   size: number;
 }
 
+interface BotHit { sourceId: string; targetId: string; side: "ally" | "enemy"; profile: BotTemplate; skill?: SkillKey; from: { x: number; y: number }; startedAt: number; duration: number; projectile: boolean; damage: number; reach: number }
 interface GameState {
+  bots: BotActor[];
+  botContext: string;
+  botHits: BotHit[];
   combat: CombatState;
   player: Player;
   enemies: Enemy[];
@@ -342,7 +356,7 @@ interface GameState {
   cameraY: number;
   lastBossDefeatedAt: number;
   mapMode: "world" | "dungeon" | "territory";
-  territoryEncounter?: { id: TerritoryId; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
+  territoryEncounter?: { siege?: { id: number; size: number; order: BotOrder }; id: TerritoryId; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
   dungeonTimeLeft: number;
   dungeonCleared: boolean;
   dungeonRewardClaimed: boolean;
@@ -887,11 +901,13 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     preferences: normalizePreferences(),
     journey: normalizeJourney(),
     military: freshMilitary(),
+    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), sieges: freshSiegeProgress(),
     facingX: 1,
     facingY: 0,
   };
   const state: GameState = {
     combat: freshCombat(),
+    bots: [], botContext: "", botHits: [],
     campfires: [],
     player,
     enemies: makeEnemies(),
@@ -1375,7 +1391,7 @@ function openTerritories(selected?: TerritoryId): void {
   const ready = canChallengeTerritory(progress, land.id, game.player.level);
   const blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
   const reason = captured ? "Đã thuộc lãnh thổ của bạn" : index > 0 && !progress.captured.includes(TERRITORIES[index - 1].id) ? `Cần chiếm ${TERRITORIES[index - 1].name}` : game.player.level < land.level ? `Cần cấp ${land.level}` : "Công thành";
-  openUtility("Tranh đoạt lãnh thổ", `<p class="dim">Chiến dịch công thành solo · Đánh bại 3 đợt quân trấn giữ trong 4 phút để chiếm thành. Chiến công mỗi thành nhận một lần, dùng để nhận ấn chức vị.</p><div class="territory-total"><b>${progress.captured.length}/9 thành đã chiếm</b><span>${formatNumber(militaryMerit(progress))} chiến công</span></div><div class="territory-map" aria-label="Bản đồ chín lãnh thổ"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M${TERRITORIES.map(land => `${land.x} ${land.y}`).join("L")}" fill="none" stroke="#ceb470" stroke-width=".7" stroke-dasharray="2 2"/></svg>${TERRITORIES.map(node => `<button class="territory-node ${progress.captured.includes(node.id) ? "captured" : ""} ${node.id === land.id ? "selected" : ""}" data-select-territory="${node.id}" style="left:${node.x}%;top:${node.y}%;--land-color:${node.color}" aria-pressed="${node.id === land.id}"><span>${progress.captured.includes(node.id) ? "⚑" : node.id === "hoang-thanh" ? "♛" : "♜"}</span><b>${node.name}</b></button>`).join("")}</div><section class="territory-detail" data-territory-detail="${land.id}"><h3>${land.name} <small>Cấp ${land.level}</small></h3><p>${land.description}</p><div class="territory-rewards"><span>⚑ ${land.merit} chiến công</span><span>◆ ${land.merit * 3} bạc</span><span>✦ ${Math.max(1, Math.floor(land.level / 25))} đá</span></div>${current ? `<p class="territory-battle-status">Đang công ${territoryOf(current.id)!.name} · Đợt ${current.wave + 1}/3 · ${Math.ceil(current.timeLeft)} giây còn lại</p><button class="outline-button" data-leave-territory>Rút quân · Giữ chiến công đã có</button>` : `<button class="outline-button" data-challenge-territory="${land.id}" ${!ready || blocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại để công thành" : reason}</button>`}</section><button class="mini-button territory-ranks-button" data-open-military>Ấn quân hàm · Thái Thú, Thừa Tướng, Hoàng Đế</button>`);
+  openUtility("Tranh đoạt lãnh thổ", `<button class="outline-button" data-open-siege>Đại chiến theo yêu cầu · Có đội BOT</button><p class="dim">Chiến dịch công thành solo · Đánh bại 3 đợt quân trấn giữ trong 4 phút để chiếm thành. Chiến công mỗi thành nhận một lần, dùng để nhận ấn chức vị.</p><div class="territory-total"><b>${progress.captured.length}/9 thành đã chiếm</b><span>${formatNumber(militaryMerit(progress))} chiến công</span></div><div class="territory-map" aria-label="Bản đồ chín lãnh thổ"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M${TERRITORIES.map(land => `${land.x} ${land.y}`).join("L")}" fill="none" stroke="#ceb470" stroke-width=".7" stroke-dasharray="2 2"/></svg>${TERRITORIES.map(node => `<button class="territory-node ${progress.captured.includes(node.id) ? "captured" : ""} ${node.id === land.id ? "selected" : ""}" data-select-territory="${node.id}" style="left:${node.x}%;top:${node.y}%;--land-color:${node.color}" aria-pressed="${node.id === land.id}"><span>${progress.captured.includes(node.id) ? "⚑" : node.id === "hoang-thanh" ? "♛" : "♜"}</span><b>${node.name}</b></button>`).join("")}</div><section class="territory-detail" data-territory-detail="${land.id}"><h3>${land.name} <small>Cấp ${land.level}</small></h3><p>${land.description}</p><div class="territory-rewards"><span>⚑ ${land.merit} chiến công</span><span>◆ ${land.merit * 3} bạc</span><span>✦ ${Math.max(1, Math.floor(land.level / 25))} đá</span></div>${current ? `<p class="territory-battle-status">Đang công ${territoryOf(current.id)!.name} · Đợt ${current.wave + 1}/3 · ${Math.ceil(current.timeLeft)} giây còn lại</p><button class="outline-button" data-leave-territory>Rút quân · Giữ chiến công đã có</button>` : `<button class="outline-button" data-challenge-territory="${land.id}" ${!ready || blocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại để công thành" : reason}</button>`}</section><button class="mini-button territory-ranks-button" data-open-military>Ấn quân hàm · Thái Thú, Thừa Tướng, Hoàng Đế</button>`);
 }
 function makeTerritoryEnemies(id: TerritoryId, wave: number): Enemy[] {
   const land = territoryOf(id)!;
@@ -1387,6 +1403,616 @@ function makeTerritoryEnemies(id: TerritoryId, wave: number): Enemy[] {
     return enemy;
   });
 }
+let luckyTab: LuckyGame = "wheel";
+let siegeArt: HTMLCanvasElement | undefined;
+function openLuckyEvents(tab: LuckyGame = luckyTab): void {
+  if (!game) return;
+  if (game.mapMode !== "world" || game.goldenEncounter)
+    return showToast("Rời trận hiện tại trước khi tham gia sự kiện.");
+  luckyTab = tab;
+  openUtility(
+    "Sự kiện · Bạc trong game",
+    luckyMarkup(game.player.lucky, tab, game.player.gold),
+  );
+  updateLuckyPresentation(game.player.lucky, game.player.gold, Date.now());
+}
+function playLucky(gameId: LuckyGame): void {
+  if (!game || game.mapMode !== "world" || game.goldenEncounter) return;
+  const p = game.player,
+    backup = {
+      gold: p.gold,
+      refiningStones: p.refiningStones,
+      potions: { ...p.potions },
+      lucky: normalizeLuckyProgress(p.lucky),
+    };
+  const stake = Number(
+    document.querySelector<HTMLInputElement>("#event-stake")?.value ?? 50,
+  );
+  const choice =
+    document.querySelector<HTMLInputElement>("#event-choice")?.value ?? "";
+  const receipt = playLuckyEvent(p, p.lucky, gameId, stake, choice, Date.now());
+  if (!receipt)
+    return showToast(
+      "Kiểm tra số bạc, cửa cược và chờ lượt trước mở thưởng xong.",
+    );
+  if (!persistGame()) {
+    Object.assign(p, backup);
+    return;
+  }
+  openLuckyEvents(gameId);
+  refreshUi(true);
+}
+const botRoleLabel = (role: string) =>
+  ({
+    healer: "Hồi phục",
+    tank: "Đỡ đòn",
+    ranged: "Đánh xa",
+    fighter: "Cận chiến",
+  })[role] ?? role;
+function openBots(): void {
+  if (!game) return;
+  const settings = game.player.botSettings,
+    blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  openUtility(
+    "Đồng hành giang hồ · BOT",
+    `<p class="dim">Bot là nhân vật do game điều khiển. Trong luyện công, bật Trợ chiến để tổ đội cùng đánh quái và chia phần thưởng cho nhân vật. Công thành luôn có đội bot riêng.</p><div class="btnrow"><button class="mini-button" data-bot-setting="enabled" ${blocked ? "disabled" : ""}>Bot trong map: ${settings.enabled ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="assist" ${blocked ? "disabled" : ""}>Trợ chiến: ${settings.assist ? "Bật" : "Tắt"}</button></div><div class="bot-roster">${BOT_TEMPLATES.map((profile) => `<article style="--bot-color:${profile.color}">${characterPortraitMarkup(SECT_BY_FACTION[profile.faction], profile.sex)}<div><b>${profile.name} <small>BOT</small></b><span>${factionOf(profile.faction).name} · ${botRoleLabel(profile.role)}</span><small>${GEAR_VARIANTS[profile.weapon].name}</small></div></article>`).join("")}</div><button class="outline-button" data-open-siege>Gọi đội công thành</button>`,
+  );
+}
+function openRequestedSiege(): void {
+  if (!game) return;
+  const encounter = game.territoryEncounter,
+    active = encounter?.siege,
+    blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  const outcomes = {
+    victory: "Thắng",
+    defeat: "Thất bại",
+    retreat: "Rút quân",
+    timeout: "Hết giờ",
+    interrupted: "Gián đoạn",
+  };
+  openUtility(
+    "Công thành theo yêu cầu",
+    `<p class="dim">Gọi trận bất cứ lúc nào, chọn mọi thành từ cấp 1. Hai phe đều có bot môn phái, thời gian 4 phút. Phá cổng → đoạt cờ → hạ Thống lĩnh và quân bảo vệ.</p><p class="dim">Thắng nhận bạc, XP và 2 đá tinh luyện. Chiến công lãnh thổ và ấn quân hàm nhận ở chiến dịch Tranh đoạt lãnh thổ.</p>${active ? `<div class="card"><b>${territoryOf(encounter.id)!.name} · ${SIEGE_PHASES[encounter.wave]}</b><p>${Math.ceil(encounter.timeLeft)} giây · ${game.bots.filter((b) => b.hp > 0).length}/${active.size} bot sống</p><div class="btnrow">${siegeOrderButtons(active.order)}</div><button class="outline-button" data-leave-territory>Rút quân</button></div>` : `<div class="card"><label class="form-row">Thành<select id="siege-city">${TERRITORIES.map((t) => `<option value="${t.id}">${t.name}</option>`).join("")}</select></label><label class="form-row">Đội bot<select id="siege-size"><option value="3">3 đồng đội</option><option value="6" selected>6 đồng đội</option><option value="9">9 đồng đội</option></select></label><button class="outline-button" data-start-siege ${blocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại để gọi trận" : "Xuất quân ngay"}</button></div>`}<h3>Chiến báo · ${game.player.sieges.victories} trận thắng</h3><div class="event-history">${
+      game.player.sieges.history
+        .slice(0, 8)
+        .map(
+          (r) =>
+            `<article><b>#${r.id} · ${territoryOf(r.city)!.name}</b><span>${outcomes[r.outcome]}${r.silver ? ` · +${r.silver} bạc · +${r.xp} XP · +${r.stones} đá` : ""}</span></article>`,
+        )
+        .join("") || `<p class="dim">Chưa có trận.</p>`
+    }</div>`,
+  );
+}
+function siegeOrderButtons(order: BotOrder): string {
+  return (
+    [
+      ["push", "Phá mục tiêu"],
+      ["guard", "Diệt quân"],
+      ["rally", "Theo tôi"],
+    ] as const
+  )
+    .map(
+      ([id, name]) =>
+        `<button class="mini-button" data-siege-order="${id}" aria-pressed="${order === id}">${name}</button>`,
+    )
+    .join("");
+}
+function makeRequestedSiegeEnemies(city: TerritoryId, wave: number): Enemy[] {
+  if (!game) return [];
+  const land = territoryOf(city)!,
+    attack = effectiveAttack(),
+    hp = game.player.maxHp;
+  const units = Array.from({ length: wave === 2 ? 5 : 4 }, (_, i) => {
+    const boss = wave === 2 && i === 0,
+      profile = BOT_TEMPLATES[(i + wave * 3 + 2) % BOT_TEMPLATES.length];
+    const enemy = createEnemy(
+      `siege-${game!.territoryEncounter!.siege!.id}-${wave}-${i}`,
+      `${boss ? "Thống lĩnh" : "Trấn quân"} ${profile.name} · BOT`,
+      boss ? "boss" : "normal",
+      800 + (i % 3) * 140,
+      (wave === 0 ? 590 : 350) + Math.floor(i / 3) * 85,
+      game!.player.level,
+      profile.color,
+    );
+    enemy.botProfile = profile;
+    enemy.maxHp = enemy.hp = Math.floor(attack * (boss ? 35 : 7));
+    enemy.attack = Math.max(100, Math.floor(hp * (boss ? 0.045 : 0.025)));
+    enemy.defense = Math.floor(effectiveDefense() * 0.15);
+    enemy.speed = 125;
+    return enemy;
+  });
+  if (wave < 2) {
+    const structure = createEnemy(
+      `siege-objective-${wave}`,
+      wave === 0 ? `Cổng ${land.name}` : "Chiến kỳ trấn thành",
+      "elite",
+      950,
+      wave === 0 ? 520 : 380,
+      game.player.level,
+      land.color,
+    );
+    structure.structure = wave === 0 ? "gate" : "banner";
+    structure.radius = wave === 0 ? 65 : 30;
+    structure.maxHp = structure.hp = Math.floor(
+      attack * (wave === 0 ? 30 : 22),
+    );
+    structure.attack = structure.defense = structure.speed = 0;
+    units.push(structure);
+  }
+  return units;
+}
+function enterRequestedSiege(city: TerritoryId, size: number): void {
+  if (
+    !game ||
+    game.mapMode !== "world" ||
+    game.goldenEncounter ||
+    ![3, 6, 9].includes(size) ||
+    !territoryOf(city)
+  )
+    return;
+  const backup = normalizeSiegeProgress(game.player.sieges),
+    id = beginSiege(game.player.sieges, city, Date.now());
+  if (!id) return;
+  if (!persistGame()) {
+    game.player.sieges = backup;
+    return;
+  }
+  game.territoryEncounter = {
+    id: city,
+    wave: 0,
+    timeLeft: 240,
+    enemies: game.enemies,
+    loot: game.loot,
+    x: game.player.x,
+    y: game.player.y,
+    inTown: game.player.idle.inTown,
+    autoBattle: game.autoBattle,
+    siege: { id, size, order: "push" },
+  };
+  game.mapMode = "territory";
+  game.enemies = makeRequestedSiegeEnemies(city, 0);
+  game.loot = [];
+  game.telegraphs = [];
+  game.effects = [];
+  game.zones = [];
+  game.combat = freshCombat();
+  game.botHits = [];
+  game.botContext = "";
+  game.targetId = null;
+  game.moveTarget = null;
+  game.player.x = 950;
+  game.player.y = 740;
+  game.player.hp = game.player.maxHp;
+  game.player.mp = game.player.maxMp;
+  game.autoBattle = true;
+  idleNextWave = 0;
+  canvasBadge.textContent = `${territoryOf(city)!.name.toLocaleUpperCase("vi")} · ĐẠI CHIẾN`;
+  resetJoystick();
+  keys.clear();
+  closeUtility();
+  showIdlePage("log");
+  addLog(
+    `Gọi trận #${id}: ${size} đồng đội BOT xuất quân công ${territoryOf(city)!.name}.`,
+  );
+  tickBots(0, nowMs());
+  refreshUi(true);
+}
+function refreshSiegeHud(): void {
+  if (!game) return;
+  const encounter = game.territoryEncounter,
+    siege = encounter?.siege,
+    hud = document.getElementById("siege-hud")!;
+  hud.classList.toggle("hidden", !siege);
+  if (!siege) return;
+  document.getElementById("siege-phase")!.textContent =
+    SIEGE_PHASES[encounter.wave];
+  document.getElementById("siege-clock")!.textContent =
+    `${Math.ceil(encounter.timeLeft)}s · BOT ${game.bots.filter((b) => b.hp > 0).length}/${siege.size}`;
+  const orders = document.getElementById("siege-orders")!;
+  if (orders.dataset.order !== siege.order) {
+    orders.innerHTML = siegeOrderButtons(siege.order);
+    orders.dataset.order = siege.order;
+  }
+  const objective = game.enemies.find((e) => e.structure || e.kind === "boss");
+  document.getElementById("siege-objective-health")!.style.width =
+    `${objective && !objective.dead ? (objective.hp / objective.maxHp) * 100 : 0}%`;
+}
+function botAppearance(profile: BotTemplate): HeroAppearance {
+  return {
+    weaponVariant: profile.weapon,
+    weaponColor: profile.color,
+    armorColor: "",
+    auraColor: profile.color,
+    tier: 1,
+    enhancement: 0,
+    simpleEffects: game?.player.preferences.skillEffects === "simple",
+    weapon: { color: profile.color, rarity: "Tốt", enhance: 0 },
+  };
+}
+function drawBot(bot: BotActor, now: number): void {
+  if (bot.hp <= 0) return;
+  ctx.save();
+  ctx.translate(bot.x, bot.y);
+  ctx.strokeStyle = bot.profile.color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 5, 21, 8, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  drawAnimatedHero(
+    ctx,
+    bot.profile.faction,
+    bot.profile.sex,
+    bot.motion,
+    now,
+    botAppearance(bot.profile),
+  );
+  drawEnemyStatus(
+    ctx,
+    { ...bot, radius: 19, dead: false },
+    now,
+    game?.player.preferences.skillEffects === "simple",
+  );
+  ctx.restore();
+  drawBar(bot.x - 24, bot.y - 72, 48, 4, bot.hp / bot.maxHp, "#7acda5");
+  ctx.textAlign = "center";
+  ctx.font = "600 10px sans-serif";
+  ctx.fillStyle = bot.profile.color;
+  drawOutlinedText(`${bot.profile.name} · BOT`, bot.x, bot.y - 78);
+  ctx.textAlign = "left";
+}
+function botImpact(
+  x: number,
+  y: number,
+  profile: BotTemplate,
+  skill: SkillKey | undefined,
+  now: number,
+): void {
+  const school = SCHOOL_KITS[SECT_BY_FACTION[profile.faction]],
+    def = school.kit[skill ?? "skill1"];
+  addSkillEffect({
+    x,
+    y: y - 24,
+    sect: school.id,
+    skill,
+    radius: 30,
+    color: profile.color,
+    kind: def.motif,
+    angle: 0,
+    phase: "impact",
+    duration: 420,
+  });
+}
+function queueBotAttack(
+  source: BotActor | Enemy,
+  profile: BotTemplate,
+  target: Enemy | BotActor | Player,
+  side: "ally" | "enemy",
+  skill: SkillKey | undefined,
+  now: number,
+): void {
+  if (!game) return;
+  const motion =
+    "motion" in source
+      ? source.motion
+      : game.combat.enemyMotions.get(source.id)!;
+  const school = SCHOOL_KITS[SECT_BY_FACTION[profile.faction]],
+    d = distance(source, target);
+  const projectile =
+    profile.role === "ranged" ||
+    profile.role === "healer" ||
+    (skill && skillUsesFlight(school.kit[skill]));
+  const duration = projectile ? Math.max(180, (d / 600) * 1000) : 220;
+  motion.facingX = target.x - source.x < 0 ? -1 : 1;
+  motion.facingY = target.y - source.y;
+  Object.assign(motion, {
+    action: skill ? "cast" : "attack",
+    actionAt: now,
+    actionDuration: duration + 260,
+  });
+  const hand = actorCastOffset(school.id, profile.sex, motion.facingX);
+  game.botHits.push({
+    sourceId: source.id,
+    targetId: "id" in target ? target.id : "player",
+    side,
+    profile,
+    skill,
+    from: { x: source.x + hand.x, y: source.y + hand.y },
+    startedAt: now + 110,
+    duration,
+    projectile: Boolean(projectile),
+    damage: source.attack * (skill ? 1.6 : 1),
+    reach: projectile ? 420 : 92,
+  });
+}
+function tickBots(dt: number, now: number): void {
+  if (!game) return;
+  const siege = game.territoryEncounter?.siege,
+    settings = game.player.botSettings;
+  const visible =
+    Boolean(siege) ||
+    (settings.enabled && game.mapMode === "world" && !game.goldenEncounter);
+  const context = siege
+    ? `siege-${siege.id}`
+    : visible
+      ? `world-${game.player.idle.stage}-${game.player.idle.inTown}-${settings.assist}`
+      : "off";
+  if (context !== game.botContext) {
+    game.botContext = context;
+    game.botHits = [];
+    const indices = [0, 1, 4, 2, 3, 5, 6, 7, 8],
+      count = siege?.size ?? (settings.assist ? 3 : 4);
+    game.bots = visible
+      ? indices
+          .slice(0, count)
+          .map((i, n) =>
+            createBot(BOT_TEMPLATES[i], n, game!.player.level, game!.player, {
+              attack: effectiveAttack(),
+              hp: game!.player.maxHp,
+              defense: effectiveDefense(),
+            }),
+          )
+      : [];
+  }
+  for (const [i, bot] of game.bots.entries()) {
+    if (bot.hp <= 0) {
+      if (now < bot.respawnAt) continue;
+      const fresh = createBot(bot.profile, i, game.player.level, game.player, {
+        attack: effectiveAttack(),
+        hp: game.player.maxHp,
+        defense: effectiveDefense(),
+      });
+      Object.assign(bot, fresh);
+    }
+    bot.cooldown = Math.max(0, bot.cooldown - dt);
+    bot.skillCooldown = Math.max(0, bot.skillCooldown - dt);
+    const fight =
+      Boolean(siege) || (settings.assist && !game.player.idle.inTown);
+    const target = fight
+      ? (chooseBotTarget(
+          bot,
+          game.enemies,
+          game.player,
+          siege?.order ?? "guard",
+        ) as Enemy | undefined)
+      : undefined;
+    const ranged = ["ranged", "healer"].includes(bot.profile.role),
+      stop = target ? (ranged ? 200 : target.radius + 40) : 15;
+    const angle =
+      Math.PI * (0.15 + (i / Math.max(1, game.bots.length - 1)) * 0.7);
+    let goal = target
+      ? {
+          x: target.x + Math.cos(angle) * (stop - 8),
+          y: target.y + Math.sin(angle) * (stop - 8),
+        }
+      : {
+          x:
+            game.player.x +
+            Math.cos(now / 6000 + i * 1.9) * (settings.assist ? 75 : 150),
+          y:
+            game.player.y +
+            Math.sin(now / 5000 + i * 1.9) * (settings.assist ? 60 : 110),
+        };
+    if (siege) goal = siegeTravelGoal(bot, goal);
+    const locked =
+      bot.motion.actionDuration > 0 &&
+      now - bot.motion.actionAt < bot.motion.actionDuration;
+    if (!locked) moveBot(bot, goal, dt, now, (x, y) => isBlocked(x, y, 19), 12);
+    else bot.motion.moving *= 0.85;
+    if (bot.stunUntil > now || locked) continue;
+    if (
+      bot.profile.role === "healer" &&
+      fight &&
+      bot.skillCooldown <= 0 &&
+      [game.player, ...game.bots].some(
+        (ally) =>
+          ally.hp > 0 &&
+          ally.hp < ally.maxHp * 0.9 &&
+          distance(bot, ally) < 260,
+      )
+    ) {
+      for (const ally of game.bots)
+        if (ally.hp > 0 && distance(bot, ally) < 260)
+          ally.hp = Math.min(ally.maxHp, ally.hp + ally.maxHp * 0.08);
+      if (distance(bot, game.player) < 260)
+        game.player.hp = Math.min(
+          game.player.maxHp,
+          game.player.hp + game.player.maxHp * 0.04,
+        );
+      botImpact(bot.x, bot.y, bot.profile, "skill2", now);
+      bot.skillCooldown = 6;
+      Object.assign(bot.motion, {
+        action: "cast",
+        actionAt: now,
+        actionDuration: 650,
+      });
+      continue;
+    }
+    if (target && distance(bot, target) <= stop + 15 && bot.cooldown <= 0) {
+      const skill =
+        bot.skillCooldown <= 0 && bot.profile.role !== "healer"
+          ? "skill1"
+          : undefined;
+      queueBotAttack(bot, bot.profile, target, "ally", skill, now);
+      bot.cooldown = 1.35;
+      if (skill) bot.skillCooldown = 3.8;
+    }
+  }
+  updateBotHits(now);
+}
+function tickSiegeDefender(
+  enemy: Enemy,
+  motion: ActorMotion,
+  dt: number,
+  now: number,
+): void {
+  if (!game || !enemy.botProfile) return;
+  const profile = enemy.botProfile,
+    candidates = [game.player, ...game.bots.filter((b) => b.hp > 0)];
+  const target = candidates.reduce(
+    (best, ally) =>
+      distance(enemy, ally) < distance(enemy, best) ? ally : best,
+    game.player as Player | BotActor,
+  );
+  const before = { x: enemy.x, y: enemy.y },
+    ranged = profile.role === "ranged",
+    reach = ranged ? 190 : 53;
+  const locked = now - motion.actionAt < motion.actionDuration;
+  if (!locked && distance(enemy, target) > reach) {
+    const goal = siegeTravelGoal(enemy, target),
+      d = distance(enemy, goal),
+      stride = Math.min(
+        d,
+        enemy.speed * dt * (enemy.slowUntil > now ? enemy.slowFactor : 1),
+      );
+    const nx = enemy.x + ((goal.x - enemy.x) / Math.max(1, d)) * stride,
+      ny = enemy.y + ((goal.y - enemy.y) / Math.max(1, d)) * stride;
+    if (!isBlocked(nx, ny, enemy.radius)) {
+      enemy.x = nx;
+      enemy.y = ny;
+    }
+  }
+  enemy.attackCooldown -= dt;
+  enemy.bossCooldown -= dt;
+  updateMotion(motion, before, enemy, dt, now);
+  if (
+    !locked &&
+    distance(enemy, target) <= reach + 15 &&
+    enemy.attackCooldown <= 0
+  ) {
+    const skill = enemy.bossCooldown <= 0 ? "skill1" : undefined;
+    queueBotAttack(enemy, profile, target, "enemy", skill, now);
+    enemy.attackCooldown = 1.7;
+    if (skill) enemy.bossCooldown = 4.5;
+  }
+}
+function updateBotHits(now: number): void {
+  if (!game) return;
+  const current = game;
+  const pending = game.botHits;
+  game.botHits = [];
+  for (const hit of pending) {
+    const source =
+      hit.side === "ally"
+        ? game.bots.find((b) => b.id === hit.sourceId && b.hp > 0)
+        : game.enemies.find((e) => e.id === hit.sourceId && !e.dead);
+    const target =
+      hit.side === "ally"
+        ? game.enemies.find((e) => e.id === hit.targetId && !e.dead)
+        : hit.targetId === "player"
+          ? game.player
+          : game.bots.find((b) => b.id === hit.targetId && b.hp > 0);
+    if (!source || !target) continue;
+    if (now < hit.startedAt + hit.duration) {
+      game.botHits.push(hit);
+      continue;
+    }
+    if (
+      !hit.projectile &&
+      distance(source, target) >
+        hit.reach + ("radius" in target ? target.radius : 19)
+    )
+      continue;
+    if (hit.side === "ally") {
+      const enemy = target as Enemy,
+        damage = scaledOutgoingDamage(
+          hit.damage,
+          enemyDefense(enemy),
+          source.level,
+          false,
+          emptyStats(),
+        );
+      enemy.hp = Math.max(0, enemy.hp - damage);
+      enemy.hitFlash = 0.16;
+      if (hit.skill && !enemy.structure) {
+        const def =
+          SCHOOL_KITS[SECT_BY_FACTION[hit.profile.faction]].kit[hit.skill];
+        if (def.slow) {
+          enemy.slowUntil = now + 2200;
+          enemy.slowFactor = def.slow;
+          enemy.chilledUntil =
+            def.motif === "frost" || def.motif === "fan" ? enemy.slowUntil : 0;
+        }
+        if (def.stun) {
+          enemy.stunUntil = now + Math.min(0.5, def.stun) * 1000;
+          enemy.frozenUntil = def.motif === "frost" ? enemy.stunUntil : 0;
+        }
+        if (def.corrode) {
+          enemy.corrodedUntil = enemy.defenseDownUntil = now + 2500;
+        }
+      }
+      addFloatingText(
+        enemy.x,
+        enemy.y - 45,
+        `-${formatNumber(damage)}`,
+        "#95d8c1",
+        12,
+      );
+      if (!enemy.hp) killEnemy(enemy);
+    } else if (hit.targetId === "player") {
+      const enemies = game.enemies;
+      damagePlayer(hit.damage, `${hit.profile.name} · BOT`);
+      if (game !== current || game.enemies !== enemies) return;
+    } else {
+      const bot = target as BotActor,
+        damage = scaledIncomingDamage(
+          hit.damage,
+          bot.defense,
+          bot.level,
+          emptyStats(),
+        );
+      bot.hp = Math.max(0, bot.hp - damage);
+      bot.motion.hurtUntil = now + 180;
+      if (!bot.hp) {
+        bot.respawnAt = now + 8000;
+        addFloatingText(
+          bot.x,
+          bot.y - 50,
+          "BOT · hồi sinh 8s",
+          bot.profile.color,
+          12,
+        );
+      }
+      if (hit.skill && bot.hp > 0) {
+        const def =
+          SCHOOL_KITS[SECT_BY_FACTION[hit.profile.faction]].kit[hit.skill];
+        if (def.slow) {
+          bot.slowUntil = now + 2000;
+          bot.slowFactor = def.slow;
+          bot.chilledUntil = def.motif === "frost" ? bot.slowUntil : 0;
+        }
+        if (def.stun) {
+          bot.stunUntil = now + Math.min(0.6, def.stun) * 1000;
+          bot.frozenUntil = def.motif === "frost" ? bot.stunUntil : 0;
+        }
+      }
+    }
+    botImpact(target.x, target.y, hit.profile, hit.skill, now);
+  }
+}
+function drawBotFlights(now: number): void {
+  if (!game) return;
+  for (const hit of game.botHits) {
+    if (!hit.projectile || now < hit.startedAt) continue;
+    const target =
+      hit.side === "ally"
+        ? game.enemies.find((e) => e.id === hit.targetId && !e.dead)
+        : hit.targetId === "player"
+          ? game.player
+          : game.bots.find((b) => b.id === hit.targetId && b.hp > 0);
+    if (!target) continue;
+    drawSkillFlight(
+      ctx,
+      hit.from,
+      { x: target.x, y: target.y - 24 },
+      Math.min(1, (now - hit.startedAt) / hit.duration),
+      SECT_BY_FACTION[hit.profile.faction],
+      hit.skill,
+      now,
+      game.player.preferences.skillEffects,
+    );
+  }
+}
+
 function enterTerritory(id: TerritoryId): void {
   if (!game || game.mapMode !== "world" || game.goldenEncounter || !canChallengeTerritory(game.player.military, id, game.player.level)) return;
   if (!persistGame()) return;
@@ -1400,10 +2026,13 @@ function enterTerritory(id: TerritoryId): void {
   addLog(`Xuất quân công ${territoryOf(id)!.name}! Dọn 3 đợt và hạ Thống lĩnh trong 4 phút.`);
   refreshUi(true);
 }
-function leaveTerritory(message = "Đã rút quân. Thành chưa chiếm không nhận chiến công."): void {
+function leaveTerritory(message = "Đã rút quân. Thành chưa chiếm không nhận chiến công.", outcome: SiegeOutcome = "retreat"): void {
   if (!game?.territoryEncounter) return;
   collectIdleLoot(true);
   const encounter = game.territoryEncounter;
+  const awardLevel = game.player.level;
+  const record = encounter.siege ? settleSiege(game.player.sieges, encounter.siege.id, outcome, awardLevel, Date.now(), game.player.preferences.xpMultiplier) : null;
+  game.botContext = ""; game.botHits = []; game.bots = [];
   game.territoryEncounter = undefined; game.mapMode = "world";
   game.enemies = encounter.enemies; game.loot = encounter.loot;
   game.player.x = encounter.x; game.player.y = encounter.y;
@@ -1412,11 +2041,24 @@ function leaveTerritory(message = "Đã rút quân. Thành chưa chiếm không 
   game.telegraphs = []; game.effects = []; game.zones = []; game.combat = freshCombat();
   idleNextWave = 0; resetJoystick(); keys.clear(); closeUtility();
   canvasBadge.textContent = game.player.idle.enabled ? `${stageInfo(game.player.idle.stage).name.toLocaleUpperCase("vi")} · ẢI ${stageInfo(game.player.idle.stage).localStage}` : "RỪNG TRÚC · KÊNH 01";
+  if (record?.outcome === "victory") {
+    game.player.gold = Math.min(1e9, game.player.gold + record.silver); game.player.refiningStones = Math.min(1e9, game.player.refiningStones + record.stones);
+    record.xp = rewardExperience(awardLevel * 7);
+    message = `Đại thắng ${territoryOf(record.city)!.name}! +${record.silver} bạc · +${record.xp} XP · +${record.stones} đá tinh luyện.`;
+  } else if (record) message = `${message} Trận #${record.id} đã kết thúc, không nhận thưởng.`;
   addLog(message); persistGame(); refreshUi(true);
 }
 function advanceTerritory(): void {
   if (!game?.territoryEncounter || game.enemies.some(enemy => !enemy.dead)) return;
   const encounter = game.territoryEncounter;
+  if (encounter.siege) {
+    if (encounter.wave < 2) {
+      encounter.wave++; game.enemies = makeRequestedSiegeEnemies(encounter.id, encounter.wave);
+      game.targetId = null; game.botHits = []; game.telegraphs = []; game.zones = []; game.combat = freshCombat();
+      addLog(`${territoryOf(encounter.id)!.name}: ${SIEGE_PHASES[encounter.wave]}!`);
+    } else { leaveTerritory("Đại thắng!", "victory"); openRequestedSiege(); }
+    return;
+  }
   if (encounter.wave < 2) {
     encounter.wave++; game.enemies = makeTerritoryEnemies(encounter.id, encounter.wave);
     game.targetId = null; game.telegraphs = []; game.zones = []; game.combat = freshCombat();
@@ -1694,6 +2336,7 @@ function isBlocked(x: number, y: number, radius: number): boolean {
     y + radius > WORLD_HEIGHT - 24
   )
     return true;
+  if (game?.territoryEncounter?.siege) return siegeBlocked(x, y, radius, game.enemies.some(e => e.structure === "gate" && !e.dead));
   if (
     game?.goldenEncounter ||
     (game && game.mapMode !== "world") ||
@@ -2063,6 +2706,11 @@ function killEnemy(enemy: Enemy): void {
   if (!game || enemy.dead) return;
   if (game.goldenEncounter && enemy.id.startsWith("golden-")) { killGoldenBoss(enemy); return; }
   enemy.dead = true;
+  if (game.territoryEncounter?.siege) {
+    enemy.respawnAt = Infinity;
+    if (!enemy.structure) { game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() }); if (game.combat.corpses.length > 16) game.combat.corpses.shift(); }
+    addLog(`Đã hạ ${enemy.name}.`); return;
+  }
   game.player.journey.kills++;
   if (enemy.kind === "elite") game.player.journey.elites++;
   if (enemy.kind === "boss") game.player.journey.bosses++;
@@ -2207,7 +2855,7 @@ function damagePlayer(amount: number, source: string): void {
       "Bạn đã ngã xuống và được đưa về điểm hồi sinh. Không mất trang bị.",
     );
     if (game.goldenEncounter) leaveGoldenBoss("Thất bại. Có thể khiêu chiến lại trong khung giờ này.");
-    else if (game.territoryEncounter) leaveTerritory("Công thành thất bại. Chưa nhận chiến công, có thể khiêu chiến lại.");
+    else if (game.territoryEncounter) leaveTerritory("Công thành thất bại. Có thể gọi trận lại.", "defeat");
     else if (inDungeon) leaveDungeon();
     else if (player.idle.enabled) {
       player.idle.stage = Math.max(1, player.idle.stage - 1);
@@ -2472,6 +3120,7 @@ function loadGame(): void {
     const worldEnemies = makeEnemies();
     game = {
       combat: freshCombat(),
+      bots: [], botContext: "", botHits: [],
       campfires: restoreCampfires(snapshot.campfires, Date.now()),
       player: snapshot.player,
       enemies: worldEnemies,
@@ -2497,6 +3146,10 @@ function loadGame(): void {
       onlinePlayers: [],
       autoBattle: false,
     };
+    if (game.player.sieges.pending) {
+      settleSiege(game.player.sieges, game.player.sieges.pending.id, "interrupted", game.player.level, Date.now());
+      addLog("Trận công thành trước đã gián đoạn. Có thể gọi trận mới bất cứ lúc nào.");
+    }
     syncStats();
     if (game.player.idle.enabled) {
       const reward = offlineReward(
@@ -2732,7 +3385,7 @@ function update(dt: number, now: number): void {
   if (game.territoryEncounter) {
     game.territoryEncounter.timeLeft = Math.max(0, game.territoryEncounter.timeLeft - dt);
     if (game.territoryEncounter.timeLeft <= 0) {
-      leaveTerritory("Hết giờ công thành. Chưa chiếm được lãnh thổ; không nhận chiến công.");
+      leaveTerritory("Hết giờ công thành.", "timeout");
       return;
     }
   }
@@ -2744,6 +3397,7 @@ function update(dt: number, now: number): void {
     return;
   }
   if (game.goldenEncounter && player.idle.autoLoot) collectIdleLoot();
+  tickBots(dt, now);
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
       player.x - VIEW_WIDTH / 2,
@@ -2833,21 +3487,18 @@ function update(dt: number, now: number): void {
   } else if (game.moveTarget) {
     const d = distance(player, game.moveTarget);
     if (d < 8) game.moveTarget = null;
-    else
-      movePlayer(
-        ((game.moveTarget.x - player.x) / d) * Math.min(d, player.speed * dt),
-        ((game.moveTarget.y - player.y) / d) * Math.min(d, player.speed * dt),
-      );
+    else {
+      const goal = game.territoryEncounter?.siege ? siegeTravelGoal(player, game.moveTarget) : game.moveTarget, travel = Math.max(1, distance(player, goal));
+      movePlayer(((goal.x - player.x) / travel) * Math.min(travel, player.speed * dt), ((goal.y - player.y) / travel) * Math.min(travel, player.speed * dt));
+    }
   } else {
     const target = currentTarget();
     if (target) {
       const d = distance(player, target);
-      if (d > basicAttackRange() + target.radius - 6 && !actionLocked())
-        movePlayer(
-          ((target.x - player.x) / d) * player.speed * dt,
-          ((target.y - player.y) / d) * player.speed * dt,
-        );
-      else playerBasicAttack();
+      if (d > basicAttackRange() + target.radius - 6 && !actionLocked()) {
+        const goal = game.territoryEncounter?.siege ? siegeTravelGoal(player, target) : target, travel = Math.max(1, distance(player, goal));
+        movePlayer(((goal.x - player.x) / travel) * Math.min(travel, player.speed * dt), ((goal.y - player.y) / travel) * Math.min(travel, player.speed * dt));
+      } else playerBasicAttack();
     }
   }
   if (game.combat.lootTarget) {
@@ -2897,12 +3548,14 @@ function update(dt: number, now: number): void {
       if (frozenMotion) { frozenMotion.moving = 0; frozenMotion.action = "idle"; }
       continue;
     }
+    if (enemy.structure) continue;
     const enemySpeed = enemy.speed * (enemy.slowUntil > now ? enemy.slowFactor : 1);
     let motion = game.combat.enemyMotions.get(enemy.id);
     if (!motion) {
       motion = freshMotion();
       game.combat.enemyMotions.set(enemy.id, motion);
     }
+    if (enemy.botProfile) { tickSiegeDefender(enemy, motion, dt, now); continue; }
     const enemyBefore = { x: enemy.x, y: enemy.y };
     const d = distance(enemy, player);
     if (enemy.kind === "boss") {
@@ -3068,11 +3721,12 @@ function drawWorld(now: number): void {
   ctx.translate(-game.cameraX, -game.cameraY);
   if (game.territoryEncounter) {
     territoryArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
-    ctx.drawImage(territoryArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    if (game.territoryEncounter.siege) { siegeArt ??= createSiegeArt(); ctx.drawImage(siegeArt, 0, 0); }
+    else ctx.drawImage(territoryArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     const land = territoryOf(game.territoryEncounter.id)!;
     ctx.fillStyle = land.color;
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    drawOutlinedText(`${land.name.toLocaleUpperCase("vi")} · CÔNG THÀNH · ĐỢT ${game.territoryEncounter.wave + 1}/3`, 660, 780);
+    if (!game.territoryEncounter.siege) drawOutlinedText(`${land.name.toLocaleUpperCase("vi")} · CÔNG THÀNH · ĐỢT ${game.territoryEncounter.wave + 1}/3`, 660, 780);
   } else if (game.mapMode === "dungeon") {
     const id = game.dungeonId!;
     dungeonArts[id] ??= createMapArt(
@@ -3137,6 +3791,7 @@ function drawWorld(now: number): void {
     ...game.enemies
       .filter((enemy) => !enemy.dead)
       .map((enemy) => ({ y: enemy.y, draw: () => drawEnemy(enemy, now) })),
+    ...game.bots.filter(b => b.hp > 0).map(bot => ({ y: bot.y, draw: () => drawBot(bot, now) })),
     ...game.onlinePlayers.map((remote) => ({
       y: remote.y,
       draw: () => drawRemotePlayer(remote, now),
@@ -3149,6 +3804,7 @@ function drawWorld(now: number): void {
     if (!groundEffects.has(effect.kind)) drawSkillEffect(effect, now);
   for (const projectile of game.combat.projectiles)
     drawProjectile(projectile, now);
+  drawBotFlights(now);
   for (const pickup of game.combat.pickups) drawPickupFlight(pickup, now);
   for (const telegraph of game.telegraphs) drawTelegraph(telegraph, now);
   for (const floatingText of game.floatingTexts)
@@ -3179,7 +3835,7 @@ function drawMinimap(now: number): void {
       ? playerIdleActive() || game.goldenEncounter
         ? trainingArt(game.player.idle.stage)
         : worldArt
-      : game.territoryEncounter ? territoryArt : dungeonArts[game.dungeonId!];
+      : game.territoryEncounter ? game.territoryEncounter.siege ? siegeArt : territoryArt : dungeonArts[game.dungeonId!];
   if (background) {
     mc.drawImage(background, 0, 0, miniMap.width, miniMap.height);
   } else {
@@ -3406,6 +4062,11 @@ function drawPickupFlight(
 }
 
 function drawEnemySprite(enemy: Enemy, now: number): void {
+  if (enemy.structure) { drawSiegeStructure(ctx, enemy.structure, enemy.hp / enemy.maxHp, now); return; }
+  if (enemy.botProfile) {
+    const p = enemy.botProfile, motion = game?.combat.enemyMotions.get(enemy.id) ?? freshMotion();
+    drawAnimatedHero(ctx, p.faction, p.sex, motion, now, botAppearance(p)); return;
+  }
   const scale = enemy.radius / 19;
   const hitColor = enemy.hitFlash > 0 ? "#fff5df" : enemy.color;
   const isWolf =
@@ -3770,6 +4431,8 @@ function refreshUi(force = false): void {
   }
   if (!force && performance.now() - lastUiUpdate < 120) return;
   lastUiUpdate = performance.now();
+  refreshSiegeHud();
+  updateLuckyPresentation(game.player.lucky, game.player.gold, Date.now());
   const shell = document.querySelector<HTMLElement>(".app-shell")!;
   if (shell.dataset.effects !== game.player.preferences.skillEffects) shell.dataset.effects = game.player.preferences.skillEffects;
   updateTitles();
@@ -4484,7 +5147,7 @@ function refreshArenaObjective(): void {
   let done = Math.min(5, game.player.questKills) + Number(game.player.bossDefeated), total = 6;
   const enemies = game.enemies.filter(enemy => !enemy.wildElite);
   if (game.goldenEncounter) { goal = `Hạ ${game.goldenEncounter.window.boss.name}`; done = enemies.filter(e => e.dead).length; total = Math.max(1, enemies.length); }
-  else if (game.territoryEncounter) { goal = `Chiếm ${territoryOf(game.territoryEncounter.id)!.name} · Đợt ${game.territoryEncounter.wave + 1}/3`; done = enemies.filter(e => e.dead).length; total = Math.max(1, enemies.length); }
+  else if (game.territoryEncounter) { goal = game.territoryEncounter.siege ? `${SIEGE_PHASES[game.territoryEncounter.wave]} · ${territoryOf(game.territoryEncounter.id)!.name}` : `Chiếm ${territoryOf(game.territoryEncounter.id)!.name} · Đợt ${game.territoryEncounter.wave + 1}/3`; done = enemies.filter(e => e.dead).length; total = Math.max(1, enemies.length); }
   else if (game.mapMode === "dungeon") { goal = game.dungeonCleared ? "Phụ bản đã hoàn thành" : `Đợt ${game.dungeonWave + 1} · ${DUNGEONS[game.dungeonId!].shortName}`; done = enemies.filter(e => e.dead).length; total = Math.max(1, enemies.length); }
   else if (game.player.idle.enabled) { goal = game.player.idle.inTown ? "Về ải để luyện công" : `Hạ quái ${stageInfo(game.player.idle.stage).name}`; done = enemies.filter(e => e.dead).length; total = Math.max(1, enemies.length); }
   document.getElementById("arena-objective")!.textContent = goal;
@@ -4911,6 +5574,10 @@ function validateSave(value: unknown): {
   if (player.mounted !== undefined && typeof player.mounted !== "boolean") throw new Error("save-invalid");
   if (!validMilitary(player.military)) throw new Error("save-invalid");
   player.military = normalizeMilitary(player.military);
+  if (!validLuckyProgress(player.lucky) || !validBotSettings(player.botSettings) || !validSiegeProgress(player.sieges)) throw new Error("save-invalid");
+  player.lucky = normalizeLuckyProgress(player.lucky);
+  player.botSettings = player.botSettings ? { ...player.botSettings } : freshBotSettings();
+  player.sieges = normalizeSiegeProgress(player.sieges);
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
   player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
@@ -5122,6 +5789,11 @@ function bindIdleUi(): void {
   document.getElementById("gear-sets-btn")!.addEventListener("click", () => openGearSets());
   document.querySelector(".app-shell")!.addEventListener("click", event => {
     const target = event.target as HTMLElement;
+    if (target.closest("[data-open-events]")) openLuckyEvents();
+    if (target.closest("[data-open-bots]")) openBots();
+    if (target.closest("[data-open-siege]")) openRequestedSiege();
+    const order = target.closest<HTMLElement>("[data-siege-order]")?.dataset.siegeOrder;
+    if (game?.territoryEncounter?.siege && ["push", "guard", "rally"].includes(order ?? "")) { game.territoryEncounter.siege.order = order as BotOrder; refreshSiegeHud(); document.querySelectorAll("[data-siege-order]").forEach(button => button.setAttribute("aria-pressed", String((button as HTMLElement).dataset.siegeOrder === order))); }
     if (target.closest("[data-open-military]")) openMilitarySeals();
     if (target.closest("[data-open-territories]")) openTerritories();
     if (target.closest("[data-mount-toggle]")) toggleMount();
@@ -5315,6 +5987,19 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const lucky = target.closest<HTMLElement>("[data-lucky-tab]")?.dataset.luckyTab;
+      if (lucky && ["wheel", "dice", "lottery"].includes(lucky)) openLuckyEvents(lucky as LuckyGame);
+      const play = target.closest<HTMLButtonElement>("[data-play-lucky]"); if (play && !play.disabled) playLucky(play.dataset.playLucky as LuckyGame);
+      const botSetting = target.closest<HTMLButtonElement>("[data-bot-setting]");
+      if (game && botSetting && !botSetting.disabled && game.mapMode === "world" && !game.goldenEncounter) {
+        const key = botSetting.dataset.botSetting as keyof BotSettings; if (["enabled", "assist"].includes(key)) {
+          const backup = { ...game.player.botSettings }; game.player.botSettings[key] = !game.player.botSettings[key];
+          if (key === "assist" && game.player.botSettings.assist) game.player.botSettings.enabled = true;
+          if (!persistGame()) game.player.botSettings = backup;
+          game.botContext = ""; openBots();
+        }
+      }
+      if (target.closest("[data-start-siege]")) enterRequestedSiege((document.getElementById("siege-city") as HTMLSelectElement).value as TerritoryId, Number((document.getElementById("siege-size") as HTMLSelectElement).value));
       const travel = target.closest<HTMLButtonElement>("[data-region]");
       if (travel && !travel.disabled) changeStage(Number(travel.dataset.region) * 10 + 1);
       if (target.closest("#travel-stage-go")) changeStage(Number((document.getElementById("travel-stage") as HTMLSelectElement).value));

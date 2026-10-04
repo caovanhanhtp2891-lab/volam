@@ -50,7 +50,7 @@ export function weaponPose(
   return {
     angle,
     progress,
-    family,
+    family: family as ReturnType<typeof weaponFamily>,
     pull: active && family === "ranged" ? Math.sin(progress * Math.PI) : 0,
     trail:
       active && family === "swing" && motion.action === "attack"
@@ -61,4 +61,50 @@ export function weaponPose(
 }
 export function bodyBreath(now: number, moving: number, riding: boolean) {
   return riding ? 0 : Math.sin(now / 540) * 0.35 * (1 - clamp(moving));
+}
+
+export function actorBodyPose(
+  motion: ActorMotion,
+  family: ReturnType<typeof weaponFamily>,
+  now: number,
+  riding = false,
+) {
+  const p =
+    motion.actionDuration > 0
+      ? clamp((now - motion.actionAt) / motion.actionDuration)
+      : 1;
+  const active =
+    (motion.action === "attack" ||
+      motion.action === "cast" ||
+      motion.action === "dash") &&
+    p < 1;
+  const windup = ease(p / 0.26),
+    release = ease((p - 0.26) / 0.25),
+    recovery = ease((p - 0.51) / 0.49);
+  const thrust = family === "thrust",
+    casting = motion.action === "cast";
+  const swing = active
+    ? (-0.1 * windup + (thrust ? 0.2 : 0.24) * release) * (1 - recovery)
+    : 0;
+  return {
+    torsoAngle:
+      swing * (riding ? 0.55 : 1) +
+      Math.sin(motion.stride) * motion.moving * 0.022,
+    torsoShift: active
+      ? (thrust ? 4.5 : casting ? 2.5 : 1.8) * release * (1 - recovery)
+      : 0,
+    crouch: riding
+      ? 0
+      : active
+        ? Math.sin(p * Math.PI) * (casting ? 1.5 : 2.7)
+        : 0,
+    kneeLift: riding ? 0 : 3.6 * motion.moving,
+    phase: !active
+      ? "idle"
+      : p < 0.26
+        ? "windup"
+        : p < 0.51
+          ? "release"
+          : "recovery",
+  };
 }

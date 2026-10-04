@@ -2,6 +2,18 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Đồng hành · Công thành · v0.18.0
+
+Cử động thân trên có nhịp lấy đà → ra đòn → thu thế; bước chân nâng và đổi trọng tâm theo quãng đường thật. Vũ khí, áo/mũ và trang sức đi theo thân người khi tung chiêu; cưỡi ngựa giữ riêng tư thế chân trên yên.
+
+**Giang hồ → Sự kiện** (cũng có trong Khác): vòng quay 50 bạc/lượt với tám phần thưởng và bảng xác suất; tài xỉu cược 10–5.000 bạc, thắng nhận 2 lần tiền cược gồm vốn, bộ ba đồng số luôn thua; xổ số chọn hai số 00–99, trùng đúng thứ tự nhận 90 lần gồm vốn. Dùng bạc trong game. Kết quả, tiền cược và phần thưởng lưu cùng nhau trước khi chạy hiệu ứng 2,2 giây; tải lại không trả thưởng lần nữa. Nếu lưu thất bại, hoàn tác cả lượt. Có lịch sử 30 lượt; bình HP vượt giới hạn 99 đổi thành 20 bạc/bình.
+
+**Đồng hành BOT** gồm mười nhân vật của mười phái. Bot xuất hiện và di chuyển trong map; bật Trợ chiến để ba đồng đội cùng đánh quái, hồi phục tổ đội và ghi nhận phần thưởng cho nhân vật. Bot có HP, vai trò đánh xa/cận chiến/đỡ đòn/hồi phục, lấy đà và đạn bay gây sát thương khi chạm. Mặc định trợ chiến tắt; bot trong công thành luôn tham chiến.
+
+**Công thành theo yêu cầu**: chọn bất kỳ thành nào ngay từ cấp 1 và đội 3/6/9 bot, gọi trận miễn phí bất cứ lúc nào ngoài các trận đang đánh. Bản đồ thành riêng có tường, cổng và chiến kỳ; phá cổng rồi đoạt cờ, cuối cùng hạ Thống lĩnh và quân bảo vệ trong 4 phút. Hai phe dùng hình và chiêu môn phái. Ra lệnh **Phá mục tiêu / Diệt quân / Theo tôi** ngay trên sân. Đồng đội gục hồi sinh sau 8 giây. Thắng nhận 100 + cấp × 6 bạc, cấp × 7 XP (áp dụng buff XP) và 2 đá; rút quân/hết giờ/thất bại/tải lại trận đang đánh không nhận thưởng. Chiến công, chiếm lãnh thổ và ấn quân hàm tiếp tục theo chiến dịch cũ. Save cũ giữ nhân vật và trang bị, bắt đầu với lịch sử hoạt động trống.
+
+Kiểm tra luật cược, lưu/tải, bot và đường đi trong `tests/activities.test.mjs`; kiểm tra giao diện, trả thưởng, hoàn tác khi hết dung lượng lưu, bot gây sát thương, thắng công thành cấp 1, ra lệnh, rút quân/hết giờ/tải lại và bố cục 320/390/844/1280px bằng `tests/activities-browser.cjs`. Chạy `pnpm test`, `pnpm typecheck` và build `--base=/volam/`; kiểm tra hồi quy với các bài đường bay/cưỡi ngựa và quân hàm.
+
 ## Vạn pháp · Linh binh · v0.17.0
 
 Kỹ năng có chuyển động theo môn phái: Hỏa long Cái Bang và song đao Thiên Nhẫn có ngọn lửa, lõi nóng và tàn lửa bay; Ngũ Độc/Đường Môn có bọt độc, hơi ăn mòn; Thúy Yên có ánh băng; Côn Lôn có tia điện đổi nhánh; Nga Mi có cánh sen bay; Võ Đang có quỹ đạo kiếm sáng; Thiếu Lâm/Thiên Vương có tia va chạm kim loại. Ra chiêu, đạn bay, dấu trúng và trận kéo dài dùng cùng lớp chuyển động. Chế độ Gọn giảm 14 hạt xuống 4, giữ nguyên tầm và sát thương.

@@ -51,8 +51,9 @@ export function drawWalkingSprite(
   context: CanvasRenderingContext2D, id: SpriteId,
   x: number, y: number, width: number, height: number,
   step: number, flip = false, sex?: CharacterSex,
+  body?: { torsoAngle: number; torsoShift: number; crouch: number; kneeLift: number },
 ): boolean {
-  if (Math.abs(step) < .025) return drawSprite(context, id, x, y, width, height, flip, sex);
+  if (Math.abs(step) < .025 && (!body || Math.abs(body.torsoAngle) + Math.abs(body.torsoShift) + body.crouch < .025)) return drawSprite(context, id, x, y, width, height, flip, sex);
   const { image: source, rect: [sx, sy, sw, sh] } = sourceFor(id, sex);
   if (!source.complete || !source.naturalWidth) return false;
   const split = .78, overlap = .045;
@@ -62,19 +63,22 @@ export function drawWalkingSprite(
   for (const side of (step > 0 ? [-1, 1] : [1, -1])) {
     const stride = step * side;
     context.save();
-    context.translate(side * width * .12 + stride * 1.6, -height * (1 - split));
-    context.rotate(stride * .055);
+    context.translate(side * width * .12 + stride * 3.1, -height * (1 - split));
+    context.rotate(stride * .11);
     context.drawImage(source,
       (sx + (side > 0 ? sw / 2 : 0)) * source.naturalWidth,
       (sy + sh * (split - overlap)) * source.naturalHeight,
       sw * source.naturalWidth / 2, sh * source.naturalHeight * (1 - split + overlap),
       side < 0 ? -width / 2 + width * .12 : -width * .12,
-      -height * overlap - Math.max(0, stride) * 1.8,
+      -height * overlap - Math.max(0, stride) * (body?.kneeLift ?? 3.6),
       width / 2, height * (1 - split + overlap),
     );
     context.restore();
   }
   context.save();
+  context.translate(0, -height * (1 - split));
+  context.rotate(body?.torsoAngle ?? 0);
+  context.translate(body?.torsoShift ?? 0, height * (1 - split) + (body?.crouch ?? 0));
   context.beginPath(); context.rect(-width / 2, -height, width, height * (split + .01)); context.clip();
   drawFromAtlas(context, source, sourceFor(id, sex).rect, 0, 0, width, height);
   context.restore();

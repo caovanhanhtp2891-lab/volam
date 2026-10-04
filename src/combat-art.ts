@@ -12,7 +12,7 @@ import {
   type WearableAppearance,
 } from "./worn-equipment-art";
 import { drawRiderLeg } from "./rider-art";
-import { weaponPose, bodyBreath } from "./actor-animation";
+import { weaponPose, bodyBreath, actorBodyPose } from "./actor-animation";
 export { drawEquipmentIcon } from "./equipment-art";
 export interface HeroAppearance extends GearAura, WearableAppearance {
   weaponVariant?: GearVariant;
@@ -59,6 +59,7 @@ export function drawAnimatedHero(
   const variant =
     appearance.weaponVariant ?? defaultWeapon[school.id] ?? "sword";
   const pose = weaponPose(variant, motion, now);
+  const body = actorBodyPose(motion, pose.family, now, !!appearance.riding);
   const direction = motion.facingX < 0 ? -1 : 1;
   ctx.save();
   ctx.translate(
@@ -70,7 +71,11 @@ export function drawAnimatedHero(
   if (appearance.riding) {
     ctx.save();
     ctx.scale(direction, 1);
+    ctx.rotate(body.torsoAngle);
     drawRidingTorso(ctx, school.id, sex, rig.pelvis);
+    ctx.restore();
+    ctx.save();
+    ctx.scale(direction, 1);
     drawRiderLeg(ctx, school.id, motion);
     ctx.restore();
   } else
@@ -84,10 +89,15 @@ export function drawAnimatedHero(
       step,
       direction < 0,
       sex,
+      body,
     );
   // The clean atlas contains empty hands. Only the equipped/default weapon is drawn.
   ctx.save();
+  if (!appearance.riding) ctx.translate(0, 12 - HERO_SIZE.height * 0.22);
   ctx.scale(direction, 1);
+  ctx.rotate(body.torsoAngle);
+  if (!appearance.riding)
+    ctx.translate(body.torsoShift, HERO_SIZE.height * 0.22 - 12 + body.crouch);
   ctx.translate(rig.right.x, rig.right.y);
   ctx.rotate(pose.angle);
   drawHeldWeapon(
@@ -105,20 +115,37 @@ export function drawAnimatedHero(
   ctx.save();
   if (appearance.riding) {
     ctx.scale(direction, 1);
-    ctx.translate(0, HERO_SIZE.height * (1 - rig.pelvis) - 12);
+    ctx.rotate(body.torsoAngle);
+    ctx.translate(0, HERO_SIZE.height * (1 - rig.pelvis));
+  } else {
+    ctx.translate(0, 12 - HERO_SIZE.height * 0.22);
+    ctx.scale(direction, 1);
+    ctx.rotate(body.torsoAngle);
+    ctx.translate(body.torsoShift, HERO_SIZE.height * 0.22 + body.crouch);
   }
-  ctx.translate(0, 12);
   ctx.scale(HERO_SIZE.width / 46, HERO_SIZE.height / 50);
   ctx.translate(0, -12);
-  // Upper fittings and enchantment still follow the seated torso; standing
-  // boot details cannot be reused for bent knees and saddle-side feet.
   drawWearableDetails(
     ctx,
-    appearance.riding ? { ...appearance, boots: undefined } : appearance,
+    { ...appearance, boots: undefined },
     now,
     false,
     step,
   );
   ctx.restore();
+  if (!appearance.riding && appearance.boots) {
+    ctx.save();
+    ctx.translate(0, 12);
+    ctx.scale((direction * HERO_SIZE.width) / 46, HERO_SIZE.height / 50);
+    ctx.translate(0, -12);
+    drawWearableDetails(
+      ctx,
+      { boots: appearance.boots, simpleEffects: appearance.simpleEffects },
+      now,
+      false,
+      step,
+    );
+    ctx.restore();
+  }
   ctx.restore();
 }
