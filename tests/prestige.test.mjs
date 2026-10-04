@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TITLES, normalizeJourney, unlockTitles, titleProgress, progressionBonuses, wornTitle } from '../src/character-progression.ts';
 import { MILITARY_RANKS } from '../src/military.ts';
-import { realmStyle, titleStyle, militaryStyle, fitPrestigeLabel, placePrestigeLabels } from '../src/prestige-art.ts';
+import { realmStyle, titleStyle, militaryStyle, fitPrestigeLabel, placePrestigeLabels, prestigeWidth, drawPrestigeLabel } from '../src/prestige-art.ts';
 import { militaryDragonSpec } from '../src/military-vfx.ts';
 import { REALMS, cultivationForPower } from '../src/cultivation.ts';
 const player=()=>({level:1,journey:normalizeJourney(),inventory:[],equipment:{},pendingItems:[],dungeonClears:{tomb:0,bamboo:0},goldenClears:[]});
@@ -32,8 +32,8 @@ test('all title conditions unlock at maximal progress; only the selected title a
   assert.equal(after.attack-before.attack,160);assert.equal(after.defense-before.defense,100);assert.equal(after.critDamage-before.critDamage,12);
   const loaded=normalizeJourney(JSON.parse(JSON.stringify(p.journey)));assert.equal(wornTitle(loaded).id,'sky-sovereign');assert.deepEqual(progressionBonuses(loaded),after);
 });
-test('realm and title badges grow with prestige and military ranks each have distinct colors',()=>{
-  let old={fontSize:0,glow:0};for(const r of REALMS){const s=realmStyle(cultivationForPower(r.minPower));assert.ok(s.fontSize>=16&&s.fontSize>=old.fontSize);assert.ok(s.glow>=old.glow);old=s}
+test('compact labels keep bounded sizes while prestige and rank colors remain distinct',()=>{
+  let old={fontSize:0,glow:0};for(const r of REALMS){const s=realmStyle(cultivationForPower(r.minPower));assert.ok(s.fontSize>=11&&s.fontSize<=14&&s.fontSize>=old.fontSize);assert.ok(s.glow>=old.glow);old=s}
   const sorted=[...TITLES].sort((a,b)=>a.rarity-b.rarity);for(let i=1;i<sorted.length;i++)assert.ok(titleStyle(sorted[i]).fontSize>=titleStyle(sorted[i-1]).fontSize);
   assert.equal(new Set(MILITARY_RANKS.map(r=>r.color)).size,7);
   for(let i=1;i<MILITARY_RANKS.length;i++){const a=militaryStyle(MILITARY_RANKS[i-1].id),b=militaryStyle(MILITARY_RANKS[i].id);assert.ok(b.fontSize>a.fontSize&&b.glow>a.glow)}
@@ -41,17 +41,33 @@ test('realm and title badges grow with prestige and military ranks each have dis
 test('military dragons become larger at every rank and simple mode bounds rendering work',()=>{
   for(let i=0;i<MILITARY_RANKS.length;i++){const s=militaryDragonSpec(MILITARY_RANKS[i].id),small=militaryDragonSpec(MILITARY_RANKS[i].id,true);assert.equal(s.count,i>=4?2:1);assert.equal(small.count,1);assert.ok(small.segments<s.segments);if(i){const previous=militaryDragonSpec(MILITARY_RANKS[i-1].id);assert.ok(s.radius>previous.radius&&s.size>previous.size&&s.glow>previous.glow)}}
 });
-test('label stack keeps military above title above realm and avoids clipping at all camera edges',()=>{
+test('label stack stays attached to its actor at every camera edge and moves by the same exact displacement',()=>{
   const labels=[{kind:'military',text:'Hoàng Đế',style:militaryStyle('hoang-de')},{kind:'title',text:'Chí Tôn',style:titleStyle(TITLES.at(-1))},{kind:'realm',text:'Vô Cực',style:realmStyle(cultivationForPower(19.9e9))}];
   for(const x of [20,300,580])for(const bottom of [45,290,800]){
-    const rows=placePrestigeLabels(labels,[180,280,260],x,bottom,{left:10,right:590,top:10,bottom:490});
-    for(let i=0;i<rows.length;i++){const row=rows[i];assert.ok(row.x-row.width/2>=10&&row.x+row.width/2<=590);assert.ok(row.y-row.label.style.height/2>=10&&row.y+row.label.style.height/2<=490);if(i)assert.ok(row.y-row.label.style.height/2>rows[i-1].y+rows[i-1].label.style.height/2)}
+    const rows=placePrestigeLabels(labels,[140,160,150],x,bottom);
+    const moved=placePrestigeLabels(labels,[140,160,150],x+67,bottom-31);
+    for(let i=0;i<rows.length;i++){
+      assert.equal(rows[i].x,x);assert.equal(moved[i].x-rows[i].x,67);
+      assert.ok(Math.abs(moved[i].y-rows[i].y+31)<1e-9);
+      if(i)assert.ok(rows[i].y-rows[i].label.style.height/2>rows[i-1].y+rows[i-1].label.style.height/2);
+    }
+    assert.ok(Math.abs(rows.at(-1).y+rows.at(-1).label.style.height/2-bottom)<1e-9);
   }
 });
 
 test('fitting long badges respects available space without altering their prestige definition',()=>{
-  const label={kind:'title',text:'Long achievement name',style:titleStyle(TITLES.find(t=>t.rarity===5))},before=JSON.stringify(label);
+  const label={kind:'title',text:'A long achievement title to fit',style:titleStyle(TITLES.find(t=>t.rarity===5))},before=JSON.stringify(label);
   const ctx={font:'',measureText(text){return {width:text.length*parseFloat(this.font.match(/[\d.]+(?=px)/)[0])*.6}}};
-  const fit=fitPrestigeLabel(ctx,label,250);ctx.font=`800 ${fit.style.fontSize}px sans-serif`;
-  assert.ok(ctx.measureText(label.text).width+52<=250+.01);assert.equal(JSON.stringify(label),before);assert.ok(fit.style.fontSize>=14);
+  const fit=fitPrestigeLabel(ctx,label,230);ctx.font=`800 ${fit.style.fontSize}px sans-serif`;
+  assert.ok(prestigeWidth(ctx,fit)<=230+.01);assert.equal(JSON.stringify(label),before);assert.ok(fit.style.fontSize>=10&&fit.style.fontSize<label.style.fontSize);
+});
+
+test('prestige artwork paints colored text and small sparkles without a filled panel',()=>{
+  const calls=[],stops=[];
+  const ctx=new Proxy({}, {get(obj,key){if(key in obj)return obj[key];if(key==='createLinearGradient')return ()=>({addColorStop(position,color){stops.push({position,color})}});return (...args)=>calls.push([key,...args]);}});
+  const label={kind:'military',text:'Ấn · Hoàng Đế',style:militaryStyle('hoang-de')};
+  drawPrestigeLabel(ctx,label,80,90,130,2500,false);
+  assert.ok(calls.some(([key])=>key==='fillText'));assert.ok(calls.some(([key])=>key==='strokeText'));
+  assert.ok(!calls.some(([key])=>['fill','fillRect','roundRect','strokeRect'].includes(key)));
+  assert.ok(stops.every(s=>s.position>=0&&s.position<=1));assert.ok(new Set(stops.map(s=>s.color)).size>=2);
 });

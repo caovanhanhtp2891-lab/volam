@@ -16,7 +16,7 @@ async function seed(page, change) {
     const context = await browser.newContext({ viewport:{width:390,height:844},isMobile:true,hasTouch:true });
     const page=await context.newPage(); page.on('pageerror',e=>errors.push(e.message));
     page.on('response',r=>{if(r.status()>=400 && r.url().startsWith(url))errors.push(`${r.status()} ${r.url()}`)});
-    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.22.0');
+    await page.goto(url,{waitUntil:'networkidle'}); assert.equal(await page.locator('html').getAttribute('data-version'),'0.23.0');
     await page.locator('#hero-name-input').fill('Ngũ Độc Thanh Vân'); await page.locator('[data-faction="wudu"]').click(); await page.locator('#join-sect').click();
     await seed(page,s=>{s.player.idle.inTown=true; s.player.idle.autoEquip=false; s.player.attack=22; s.player.defense=5;});
     for (const [width,height] of [[320,568],[360,640],[390,844],[600,960],[844,390],[1440,900]]) {
@@ -36,8 +36,8 @@ async function seed(page, change) {
       await page.locator('#arena-quest-toggle').click(); assert.equal(await page.locator('#arena-quest-body').isVisible(),false); await page.locator('#arena-quest-toggle').click(); assert.equal(await page.locator('#arena-quest-body').isVisible(),true);
       await page.locator('[data-idle-tab="log"]').click(); assert.equal(await page.locator('.game-layout').isVisible(),true); assert.equal(await page.locator('[data-idle-tab="log"]').getAttribute('aria-expanded'),'true');
       await page.locator('#world-panel-close').click(); assert.equal(await page.locator('.game-layout').isVisible(),false); assert.equal(await page.locator('.joystick').isVisible(),true);
-      await page.locator('#settings-shortcut').click(); assert.equal(await page.locator('.settings-panel').isVisible(),true); await page.locator('[data-idle-tab="log"]').click(); assert.equal(await page.locator('.game-layout').isVisible(),false);
-      await page.locator('#hero-status').click(); assert.equal(await page.locator('.character-panel').isVisible(),true); await page.locator('[data-idle-tab="log"]').click();
+      await page.locator('#settings-shortcut').click(); assert.equal(await page.locator('.settings-panel').isVisible(),true); await page.locator('[data-idle-tab="log"]').click(); assert.equal(await page.locator('.world-panel').isVisible(),true); await page.locator('#world-panel-close').click(); assert.equal(await page.locator('.game-layout').isVisible(),false);
+      await page.locator('#hero-status').click(); assert.equal(await page.locator('.character-panel').isVisible(),true); await page.locator('[data-idle-tab="log"]').click(); await page.locator("#world-panel-close").click();
       await page.locator('#arena-log-toggle').click(); assert.equal(await page.locator('.battle-log-history p').count()>0,true); await page.locator('#utility-close').click();
       console.log(`PASS reference HUD ${width}x${height}: full arena, no scrolling/overlapping controls, quest and sheets reachable`);
     }
@@ -64,7 +64,7 @@ async function seed(page, change) {
     const reloaded=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).player,key); assert.equal(reloaded.attack,saved.attack); assert.equal(reloaded.defense,saved.defense);assert.deepEqual(reloaded.equipment,saved.equipment);
     await page.locator('#realm-guide-btn').click(); assert.equal(await page.locator('.realm-table tbody tr').count(),23);
     for(const [width,height]of [[320,568],[844,390]]) {await page.setViewportSize({width,height});assert.ok(await page.locator('.utility-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'realm guide stays within dialog');}
-    await page.locator('#utility-close').click();await page.locator('[data-idle-tab="log"]').click();await page.locator('#compact-btn').click();assert.equal(await page.locator('#hero-status').isVisible(),false);await page.locator('#compact-btn').click();assert.equal(await page.locator('#hero-status').isVisible(),true);
+    await page.locator('#utility-close').click();await page.locator('[data-idle-tab="log"]').click();await page.locator('#world-panel-close').click();await page.locator('#compact-btn').click();assert.equal(await page.locator('#hero-status').isVisible(),false);await page.locator('#compact-btn').click();assert.equal(await page.locator('#hero-status').isVisible(),true);
     assert.deepEqual(errors,[]); console.log('PASS exact stronger/weaker gear and enhancement CP previews, unchanged save bases, 23-realm guide and HUD toggle');await context.close();
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

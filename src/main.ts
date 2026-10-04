@@ -4862,36 +4862,6 @@ function drawHeroSprite(
   ctx.restore();
 }
 
-let prestigeHudKey = "";
-let prestigeHudRects: { left: number; right: number; top: number; bottom: number }[] = [];
-let prestigeHudTop = 10;
-function playerPrestigeBounds(top: number, bottom: number) {
-  const expanded = document.querySelector(".app-shell")!.classList.contains("arena-expanded");
-  const key = `${VIEW_WIDTH}:${VIEW_HEIGHT}:${game!.player.preferences.minimap}:${document.getElementById("arena-quest-toggle")!.getAttribute("aria-expanded")}:${expanded}`;
-  if (key !== prestigeHudKey) {
-    prestigeHudKey = key;
-    const rect = canvas.getBoundingClientRect(), scaleX = VIEW_WIDTH / rect.width, scaleY = VIEW_HEIGHT / rect.height;
-    prestigeHudRects = [".mobile-map-card", ".arena-quest"].flatMap(selector => {
-      const element = document.querySelector<HTMLElement>(selector)!;
-      if (element.classList.contains("hidden")) return [];
-      const box = element.getBoundingClientRect();
-      return [{ left: (box.left - rect.left) * scaleX, right: (box.right - rect.left) * scaleX, top: (box.top - rect.top) * scaleY, bottom: (box.bottom - rect.top) * scaleY }];
-    });
-    const header = document.getElementById("hero-status")!.getBoundingClientRect();
-    prestigeHudTop = Math.max(10, (header.bottom - rect.top) * scaleY + 8);
-  }
-  const height = bottom - top;
-  const relativeTop = Math.max(prestigeHudTop, Math.min(VIEW_HEIGHT - 10 - height, top - game!.cameraY));
-  const relativeBottom = relativeTop + height;
-  let left = 9, right = VIEW_WIDTH - 9;
-  for (const rect of prestigeHudRects) {
-    if (rect.top >= relativeBottom || rect.bottom <= relativeTop) continue;
-    if ((rect.left + rect.right) / 2 < VIEW_WIDTH / 2) left = Math.max(left, rect.right + 12);
-    else right = Math.min(right, rect.left - 12);
-  }
-  return { left: game!.cameraX + left, right: game!.cameraX + right, top: game!.cameraY + prestigeHudTop, bottom: game!.cameraY + VIEW_HEIGHT - 10 };
-}
-
 function drawPlayer(player: Player, now: number): void {
   const sect = playerSect(player);
   const cultivation = cultivationForPower(currentCombatPower());
@@ -4929,11 +4899,9 @@ function drawPlayer(player: Player, now: number): void {
   if (title && player.preferences.titleVisible) labels.push({ kind: "title", text: `${title.glyph} ${title.name}`, style: titleStyle(title) });
   labels.push({ kind: "realm", text: cultivation.label, style: realmStyle(cultivation) });
   const bottom = player.y - HERO_SIZE.height - 15 - ridingOffset;
-  const height = labels.reduce((sum, label) => sum + label.style.height + 5, -5);
-  const bounds = playerPrestigeBounds(bottom - height, bottom);
-  const fitted = labels.map(label => fitPrestigeLabel(ctx, label, bounds.right - bounds.left));
+  const fitted = labels.map(label => fitPrestigeLabel(ctx, label, Math.min(230, VIEW_WIDTH - 18)));
   const widths = fitted.map(label => prestigeWidth(ctx, label));
-  const placements = placePrestigeLabels(fitted, widths, player.x, bottom, bounds);
+  const placements = placePrestigeLabels(fitted, widths, player.x, bottom);
   for (const placement of placements) drawPrestigeLabel(ctx, placement.label, placement.x, placement.y, placement.width, now, simple);
   ctx.textAlign = "left";
 }
@@ -5004,8 +4972,9 @@ function refreshUi(force = false): void {
     "#mp-label",
     `${formatNumber(player.mp)} / ${formatNumber(player.maxMp)}`,
   );
-  setText("#gold-label", compactNumber(player.gold));
+  setText("#gold-label", formatNumber(player.gold));
   document.getElementById("gold-label")!.title = `${formatNumber(player.gold)} bạc`;
+  document.querySelector(".gold-header")!.setAttribute("aria-label", `${formatNumber(player.gold)} bạc`);
   setText("#stone-label", formatNumber(player.refiningStones));
   setText("#token-label", formatNumber(player.dungeonTokens));
   setText("#mobile-gold", formatNumber(player.gold));
@@ -5805,6 +5774,7 @@ function refreshIdleUi(): void {
     label.textContent = value; label.classList.toggle("hidden", !value);
     label.dataset.prestigeTier = String(style?.tier ?? 1);
     label.style.setProperty("--prestige-color", style?.color ?? "#e9dba5");
+    label.style.setProperty("--prestige-accent", style?.accent ?? "#fff0bf");
     label.style.setProperty("--prestige-font", `${style?.fontSize ?? 16}px`);
     label.style.setProperty("--prestige-glow", `${style?.glow ?? 0}px`);
   }
@@ -6366,7 +6336,15 @@ function bindIdleUi(): void {
     if (target.closest("[data-open-exploration]")) openExplorationAtlas();
     if (target.closest("[data-open-bestiary]")) openBestiary();
     if (target.closest("[data-exit-exploration]")) exitExploration();
-    if (target.closest("[data-open-events]")) openLuckyEvents();
+    const eventButton = target.closest<HTMLElement>("[data-open-events]");
+    if (eventButton) {
+      const selected = eventButton.dataset.eventGame;
+      openLuckyEvents(selected === "dice" || selected === "lottery" ? selected : "wheel");
+    }
+    if (target.closest("[data-open-daily]")) openDailyRewards();
+    if (target.closest("[data-open-golden-boss]")) openGoldenBoss();
+    const settingAnchor = target.closest<HTMLElement>("[data-settings-anchor]")?.dataset.settingsAnchor;
+    if (settingAnchor) document.getElementById(settingAnchor)?.scrollIntoView({ block: "start" });
     if (target.closest("[data-open-bots]")) openBots();
     if (target.closest("[data-open-siege]")) openRequestedSiege();
     const order = target.closest<HTMLElement>("[data-siege-order]")?.dataset.siegeOrder;
@@ -6422,7 +6400,7 @@ function bindIdleUi(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-idle-tab]").forEach(button => {
     button.addEventListener("click", () => {
       const shell = document.querySelector(".app-shell")!;
-      const openActivities = button.dataset.idleTab === "log" && shell.getAttribute("data-page") === "log" && !shell.classList.contains("activities-open");
+      const openActivities = button.dataset.idleTab === "log" && !shell.classList.contains("activities-open");
       showIdlePage(button.dataset.idleTab!);
       shell.classList.toggle("activities-open", openActivities);
       if (button.dataset.idleTab === "log") button.setAttribute("aria-expanded", String(openActivities));

@@ -3044,3 +3044,47 @@ h2 {
 .loot-settings-card select { min-width: 0; width: 100%; }
 .loot-settings-card .discard-check { margin: 12px 0; line-height: 1.6; }
 .loot-settings-card .dim { line-height: 1.7; }
+
+/* Activity hub and settings stay in their own sheets. */
+.app-shell[data-page="log"].activities-open .game-layout { height: min(74dvh, 620px); }
+.activity-intro { margin: 8px 0 14px; padding: 14px; border: 1px solid #62715a; border-radius: 8px; background: linear-gradient(115deg, #263c31, #142721); }
+.activity-intro > small { letter-spacing: 2px; font-size: 9px; color: #cdbd85; }
+.activity-intro h2, .settings-intro h2 { margin: 4px 0; font: 700 23px serif; color: #f0deb0; }
+.activity-intro p, .settings-intro p { margin: 0; color: #aebdae; font-size: 11px; line-height: 1.5; }
+.activity-group { margin-bottom: 14px; }
+.activity-group h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-size: 13px; }
+.activity-group h3 small { color: #9faa96; font-size: 9px; font-weight: 400; }
+.activity-grid, .activity-grid.todo-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; background: none; border: 0; }
+.activity-tile { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 76px; padding: 10px 8px; text-align: left; border: 1px solid color-mix(in srgb, var(--activity-color) 30%, #304735); border-radius: 7px; color: #e8e7d8; background: linear-gradient(135deg, #26382a, #14231e); }
+.activity-tile:hover, .activity-tile:focus-visible { border-color: var(--activity-color); background: #2b3b30; }
+.activity-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 38px; border-radius: 8px; color: var(--activity-color); background: color-mix(in srgb, var(--activity-color) 10%, #0d1c18); }
+.activity-icon svg { width: 31px; height: 31px; }
+.activity-tile > span:nth-child(2) { min-width: 0; flex: 1; }
+.activity-tile b { display: block; color: var(--activity-color); font-size: 11px; line-height: 1.4; }
+.activity-tile small { display: block; margin-top: 4px; color: #aebcae; font-size: 9px; line-height: 1.4; }
+.activity-tile i { color: #b6c1a5; font-size: 16px; font-style: normal; }
+.activity-rewards, .activity-mode-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
+.settings-intro { padding: 10px 0 14px; border-bottom: 1px solid #465941; margin-bottom: 10px; }
+.settings-sections { display: flex; gap: 6px; margin-bottom: 14px; }
+.settings-sections button { flex: 1; border: 1px solid #637354; background: #203529; color: #e4d7ac; padding: 7px; border-radius: 5px; font-size: 11px; }
+.settings-panel h3 { scroll-margin-top: 12px; }
+@media (max-width: 360px) { .activity-tile { gap: 5px; padding: 8px 5px; } .activity-icon { flex-basis: 27px; width: 27px; } .activity-icon svg { width: 25px; height: 25px; } .activity-tile i { display: none; } }
+/* Reserve room for the exact silver balance, including 1.000.000.000. */
+.topbar { gap: 5px; }
+.hero-status { max-width: min(54%, 190px); }
+.topmid { grid-template-columns: minmax(0, 1fr); }
+.gold-header { max-width: none; flex-shrink: 0; gap: 3px; padding: 3px 6px; font-size: 10px; }
+.gold-header b { overflow: visible; text-overflow: clip; font-variant-numeric: tabular-nums; }
+.gold-header .resource-art { width: 15px; height: 18px; flex-shrink: 0; }
+@media (max-width: 360px) { .gold-header { max-width: none; font-size: 9px; padding: 3px 5px; } }
+@media (orientation: landscape) and (max-height: 500px) { .hero-status { max-width: 230px; } }
+/* Transparent prestige text: no plates or boxes over the map or portrait. */
+.character-prestige { gap: 3px; margin: 6px auto 8px; }
+.prestige-badge { overflow: visible; padding: 1px 7px; border: 0; border-radius: 0; background: none; box-shadow: none; font-size: var(--prestige-font, 12px); text-shadow: 0 1px 2px #081016, 0 0 var(--prestige-glow, 3px) var(--prestige-color); }
+.prestige-badge:is([data-prestige-tier="4"], [data-prestige-tier="5"], [data-prestige-tier="6"], [data-prestige-tier="7"]) { border: 0; border-radius: 0; animation: prestige-ink 3s ease-in-out infinite; }
+.prestige-badge::after { display: none; }
+.title-card[data-prestige-tier="5"] .title-name { font-size: 15px; }
+#worn-title-label { font-size: 13px; }
+@keyframes prestige-ink { 50% { color: var(--prestige-accent, #fff0bf); text-shadow: 0 1px 2px #081016, 0 0 4px var(--prestige-color); } }
+@media (prefers-reduced-motion: reduce) { .prestige-badge { animation: none !important; } }
+[data-effects="simple"] .prestige-badge { animation: none; }

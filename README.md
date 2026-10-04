@@ -2,6 +2,15 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Hoạt động · Thanh sắc · v0.23.0
+
+- Tab **Giang hồ** đổi thành **Hoạt động**, mở danh sách ngay bằng một lần chạm từ mọi tab. Giao diện chia nhóm Chinh phục, Du ngoạn và Vui chơi, với biểu tượng/màu riêng: Phụ bản, Leo tháp, Công thành chiến, Tranh đoạt lãnh thổ, Khám phá, Đồng hành BOT, Sổ quái, Quay thưởng, Tài xỉu và Xổ số. Quay thưởng/Tài xỉu/Xổ số mở thẳng trò đã chọn. Săn boss, luyện công, nhiệm vụ và quà cũng nằm trong Hoạt động; đóng bảng để trở lại sân đấu.
+- Tab **Khác** đổi thành **Cài đặt**, giữ các tùy chọn tự động, nhặt/vứt đồ, tốc độ/XP, âm thanh, đồ họa, hiển thị, tên/giới tính, quản lý nhân vật, lưu/tải/bản sao lưu và kết nối online. Các nút tham gia hoạt động được chuyển ra ngoài tab này. Ba nút đầu bảng đưa tới Tự động, Hiển thị và Lưu game.
+- Cảnh giới, danh hiệu và quân hàm trên nhân vật thu về khoảng **11–14 px**, tên dài co xuống tối thiểu 10 px. Bỏ nền hộp và viền khung trong sân đấu lẫn ảnh Nhân vật, thay bằng chữ chuyển sắc, viền chữ mảnh, ánh sáng và tinh quang ở bậc cao. Cả cụm chữ dùng cùng tọa độ nhân vật trong từng khung hình; bỏ ghim theo HUD/mép màn hình gây cảm giác chữ bị tụt lại khi di chuyển. Chế độ Gọn/giảm chuyển động vẫn hoạt động.
+- Thu ngắn cả ba thanh **HP/MP/XP**, dành chỗ cho số bạc đầy đủ (kể cả **1.000.000.000**), bỏ rút gọn/ẩn phần dư của số bạc. Không thay đổi chỉ số, thưởng hoặc cấu trúc tiến trình đã lưu.
+
+Kiểm tra: 197 unit tests, typecheck, build `--base=/volam/`; `tests/activity-hud-labels-browser.cjs` kiểm tra các cửa sổ hoạt động thật, cài đặt, số bạc tối đa ở sáu kích thước, chữ bám sát nhân vật khi đi bộ/cưỡi ngựa qua mép camera, nền trong suốt và lưu/tải. Kiểm tra hồi quy bằng `tests/hud-browser.cjs`, `tests/prestige-browser.cjs` và `tests/activities-browser.cjs`.
+
 ## Du hành · Chiến kỳ · v0.22.0
 
 - **Khác → Nhặt đồ · Tự vứt đồ**, hoặc **Hành trang → Lọc nhặt · Tự vứt**: chọn phẩm chất và bậc nhặt tối thiểu (16 bậc, mỗi bậc 10 cấp). Cả hai điều kiện cùng áp dụng cho tự nhặt; nhặt tay bỏ qua lọc. Bạc/đá đi kèm đồ bị lọc vẫn nhặt riêng, không nhận lặp. Đồ chưa đạt lọc còn trên đất; rời/chuyển trận và quá giới hạn đồ rơi sẽ thu hồi để không mất thưởng.
@@ -238,7 +247,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.22.0 · Du hành · Chiến kỳ** để xác định bản đang tải.
+- Tab **Cài đặt** hiển thị bản **v0.23.0 · Hoạt động · Thanh sắc** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
