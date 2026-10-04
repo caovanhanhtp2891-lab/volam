@@ -29,9 +29,9 @@ export const REALMS = [
   { name: "Tiên Vương", minPower: 7_200_000_000, color: "#ca9aff", accent: "#ffdf92" },
   { name: "Tiên Đế", minPower: 8_800_000_000, color: "#ffd277", accent: "#ffa9cb" },
   { name: "Đạo Tổ", minPower: 10_000_000_000, color: "#fff2bb", accent: "#85eaff" },
-  { name: "Hỗn Nguyên", minPower: 100_000_000_000, color: "#9ff4e6", accent: "#f9d6ff" },
-  { name: "Hồng Mông", minPower: 1_000_000_000_000, color: "#e7abff", accent: "#fff2bc" },
-  { name: "Vô Cực", minPower: 10_000_000_000_000, color: "#ffffff", accent: "#9fdcff" },
+  { name: "Hỗn Nguyên", minPower: 12_000_000_000, color: "#9ff4e6", accent: "#f9d6ff" },
+  { name: "Hồng Mông", minPower: 14_500_000_000, color: "#e7abff", accent: "#fff2bc" },
+  { name: "Vô Cực", minPower: 17_500_000_000, color: "#ffffff", accent: "#9fdcff" },
 ] as const;
 
 export const REALM_PHASES = [
@@ -85,7 +85,7 @@ export function cultivationForPower(value: number): Cultivation {
     next = REALMS[rank + 1];
   const span = next
     ? next.minPower - realm.minPower
-    : realm.minPower;
+    : realm.minPower - REALMS[rank - 1].minPower;
   const layered = rank === 1 || rank === 2;
   const phaseCount = rank === 0 ? 1 : layered ? 9 : REALM_PHASES.length;
   const phasePower = (index: number) =>

@@ -58,13 +58,13 @@ test("advanced affixes affect loadout choice and enhancement while every absent 
 test("ten sect sets add distinct bonuses only at six and eleven pieces, all remain obtainable", () => {
   const newSets = SET_IDS.filter(id => GEAR_SETS[id].sect);
   assert.equal(newSets.length, 10);
-  assert.equal(new Set(SET_IDS.map(id => JSON.stringify(setBonuses(fullSet(id))))).size, 15);
+  assert.equal(new Set(SET_IDS.map(id => JSON.stringify(setBonuses(fullSet(id))))).size, 16);
   for (const id of newSets) {
     const set = GEAR_SETS[id], items = fullSet(id), key = set.specialty;
     assert.equal(setBonuses(items.slice(0, 5))[key], 0);
     assert.ok(setBonuses(items.slice(0, 6))[key] > 0);
     assert.ok(setBonuses(items)[key] > setBonuses(items.slice(0, 10))[key]);
-    const sameElement = SET_IDS.filter(other => GEAR_SETS[other].element === set.element);
+    const sameElement = SET_IDS.filter(other => GEAR_SETS[other].element === set.element && GEAR_SETS[other].source !== "tower");
     const values = [.1, (sameElement.indexOf(id) + .1) / sameElement.length, 0];
     assert.equal(rollGearIdentity("weapon", "Hoàng Kim", set.element, () => values.shift()).setId, id);
     const aligned = setBonuses(items, set.element), base = setBonuses(items);

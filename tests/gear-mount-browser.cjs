@@ -87,7 +87,7 @@ async function move(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.19.0",
+      "0.20.0",
     );
     await page.locator("#hero-name-input").fill("Kim Phong Kỵ Sĩ");
     await page.locator('[data-faction="shaolin"]').click();
@@ -325,7 +325,7 @@ async function move(page) {
       path: path.join(captureDir, "gear-variants-mobile.png"),
     });
     console.log(
-      "PASS all fifteen sets and 60 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
+      "PASS all sixteen sets and 60 illustrated kinds, 16 grades, five quality colors, elemental badges and enchantment traces",
     );
 
     await seed(page, (s) => {

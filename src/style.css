@@ -1080,7 +1080,7 @@ h3 small {
 }
 .attribute-row {
   display: grid;
-  grid-template-columns: 1fr 25px 26px 26px;
+  grid-template-columns: minmax(0, 1fr) minmax(25px, auto) 26px 26px;
   gap: 6px;
   align-items: center;
   padding: 5px 0;
@@ -2348,6 +2348,24 @@ h2 {
 .skill-button.ultimate-ready { border-color: #ffe394; box-shadow: 0 0 5px #ffd26166, inset 0 0 5px #ffd26133; }
 .skill-button.out-of-range { border-color: #c88464; }
 .skill-row-copy .skill-range, .skill-range { color: #bddcae; }
+.point-controls { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(65px, 1fr) auto auto; gap: 6px; align-items: center; }
+.point-controls input { width: 100%; min-width: 0; height: 30px; padding: 4px 8px; color: #ffebbd; background: #152b24; border: 1px solid #657a59; border-radius: 4px; }
+.point-controls .mini-button { min-height: 30px; margin: 0; }
+.point-suggest { width: 100%; margin: 6px 0; white-space: normal; }
+.point-plan { width: 100%; font-size: 12px; }
+.point-plan th, .point-plan td { padding: 6px 3px; overflow-wrap: anywhere; }
+.tower-banner { display: flex; gap: 14px; align-items: center; padding: 14px; border: 1px solid #b194c8; border-radius: 8px; background: radial-gradient(ellipse at left, #624275, #142b29); color: #ffe0ff; }
+.tower-banner > span { font-size: 42px; color: #ebc7ff; text-shadow: 0 0 16px #b383e7; }
+.tower-banner small { display: block; margin-top: 5px; color: #e3c7ef; }
+.tower-floors { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 10px 0; }
+.tower-floor { min-height: 36px; border: 1px solid #687b68; border-radius: 4px; color: #d3d8c8; background: #1a3129; }
+.tower-floor.cleared { color: #99dfb7; }
+.tower-floor.selected { border-color: #eac7ff; background: #513d60; color: #fff1c7; }
+.tower-detail { padding: 10px; border: 1px solid #657061; border-radius: 5px; margin: 10px 0; }
+.tower-rewards { display: flex; flex-wrap: wrap; gap: 6px 12px; color: #ffdc96; margin: 8px 0; }
+.tower-rewards b { width: 100%; color: #efc4ff; }
+.tower-result { padding: 10px; background: #254532; border-left: 3px solid #a4e6b0; }
+.tower-detail .outline-button { width: 100%; margin-top: 8px; }
 .skill-button[data-basic-attack] > svg { width: 25px; height: 25px; }
 .skill-bar {
   grid-template-columns: repeat(4, 1fr);

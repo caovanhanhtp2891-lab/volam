@@ -133,14 +133,14 @@ export const SET_IDS = [
   "xich-diem",
   "huyen-nham",
   "kim-cang", "ba-vuong", "bao-vu", "ngu-doc", "lien-hoa",
-  "bang-phach", "hang-long", "ma-diem", "thai-cuc", "tu-loi",
+  "bang-phach", "hang-long", "ma-diem", "thai-cuc", "tu-loi", "tran-thien",
 ] as const;
 export type SetId = (typeof SET_IDS)[number];
-export type SetCrest = "blade" | "bamboo" | "moon" | "flame" | "mountain" | "bell" | "spear" | "dart" | "serpent" | "lotus" | "crystal" | "dragon" | "taiji" | "thunder";
+export type SetCrest = "blade" | "bamboo" | "moon" | "flame" | "mountain" | "bell" | "spear" | "dart" | "serpent" | "lotus" | "crystal" | "dragon" | "taiji" | "thunder" | "tower";
 interface GearSet {
   name: string; element: Element; color: string; glyph: string;
   hidden: string; description: string; specialty: keyof GearStats;
-  full: Partial<GearStats>; crest: SetCrest; weapon: GearVariant; sect?: string;
+  full: Partial<GearStats>; crest: SetCrest; weapon: GearVariant; sect?: string; source?: "tower"; universal?: boolean;
 }
 export const GEAR_SETS: Record<SetId, GearSet> = {
   "kim-phong": {
@@ -208,6 +208,7 @@ export const GEAR_SETS: Record<SetId, GearSet> = {
   "ma-diem": { name: "Ma Diệm", element: "hoa", color: "#ff7863", glyph: "焰", sect: "Thiên Nhẫn", crest: "flame", weapon: "firesaber", hidden: "Ma Diệm Phần Thiên", description: "Xuyên giáp và sát thương chí mạng", specialty: "armorPen", full: { attack: 35, armorPen: 8, critDamage: 15, attackSpeed: 6 } },
   "thai-cuc": { name: "Thái Cực", element: "tho", color: "#a4ddff", glyph: "☯", sect: "Võ Đang", crest: "taiji", weapon: "sword", hidden: "Âm Dương Hợp Nhất", description: "Hồi nội lực và giảm sát thương", specialty: "mpRegen", full: { attack: 20, mp: 120, mpRegen: 6, damageReduction: 6 } },
   "tu-loi": { name: "Tử Lôi", element: "tho", color: "#d2b4ff", glyph: "雷", sect: "Côn Lôn", crest: "thunder", weapon: "thundersword", hidden: "Cửu Thiên Lôi Đình", description: "Chí mạng và tốc độ đánh", specialty: "crit", full: { attack: 28, crit: 4, critDamage: 16, attackSpeed: 8 } },
+  "tran-thien": { name: "Trấn Thiên", element: "tho", color: "#e6bfff", glyph: "塔", crest: "tower", weapon: "thundersword", source: "tower", universal: true, hidden: "Trấn Thiên Bất Diệt", description: "Bộ leo tháp: hút sinh lực, xuyên giáp và hồi phục; cộng hưởng mọi môn phái", specialty: "lifeSteal", full: { attack: 36, defense: 24, hp: 220, armorPen: 8, lifeSteal: 6, hpRegen: 6 } },
 };
 export interface GearIdentity {
   variant?: GearVariant;
@@ -254,7 +255,7 @@ export function rollGearIdentity(
       : pick(["kim", "moc", "thuy", "hoa", "tho"] as const);
   const setId =
     ["Hoàng Kim", "Truyền Thuyết", "Thần Thoại"].includes(rarity) || random() < (rarity === "Thường" ? 0.2 : 0.65)
-      ? pick(SET_IDS.filter(id => GEAR_SETS[id].element === element))
+      ? pick(SET_IDS.filter(id => GEAR_SETS[id].element === element && GEAR_SETS[id].source !== "tower"))
       : undefined;
   return {
     variant: pick(variantsForSlot(slot)),
@@ -320,7 +321,7 @@ export function setStatuses(
       for (const [key, value] of Object.entries(set.full))
         stats[key as keyof GearStats] +=
           value! * (PERCENT_STATS.includes(key as keyof GearStats) || key === "speed" ? 1 : grade);
-    const aligned = element === set.element;
+    const aligned = element !== undefined && (set.universal === true || element === set.element);
     if (aligned)
       for (const key of Object.keys(stats) as (keyof GearStats)[])
         stats[key] = Math.ceil(stats[key] * 1.2);

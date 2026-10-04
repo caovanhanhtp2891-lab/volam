@@ -57,9 +57,9 @@ test("set thresholds activate only with equipped distinct slots and full hidden 
     false,
   );
 });
-test("fifteen full sets have different actual bonuses, matching element strengthens only set stats", () => {
+test("sixteen full sets have different actual bonuses, matching element strengthens only set stats", () => {
   const full = SET_IDS.map((id) => setBonuses(set(11, id)));
-  assert.equal(new Set(full.map(JSON.stringify)).size, 15);
+  assert.equal(new Set(full.map(JSON.stringify)).size, 16);
   for (const id of SET_IDS) {
     const items = set(11, id),
       base = setBonuses(items),

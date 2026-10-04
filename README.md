@@ -2,6 +2,17 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Leo tháp và phân bổ điểm (v0.20.0)
+
+- Mở **Trấn Thiên Tháp** từ nút **Leo tháp** trong hoạt động Giang hồ, yêu cầu cấp 5. Có 100 tầng, cần vượt tầng trước để mở tầng sau; có thể đánh lại tầng đã vượt. Mỗi trận 2 đợt trong 3 phút; tầng bội 10 có thủ lĩnh. Quái tăng từ cấp 6 đến 155, tăng sinh lực, công và phòng theo tầng.
+- Thưởng sau khi hạ toàn bộ cả 2 đợt: bạc, XP, đá, ấn tháp và 1 món bộ Trấn Thiên. Bạc cơ bản `150 + 50 × tầng + 3 × tầng²`; XP cơ bản `80 + 28 × tầng + 2 × tầng²`. Lần đầu gấp đôi bạc/XP, thêm 1 đá và 1 ấn. XP vẫn chịu hệ số XP trong cài đặt và giới hạn cấp 160. Thua, hết giờ hoặc rời sớm không thưởng tầng.
+- Đồ Hiếm tầng 1–24, Cực phẩm tầng 25–59, Hoàng Kim tầng 60–100; cấp đồ theo quái. Vị trí nhận luân phiên qua 11 ô, kể cả nhẫn thứ hai/ngựa. **20 ấn tháp** đổi 1 món tự chọn vị trí, cấp/phẩm chất theo tầng cao nhất. Túi đầy: thưởng chiến đấu chuyển sang quà chờ nhận; đổi ấn yêu cầu có ô trống. Bộ Trấn Thiên có mốc 2/4/6/11 món, cộng hưởng +20% với mọi môn phái và huy hiệu tháp riêng. Không mua bằng bạc hoặc rơi ngoài tháp.
+- Tầng cao nhất, số lần vượt và ấn tháp lưu riêng theo nhân vật, giữ qua trùng sinh. Save cũ khởi tạo tháp chưa vượt. Trận đang đánh không lưu: tải lại đưa về trạng thái trước trận, không nhận thưởng phần đã đánh.
+- **Nhân vật → Tiềm năng** và **Võ công**: nhập số nguyên dương rồi **Cộng**, hoặc **Max** để cộng toàn bộ điểm phù hợp giới hạn (tiềm năng 100.000 mỗi dòng, võ học bậc 20/đủ cấp mở chiêu). Nhập quá số điểm/giới hạn không trừ điểm.
+- **Đề xuất** xem bảng hiện tại → cộng thêm → sau cộng trước khi **Áp dụng**. Tỷ lệ riêng 10 môn phái, cân đối với điểm đã có, không rút điểm cũ; chiêu khóa/đạt trần giữ điểm dư. **Khác → Tự động** có tùy chọn tự cộng tiềm năng/võ học theo môn phái khi lên cấp; mặc định tắt, lưu lựa chọn. Bật chỉ áp dụng ở lần lên cấp tiếp theo.
+
+Kiểm tra logic: `pnpm test`; trình duyệt: `node --experimental-strip-types tests/tower-points-browser.cjs` với Playwright/Chromium/URL như hướng dẫn bên dưới. Bao phủ trận thật ở các mốc 1/10/25/60/100, thưởng lại, đổi đồ/túi đầy, timeout/thua, cộng điểm/cancel/Max và tự cộng khi nhận XP, màn hình 320–1280px.
+
 ## Vạn thú · Bí cảnh · v0.19.0
 
 **Giang hồ → Khám phá · Bản đồ lớn** mở 16 map, mỗi map rộng **3.600 × 2.400**, có bốn khu vực đặt tên riêng, đường nối và mốc khu. Có thể đi bộ, cưỡi ngựa hoặc bấm **Đổi khu** để dịch chuyển. Map mở khi đủ cấp vào vùng hoặc đã mở ải tương ứng, giữ quyền truy cập sau trùng sinh. Mỗi map có 24 quái thường, ba tinh anh và một boss; các khu lần lượt có cấp 1–3, 4–5, 6–8, 9–10 cộng mức của vùng. Quái thường/tinh anh/boss hồi sinh sau 12/20/60 giây trong phiên chơi. **Về thành** trở lại chế độ luyện công trước đó và thu hồi đồ dưới đất.
@@ -100,7 +111,7 @@ node --experimental-strip-types tests/military-characters-browser.cjs
 
 - 30 icon có huy hiệu môn phái; tụ lực, đạn và tuyệt chiêu dùng cùng biểu tượng. Bổ sung tua thương Thiên Vương, đai côn/kim chung Thiếu Lâm, độc nha Ngũ Độc, cánh sen Nga Mi, băng tinh Thúy Yên và kiếm trận Võ Đang; giữ hỏa long Cái Bang, ma diệm Thiên Nhẫn, ám khí độc Đường Môn và lôi điện Côn Lôn.
 - **84 mẫu trang bị**, thêm 24 mẫu như Bàn Long Côn, Liệt Diễm Đao, Bạo Vũ Phi Châm, Hàn Ngọc Kiếm, Tử Điện Kiếm, Liên Hoa Phiến, Hàng Long Bào, Phượng Vũ Giáp, Thái Cực Bội và Ngũ Độc Bình. Mỗi mẫu có hình, vật liệu, hoa văn và đá riêng.
-- **15 bộ**, gồm 5 bộ ngũ hành cũ và 10 bộ môn phái. Bộ mới rơi từ quái và có đủ 11 vị trí trong Tiệm. Cùng hệ vẫn nhận +20%; tên môn phái gợi ý lối chơi, không khóa quyền mặc. Huy hiệu, linh khí, hoa văn trên áo/vũ khí và vòng dưới chân lấy đúng bộ đang mặc.
+- **16 bộ**, gồm 5 bộ ngũ hành cũ, 10 bộ môn phái và bộ Trấn Thiên. 15 bộ thường rơi từ quái và có đủ 11 vị trí trong Tiệm; Trấn Thiên nhận riêng từ leo tháp/đổi ấn tháp. Cùng hệ vẫn nhận +20%; tên môn phái gợi ý lối chơi, không khóa quyền mặc. Huy hiệu, linh khí, hoa văn trên áo/vũ khí và vòng dưới chân lấy đúng bộ đang mặc.
 - **14 loại chỉ số**, đồ mới có **2/3/5/7/10 dòng phụ** từ Thường đến Hoàng Kim. Cường hóa, bảng so sánh, Mặc đồ mạnh nhất và lực chiến tính cả các dòng mới. Đồ cũ giữ nguyên các dòng đã có.
 
 | Bộ mới | Môn phái | Lối chơi |
@@ -137,7 +148,7 @@ node --experimental-strip-types tests/world-upgrade-browser.cjs
 
 - Sân đấu chiếm toàn bộ phần màn hình phía trên menu đáy. Ảnh đại diện, cấp, tên/lực chiến và HP/MP/XP ở góc trái; bạc, quà ngày, cài đặt ở góc phải. Minimap và nhiệm vụ có thể thu gọn ở bên phải; thông báo nhặt đồ ở bên trái. Joystick/Tự động bên trái, cụm nút tròn kỹ năng/thuốc/về thành bên phải, nhật ký một dòng sát menu.
 - Chạm **Nhân vật / Võ công / Hành trang / Khác** để mở bảng cuộn bên trong màn hình. Chạm **Giang hồ** để quay về sân; chạm lần nữa mở bảng hoạt động (ải, luyện công, lịch boss, phụ bản, lửa trại). Nút × đóng bảng hoạt động. Chạm ảnh đại diện mở chỉ số, bánh răng mở cài đặt, dòng nhật ký mở lịch sử; nút trong minimap ẩn/hiện HUD.
-- **23 cảnh giới** từ Phàm Nhân đến Vô Cực: Phàm Nhân dưới 100.000, Luyện Thể từ 100.000 đến dưới 1 triệu, Đạo Tổ từ 10 tỷ; sau đó Hỗn Nguyên từ 100 tỷ, Hồng Mông từ 1.000 tỷ, Vô Cực từ 10.000 tỷ. Bảng đầy đủ ở phần cảnh giới và trong game.
+- **23 cảnh giới** từ Phàm Nhân đến Vô Cực: Phàm Nhân dưới 100.000, Luyện Thể từ 100.000 đến dưới 1 triệu, Đạo Tổ từ 10 tỷ; sau đó Hỗn Nguyên từ 12 tỷ, Hồng Mông từ 14,5 tỷ, Vô Cực từ 17,5 tỷ. Bảng đầy đủ ở phần cảnh giới và trong game.
 - Lực chiến mới tăng theo tổng chỉ số; số cạnh tên rút gọn K/tr/tỷ, bảng Nhân vật giữ con số đầy đủ. So sánh đồ và xem trước cường hóa đồ đang mặc hiển thị mức lực chiến nhân vật thực sự đạt sau thay đổi. Giữ nguyên chỉ số chiến đấu và dữ liệu lưu; không cộng lại vào công/phòng hay trang bị.
 - Giữ hình 2D đơn giản: atlas vẫn **28.026 byte**, không thêm ảnh nền/texture. Phàm Nhân chỉ có vòng mờ; bậc cao dùng vòng sáng Canvas giới hạn như trước.
 
@@ -188,7 +199,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.13.0 · Thập phái & Tranh đoạt** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.20.0 · Trấn Thiên Tháp & Tiềm năng** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 
@@ -296,11 +307,11 @@ Chí mạng chiến đấu = 12% cơ bản + trang bị + danh hiệu, giới h�
 | 18 | Tiên Vương | 7.200.000.000 |
 | 19 | Tiên Đế | 8.800.000.000 |
 | 20 | Đạo Tổ | 10.000.000.000 |
-| 21 | Hỗn Nguyên | 100.000.000.000 |
-| 22 | Hồng Mông | 1.000.000.000.000 |
-| 23 | Vô Cực | 10.000.000.000.000 |
+| 21 | Hỗn Nguyên | 12.000.000.000 |
+| 22 | Hồng Mông | 14.500.000.000 |
+| 23 | Vô Cực | 17.500.000.000 |
 
-Mỗi bậc kéo dài đến dưới ngưỡng tiếp theo, tránh trùng mốc: đúng 100.000 vào Luyện Thể, đúng 1 triệu vào Luyện Khí. Phàm Nhân chưa chia tầng; Luyện Thể/Luyện Khí có 9 tầng; từ Trúc Cơ có **Sơ kỳ → Trung kỳ → Hậu kỳ → Đỉnh phong → Đại viên mãn**. Vô Cực chia theo các mốc 10.000 / 12.000 / 14.000 / 16.000 / 18.000 tỷ. Cảnh giới tự đổi theo lực chiến; chưa có thao tác dùng đan hoặc nhiệm vụ thiên kiếp. Các bậc sau Đạo Tổ dành cho tiến trình trùng sinh dài hạn; nhịp đạt mốc cần tiếp tục playtest. Dữ liệu nằm trong `src/cultivation.ts`.
+Mỗi bậc kéo dài đến dưới ngưỡng tiếp theo, tránh trùng mốc: đúng 100.000 vào Luyện Thể, đúng 1 triệu vào Luyện Khí. Phàm Nhân chưa chia tầng; Luyện Thể/Luyện Khí có 9 tầng; từ Trúc Cơ có **Sơ kỳ → Trung kỳ → Hậu kỳ → Đỉnh phong → Đại viên mãn**. Vô Cực chia theo các mốc 17,5 / 18,1 / 18,7 / 19,3 / 19,9 tỷ. Ba bậc cuối tăng khoảng 20–21% mỗi bậc; chỉ đổi ngưỡng cảnh giới, giữ công thức lực chiến và sát thương đang có. Cảnh giới tự đổi theo lực chiến; chưa có thao tác dùng đan hoặc nhiệm vụ thiên kiếp. Các bậc sau Đạo Tổ dành cho tiến trình trùng sinh dài hạn; nhịp đạt mốc cần tiếp tục playtest. Dữ liệu nằm trong `src/cultivation.ts`.
 
 ## Chạy local
 

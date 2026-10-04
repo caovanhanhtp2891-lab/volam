@@ -46,7 +46,7 @@ async function aim(page, point) {
     page.on("pageerror", error => errors.push(error.message));
     page.on("response", response => { if (response.status() >= 400 && response.url().startsWith(url)) errors.push(`${response.status()} ${response.url()}`); });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.19.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.20.0");
     await click(page, '[data-faction="gaibang"]'); await click(page, "#join-sect"); await step(page);
 
     await seed(page, data => { Object.assign(data.player, { level: 30, attack: 220, defense: 90 }); Object.assign(data.player.idle, { inTown: true, enabled: false, autoSkills: false, autoEquip: false, autoLoot: false }); });

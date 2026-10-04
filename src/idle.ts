@@ -120,6 +120,8 @@ export interface IdleProgress {
   autoPotions: boolean;
   autoLoot: boolean;
   autoEquip: boolean;
+  autoAttributes: boolean;
+  autoSkillPoints: boolean;
   speed: 1 | 1.5 | 2.5;
   attributePoints: number;
   attributes: Record<Attribute, number>;
@@ -147,6 +149,8 @@ export function normalizeIdle(value?: Partial<IdleProgress>, legacy = false): Id
     autoPotions: bool("autoPotions", true),
     autoLoot: bool("autoLoot", true),
     autoEquip: bool("autoEquip", true),
+    autoAttributes: bool("autoAttributes", false),
+    autoSkillPoints: bool("autoSkillPoints", false),
     speed: source.speed === 1.5 || source.speed === 2.5 ? source.speed : 1,
     attributePoints: integer(source.attributePoints, 0, 0, 1e5),
     attributes: Object.fromEntries(
@@ -202,7 +206,7 @@ export function goToStage(progress: IdleProgress, stage: number, level = 1): boo
 export function spendAttribute(progress: IdleProgress, attribute: Attribute, delta: 1 | -1): boolean {
   if (!Object.hasOwn(ATTRIBUTES, attribute) || (delta !== 1 && delta !== -1)) return false;
   if (delta === 1) {
-    if (progress.attributePoints < 1) return false;
+    if (progress.attributePoints < 1 || progress.attributes[attribute] >= 100000) return false;
     progress.attributePoints--;
     progress.attributes[attribute]++;
   } else {

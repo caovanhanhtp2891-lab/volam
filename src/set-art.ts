@@ -2,6 +2,7 @@ import type { SetCrest } from "./gear-catalog";
 
 // Small engraved crests shared by inventory badges, worn gear and set circles.
 export const SET_CREST_PATHS: Record<SetCrest, string> = {
+  tower: "M0-14V-11M-4-8L0-12 4-8ZM-9-2L0-7 9-2ZM-13 5L0-1 13 5ZM-9 5v7H9V5M-3 12V6H3V12M-12 12H12",
   blade: "M0-12-3-7-2 6H2L3-7ZM-7 7H7M0 7v5",
   bamboo: "M-3 12V-12M-7-6H1M-7 1H1M-7 8H1M1-3q10-10 10-1Q5-2 1-3M-7 5q-8-10-4-11",
   moon: "M6-11a12 12 0 1 0 0 22Q-8 0 6-11ZM8-6l2 3 3 1-3 1-2 3-1-3-3-1 3-1Z",

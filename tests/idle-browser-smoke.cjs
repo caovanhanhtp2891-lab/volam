@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.19.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.20.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -161,7 +161,7 @@ async function fit(page, width, height) {
     console.log("PASS daily gift awarded once, including after a page reload");
 
     await tab(page, "more");
-    assert.match(await page.locator(".release-stamp").textContent(), /v0\.16\.0/);
+    assert.match(await page.locator(".release-stamp").textContent(), /v0\.20\.0/);
     await page.locator("#settings-name").fill("");
     await page.locator("#settings-name").pressSequentially("WASD Lữ");
     await page.locator("#settings-sex").selectOption("female");

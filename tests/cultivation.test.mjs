@@ -53,11 +53,11 @@ test("five phases start at Truc Co and reaching the next realm resets the phase"
   assert.equal(cultivationForPower(8_000_000).phase,"Sơ kỳ");
   assert.equal(cultivationForPower(1_000_000_000).realm.name,"Chân Tiên");
   assert.equal(cultivationForPower(10_000_000_000).label,"Đạo Tổ · Sơ kỳ");
-  assert.equal(cultivationForPower(99_999_999_999).nextLabel,"Hỗn Nguyên · Sơ kỳ");
+  assert.equal(cultivationForPower(11_999_999_999).nextLabel,"Hỗn Nguyên · Sơ kỳ");
 });
 
 test("progress always points forward, including realms beyond Dao To and the final phase", () => {
-  const top=cultivationForPower(18_000_000_000_000);
+  const top=cultivationForPower(19_900_000_000);
   assert.equal(top.label,"Vô Cực · Đại viên mãn");
   assert.equal(top.nextPower,null); assert.equal(top.nextLabel,null); assert.equal(top.progress,1);
   const samples=[0,Number.MAX_SAFE_INTEGER];
