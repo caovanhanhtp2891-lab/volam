@@ -1,10 +1,9 @@
 import { emptyStats, type GearStats } from "./equipment.ts";
 
-export const MAX_LEVEL = 160;
-export const XP_MULTIPLIERS = [1, 5, 10, 100, 1000] as const;
+import { MAX_LEVEL, normalizeExperienceBuff } from "./level-limits.ts";
+export { MAX_LEVEL } from "./level-limits.ts";
 export const xpToNext = (level: number) => Math.floor(100 + 35 * level + 8 * level * level);
 export interface GamePreferences {
-  xpMultiplier: (typeof XP_MULTIPLIERS)[number];
   damageNumbers: boolean;
   titleVisible: boolean;
   titleEffects: boolean;
@@ -14,7 +13,7 @@ export interface GamePreferences {
 export function normalizePreferences(value?: Partial<GamePreferences>): GamePreferences {
   const source = value && typeof value === "object" ? value : {};
   const bool = (key: keyof GamePreferences) => typeof source[key] === "boolean" ? source[key] as boolean : true;
-  return { skillEffects: source.skillEffects === "simple" ? "simple" : "full", xpMultiplier: XP_MULTIPLIERS.includes(source.xpMultiplier!) ? source.xpMultiplier! : 1, damageNumbers: bool("damageNumbers"), titleVisible: bool("titleVisible"), titleEffects: bool("titleEffects"), minimap: bool("minimap") };
+  return { skillEffects: source.skillEffects === "simple" ? "simple" : "full", damageNumbers: bool("damageNumbers"), titleVisible: bool("titleVisible"), titleEffects: bool("titleEffects"), minimap: bool("minimap") };
 }
 export interface Journey {
   rebirths: number;
@@ -36,9 +35,9 @@ export interface ExperienceOwner {
   level: number; xp: number; attack: number; defense: number; skillPoints: number;
   idle: { attributePoints: number };
 }
-export function applyExperience(player: ExperienceOwner, base: number, multiplier: GamePreferences["xpMultiplier"]): { amount: number; levels: number } {
+export function applyExperience(player: ExperienceOwner, base: number, multiplier = 1): { amount: number; levels: number } {
   if (player.level >= MAX_LEVEL) { player.xp = 0; return { amount: 0, levels: 0 }; }
-  const amount = Number.isFinite(base) ? Math.floor(Math.max(0, Math.min(1e9, base)) * (XP_MULTIPLIERS.includes(multiplier) ? multiplier : 1)) : 0;
+  const amount = Number.isFinite(base) ? Math.floor(Math.max(0, Math.min(1e9, base)) * normalizeExperienceBuff(multiplier)) : 0;
   player.xp += amount;
   let levels = 0;
   while (player.level < MAX_LEVEL && player.xp >= xpToNext(player.level)) {
@@ -78,7 +77,7 @@ export const TITLES: readonly TitleDefinition[] = [
   { id: "forge", rarity: 2, name: "Bách Luyện Thành Cương", color: "#ffae72", glyph: "⚒", motif: "sparks", metric: "enhance", target: 5, requirement: "Sở hữu trang bị +5", effect: "Tia lửa lò rèn", bonuses: { defense: 30, hp: 150 } },
   { id: "weapon", rarity: 4, name: "Thần Binh Chi Chủ", color: "#edb0ff", glyph: "⚔", motif: "swords", metric: "enhance", target: 10, requirement: "Sở hữu trang bị +10", effect: "Song kiếm tím", bonuses: { attack: 60, crit: 4 } },
   { id: "master", rarity: 3, name: "Võ Lâm Cao Thủ", color: "#88d4ff", glyph: "✧", motif: "stars", metric: "level", target: 50, requirement: "Từng đạt cấp 50", effect: "Tinh tú xanh lam", bonuses: { attack: 25, defense: 15, mp: 30 } },
-  { id: "grandmaster", rarity: 4, name: "Nhất Đại Tông Sư", color: "#ffe48c", glyph: "☼", motif: "sun", metric: "level", target: MAX_LEVEL, requirement: "Từng đạt cấp 160", effect: "Mặt trời kim sắc", bonuses: { attack: 80, hp: 400 } },
+  { id: "grandmaster", rarity: 4, name: "Nhất Đại Tông Sư", color: "#ffe48c", glyph: "☼", motif: "sun", metric: "level", target: MAX_LEVEL, requirement: `Từng đạt cấp ${MAX_LEVEL}`, effect: "Mặt trời kim sắc", bonuses: { attack: 80, hp: 400 } },
   { id: "reborn", rarity: 3, name: "Niết Bàn Tái Sinh", color: "#ff9ed1", glyph: "❀", motif: "lotus", metric: "rebirths", target: 1, requirement: "Trùng sinh 1 lần", effect: "Sen hồng nở quanh chân", bonuses: { hp: 300, mp: 80, speed: 5 } },
   { id: "eternal", rarity: 5, name: "Luân Hồi Chí Tôn", color: "#ccbbff", glyph: "☯", motif: "orbit", metric: "rebirths", target: 5, requirement: "Trùng sinh 5 lần", effect: "Hai quỹ đạo luân hồi", bonuses: { attack: 120, defense: 80, hp: 600, crit: 5 } },
   { id: "young-hero", rarity: 2, name: "Thiếu Niên Anh Kiệt", color: "#9cebcf", glyph: "✧", motif: "clouds", metric: "level", target: 20, requirement: "Từng đạt cấp 20", effect: "Mây ngọc nâng bước", bonuses: { attack: 8, hp: 35 } },

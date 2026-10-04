@@ -3,6 +3,18 @@
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
 
+## Chat giang hồ · Cấp 200 · Tối ưu hiệu năng · v0.28.0
+
+- **Giảm giật:** cache tổng chỉ số trang bị/Tri kỷ/bị động, chỉ tính lại khi đổi chỉ số; tái sử dụng bộ định dạng số/ngày. Chỉ cập nhật nội dung HUD thay đổi, giữ nguyên các nút/ô mục tiêu, không dựng lại bảng Nhân vật và Túi đồ khi đang đóng. Ngừng vẽ sân bị che bởi bảng khác; bỏ vẽ NPC/quái/bot ngoài vùng nhìn nhưng vẫn chạy chiến đấu/tuần tra. Gom lưu tự động khi đánh/nhặt đồ tối đa một lần mỗi giây, flush khi ẩn/đóng trang; giao dịch vòng quay, cường hóa, đổi bản đồ và thao tác lưu vẫn lưu ngay.
+- **Cấp tối đa 200:** nhân vật cấp 160 tiếp tục nhận XP và lên cấp; đủ điểm tiềm năng/võ học cho từng cấp. Trùng sinh và danh hiệu Nhất Đại Tông Sư mới yêu cầu cấp 200; danh hiệu đã nhận ở bản cũ vẫn được giữ. Trang bị và bộ lọc hỗ trợ cấp 200/bậc 20. Các map hiện có vẫn gồm 16 vùng/160 ải.
+- **Bỏ các tùy chọn nhân tốc độ và buff XP trong Cài đặt.** Tốc độ mô phỏng luôn bình thường. File cũ bỏ các preset này khi tải, giữ cấp, trang bị, điểm và tiền; buff mới mặc định x1.
+- **Chat:** chạm thanh chat ở đáy sân để mở khung nhập tin, Gửi/Enter để gửi, × để thu gọn. Nhật ký chiến đấu vẫn xem trong Hoạt động. Chat cục bộ có phản hồi BOT, lịch sử tối đa 80 tin × 160 ký tự; gõ phím trong ô nhập không làm nhân vật di chuyển và giữ font 16px chống tự phóng màn hình. Có máy chủ online đang chạy thì chat dùng WebSocket, tên người gửi lấy từ phiên xác thực; server giới hạn một tin/giây. GitHub Pages mặc định chơi/chat cục bộ với BOT; máy chủ WebSocket cần chạy riêng.
+- **Buff XP bằng lệnh `/kn x`:** x là số nguyên **1–1000**, ví dụ `/kn 7`, `/kn 100`; `/kn 1` trở về XP thường. Lưu riêng từng nhân vật, áp dụng quái/nhiệm vụ/lửa trại/vắng mặt/bí cảnh/công thành. Trong bí cảnh, chỉ sửa buff trong bản lưu trước trận để giữ vị trí thế giới; lỗi lưu hoàn tác hệ số. Lệnh không phát cho người khác trong chat online.
+
+Đo cùng kịch bản tự chiến cấp 120, kỹ năng Full, bot trợ chiến, Chromium 390×844 trong 8 giây: thời gian xử lý **2,77 → 2,20 giây (~20% giảm)**, JavaScript **0,84 → 0,56 giây**, ghi HTML **255 → 19 (~93% giảm)**, ghi save **14 → 8**; khoảng cách khung RAF p95 vẫn **16,8 ms**. Đây là phép đo tại môi trường kiểm thử, kết quả trên điện thoại phụ thuộc thiết bị. Có thể chạy lại bằng `node tests/performance-profile.cjs after` với `VOLAM_TEST_URL`.
+
+Kiểm tra: `pnpm test` (240 kiểm tra logic), `pnpm typecheck`, `pnpm server:check`, `pnpm server:build`, build production `/volam/`; `tests/chat-performance-browser.cjs` kiểm tra chat/lệnh, giữ save, hoàn tác và 4 viewport; `tests/chat-server.cjs` chạy máy chủ tạm và hai client, kiểm tra gửi/nhận thật, tên xác thực, chống spam và lệnh cục bộ. Hồi quy cấp 200/trùng sinh, trang bị/ngọc, Tri kỷ, đồ sát/công thành, hoạt động may mắn và cưỡi ngựa.
+
 ## Đồ sát giang hồ · May mắn tích lũy · v0.27.0
 
 - **Lọc nhặt đồ:** trang bị phải đạt cả phẩm chất tối thiểu và bậc tối thiểu, kể cả đồ bộ/Vàng/Cam/Đỏ. Áp dụng trong luyện ải, đại thế giới và phiêu lưu Rừng Trúc. Bạc/đá đi kèm được nhặt riêng, trang bị dưới lọc nằm trên đất cho nhặt tay; chuyển map và thu hồi đồ cũ khi sân đầy không đưa đồ dưới lọc vào túi. Thưởng kết thúc phụ bản và thu hồi boss Hoàng Kim vẫn được bảo toàn. Cài đặt theo nhân vật, giữ lựa chọn của save cũ.
@@ -99,7 +111,7 @@ Kiểm tra dữ liệu: `pnpm test`. Kiểm tra hình/nhãn/28 mẫu/7 quân hà
 ## Leo tháp và phân bổ điểm (v0.20.0)
 
 - Mở **Trấn Thiên Tháp** từ nút **Leo tháp** trong hoạt động Giang hồ, yêu cầu cấp 5. Có 100 tầng, cần vượt tầng trước để mở tầng sau; có thể đánh lại tầng đã vượt. Mỗi trận 2 đợt trong 3 phút; tầng bội 10 có thủ lĩnh. Quái tăng từ cấp 6 đến 155, tăng sinh lực, công và phòng theo tầng.
-- Thưởng sau khi hạ toàn bộ cả 2 đợt: bạc, XP, đá, ấn tháp và 1 món bộ Trấn Thiên. Bạc cơ bản `150 + 50 × tầng + 3 × tầng²`; XP cơ bản `80 + 28 × tầng + 2 × tầng²`. Lần đầu gấp đôi bạc/XP, thêm 1 đá và 1 ấn. XP vẫn chịu hệ số XP trong cài đặt và giới hạn cấp 160. Thua, hết giờ hoặc rời sớm không thưởng tầng.
+- Thưởng sau khi hạ toàn bộ cả 2 đợt: bạc, XP, đá, ấn tháp và 1 món bộ Trấn Thiên. Bạc cơ bản `150 + 50 × tầng + 3 × tầng²`; XP cơ bản `80 + 28 × tầng + 2 × tầng²`. Lần đầu gấp đôi bạc/XP, thêm 1 đá và 1 ấn. XP vẫn chịu hệ số XP từ lệnh chat và giới hạn cấp 200. Thua, hết giờ hoặc rời sớm không thưởng tầng.
 - Đồ Hiếm tầng 1–24, Cực phẩm tầng 25–59, Hoàng Kim tầng 60–100; cấp đồ theo quái. Vị trí nhận luân phiên qua 11 ô, kể cả nhẫn thứ hai/ngựa. **20 ấn tháp** đổi 1 món tự chọn vị trí, cấp/phẩm chất theo tầng cao nhất. Túi đầy: thưởng chiến đấu chuyển sang quà chờ nhận; đổi ấn yêu cầu có ô trống. Bộ Trấn Thiên có mốc 2/4/6/11 món, cộng hưởng +20% với mọi môn phái và huy hiệu tháp riêng. Không mua bằng bạc hoặc rơi ngoài tháp.
 - Tầng cao nhất, số lần vượt và ấn tháp lưu riêng theo nhân vật, giữ qua trùng sinh. Save cũ khởi tạo tháp chưa vượt. Trận đang đánh không lưu: tải lại đưa về trạng thái trước trận, không nhận thưởng phần đã đánh.
 - **Nhân vật → Tiềm năng** và **Võ công**: nhập số nguyên dương rồi **Cộng**, hoặc **Max** để cộng toàn bộ điểm phù hợp giới hạn (tiềm năng 100.000 mỗi dòng, võ học bậc 20/đủ cấp mở chiêu). Nhập quá số điểm/giới hạn không trừ điểm.
@@ -320,9 +332,9 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 
 ## Cài đặt, trùng sinh và danh hiệu · v0.7.0
 
-- **Khác → Buff kinh nghiệm** chọn **x1, x5, x10, x100 hoặc x1000**; lưu riêng từng nhân vật. Mọi nguồn đi qua cùng phép tính XP: quái, nhiệm vụ, boss Hoàng Kim, thưởng phụ bản, lửa trại và vắng mặt. XP vắng mặt dùng hệ số trong bản lưu, không nhân bạc/đá/đồ. Lên nhiều cấp nhận đủ điểm võ học/tiềm năng; cấp tối đa **160**, XP dư bị bỏ và không chuyển sang lượt trùng sinh.
+- **Chat → `/kn x`** chọn hệ số nguyên **1–1000**; lưu riêng từng nhân vật. Mọi nguồn đi qua cùng phép tính XP: quái, nhiệm vụ, boss Hoàng Kim, thưởng phụ bản, lửa trại và vắng mặt. XP vắng mặt dùng hệ số trong bản lưu, không nhân bạc/đá/đồ. Lên nhiều cấp nhận đủ điểm võ học/tiềm năng; cấp tối đa **200**, XP dư bị bỏ và không chuyển sang lượt trùng sinh.
 - **Khác → Hiển thị** bật/tắt số sát thương, minimap, tên danh hiệu và hiệu ứng danh hiệu. Ẩn tên/hiệu ứng không tháo danh hiệu hoặc mất chỉ số. Tùy chọn lưu theo từng ô nhân vật; đổi khi đã rời phụ bản để không mất cài đặt do checkpoint của lượt chưa lưu.
-- **Nhân vật → Trùng sinh** xem trước rồi xác nhận khi đạt cấp 160 và đã rời phụ bản/boss Hoàng Kim. Mỗi lần về cấp 1/XP 0, trở lại thành tại ải 1 và nhận vĩnh viễn **+80 công, +50 phòng, +600 HP, +120 MP, +4 tốc**. Chỉ số theo cấp được tính lại từ cấp 1; điểm tiềm năng, võ học đã nâng, đồ/cường hóa, bạc/đá, vật phẩm chờ nhận, thành tích/danh hiệu và các ải đã mở đều giữ. Các chiêu vẫn cần cấp 3/5 để dùng lại. Đồ dưới đất được thu hồi, kể cả vào hàng chờ khi túi đầy.
+- **Nhân vật → Trùng sinh** xem trước rồi xác nhận khi đạt cấp 200 và đã rời phụ bản/boss Hoàng Kim. Mỗi lần về cấp 1/XP 0, trở lại thành tại ải 1 và nhận vĩnh viễn **+80 công, +50 phòng, +600 HP, +120 MP, +4 tốc**. Chỉ số theo cấp được tính lại từ cấp 1; điểm tiềm năng, võ học đã nâng, đồ/cường hóa, bạc/đá, vật phẩm chờ nhận, thành tích/danh hiệu và các ải đã mở đều giữ. Các chiêu vẫn cần cấp 3/5 để dùng lại. Đồ dưới đất được thu hồi, kể cả vào hàng chờ khi túi đầy.
 - Trùng sinh tạo bản sao lưu trước, kiểm tra lại cấp/số lần khi xác nhận, chặn nhấn lặp; không thực hiện nếu không tạo được backup. Bonus tính từ số lần trùng sinh, không cộng lại vào dữ liệu gốc mỗi lần sync/reload. Không làm mới lượt thưởng ngày hoặc lượt boss Hoàng Kim.
 - **Nhân vật → Danh hiệu** có 28 danh hiệu, xem trước hiệu ứng, tiến độ mở, đeo/tháo. Chỉ danh hiệu đang đeo cộng chỉ số thật và lực chiến; các danh hiệu đã mở không cộng chồng. Thành tích hạ quái/tinh anh/boss và cấp cao nhất giữ qua trùng sinh. Save cũ nhận cài đặt x1, 0 trùng sinh, không tự đeo danh hiệu; mở các điều kiện đã biết từ tiến trình cũ.
 
@@ -337,7 +349,7 @@ Lịch boss và phần thưởng hiện chạy local theo đồng hồ thiết b
 | Bách Luyện Thành Cương | Sở hữu đồ +5 | +30 phòng, +150 HP | Tia lửa |
 | Thần Binh Chi Chủ | Sở hữu đồ +10 | +60 công, +4% chí mạng | Song kiếm tím |
 | Võ Lâm Cao Thủ | Từng đạt cấp 50 | +25 công, +15 phòng, +30 MP | Tinh tú xanh |
-| Nhất Đại Tông Sư | Từng đạt cấp 160 | +80 công, +400 HP | Mặt trời kim sắc |
+| Nhất Đại Tông Sư | Từng đạt cấp 200 | +80 công, +400 HP | Mặt trời kim sắc |
 | Niết Bàn Tái Sinh | Trùng sinh lần đầu | +300 HP, +80 MP, +5 tốc | Sen hồng |
 | Luân Hồi Chí Tôn | Trùng sinh 5 lần | +120 công, +80 phòng, +600 HP, +5% chí mạng | Hai quỹ đạo |
 
@@ -354,7 +366,7 @@ Kiểm tra hình ảnh: `node --experimental-strip-types tests/equipment-art-bro
 
 ## Bộ ngũ hành và cưỡi ngựa · v0.11.0
 
-- Trang bị có **108 chủng loại**: 26 vũ khí, 12 giáp, 12 mũ, 8 giày, 8 đai, 8 dây chuyền, 9 nhẫn, 8 hộ uyển, 11 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Bảy phẩm chất từ trắng đến đỏ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
+- Trang bị có **108 chủng loại**: 26 vũ khí, 12 giáp, 12 mũ, 8 giày, 8 đai, 8 dây chuyền, 9 nhẫn, 8 hộ uyển, 11 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–200 chia 20 bậc; khung họa tiết tăng ở bậc 5/9/13. Bảy phẩm chất từ trắng đến đỏ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
 - Năm bộ **Kim Phong / Thanh Trúc / Hàn Nguyệt / Xích Diệm / Huyền Nham** ứng với Kim/Mộc/Thủy/Hỏa/Thổ. Đồ Hoàng Kim mới luôn thuộc một bộ; đồ khác có cơ hội thuộc bộ. Đồ rơi ưu tiên hệ môn phái 60% khi chọn hệ. Save cũ giữ nguyên chỉ số, không tự thêm dòng phụ, hệ hoặc bộ.
 - **2 món:** +6 công, +4 phòng; **4 món:** thêm +90 HP, +24 MP; **6 món:** thêm chỉ số đặc trưng của hệ. **Đủ 11 vị trí**, gồm hai nhẫn và ngựa, mở thuộc tính ẩn bên dưới và trận sáng riêng. Công/phòng/HP/MP của bộ nhân với bậc món thấp nhất; cùng hệ môn phái tăng các thuộc tính bộ 20%, làm tròn lên. Bộ chỉ đếm các ô đang mặc; ngựa vẫn tính vào bộ khi đi bộ. Phối nhiều bộ nhận những mốc riêng đã đủ, không nhận thuộc tính ẩn của bộ thiếu món.
 

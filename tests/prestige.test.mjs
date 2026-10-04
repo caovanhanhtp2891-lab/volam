@@ -26,7 +26,7 @@ test('new achievements unlock only at their real tower, territory and dungeon-ru
   }
 });
 test('all title conditions unlock at maximal progress; only the selected title adds stats and survives reload',()=>{
-  const p=player();p.level=160;Object.assign(p.journey,{kills:10000,elites:500,bosses:1000,rebirths:20});p.tower={highestFloor:100};p.military={captured:Array(9).fill('land')};p.dungeonClears={tomb:50,bamboo:50};p.goldenClears=['boss'];p.inventory=[{enhance:10}];
+  const p=player();p.level=200;Object.assign(p.journey,{kills:10000,elites:500,bosses:1000,rebirths:20});p.tower={highestFloor:100};p.military={captured:Array(9).fill('land')};p.dungeonClears={tomb:50,bamboo:50};p.goldenClears=['boss'];p.inventory=[{enhance:10}];
   unlockTitles(p);assert.equal(p.journey.unlockedTitles.length,28);
   const before=progressionBonuses(p.journey);p.journey.activeTitle='sky-sovereign';const after=progressionBonuses(p.journey);
   assert.equal(after.attack-before.attack,160);assert.equal(after.defense-before.defense,100);assert.equal(after.critDamage-before.critDamage,12);

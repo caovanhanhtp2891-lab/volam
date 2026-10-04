@@ -153,7 +153,7 @@ async function siege(p, city) {
     await p.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await p.locator("html").getAttribute("data-version"),
-      "0.27.0",
+      "0.28.0",
     );
     await p.locator('[data-faction="gaibang"]').click();
     await p.locator("#join-sect").click();

@@ -76,6 +76,7 @@ async function siege(p, city) { await click(p,'[data-open-siege]'); await p.loca
   // Patrol targets are independent of the hero and remain far away after travel.
   await seed(p,s=>{Object.assign(s.player.idle,{enabled:true,inTown:false,stage:1,wave:1,autoLoot:false,autoSkills:false});s.player.botSettings={enabled:true,assist:false,pvp:false};s.player.x=950;s.player.y=650;});
   if(await p.locator('#mobile-auto').getAttribute('aria-pressed')==='true')await click(p,'#mobile-auto');
+  await click(p,"#world-panel-close");
   await step(p,12000);const positions=await p.evaluate(()=>window.botPositions);
   assert.ok(Object.values(positions).some(b=>Math.hypot(b.x-950,b.y-650)>300),'BOT patrol goes beyond the old follow circle');
   // Actual PK: one encounter turns a BOT into a targetable player enemy, with no gear loss.

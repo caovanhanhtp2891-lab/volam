@@ -9,7 +9,7 @@ test("old saves keep all pickup qualities with automatic discard off; invalid fi
   assert.deepEqual(normalizeLootSettings(), freshLootSettings());
   assert.equal(freshLootSettings().autoDiscard, false);
   assert.equal(validLootSettings(undefined), true);
-  for (const bad of [null, [], {}, { ...freshLootSettings(), minRarity: 7 }, { ...freshLootSettings(), minGrade: 1.5 }, { ...freshLootSettings(), maxDiscardRarity: 7 }, { ...freshLootSettings(), autoDiscard: "true" }, { ...freshLootSettings(), maxDiscardGrade: 17 }]) assert.equal(validLootSettings(bad), false);
+  for (const bad of [null, [], {}, { ...freshLootSettings(), minRarity: 7 }, { ...freshLootSettings(), minGrade: 1.5 }, { ...freshLootSettings(), maxDiscardRarity: 7 }, { ...freshLootSettings(), autoDiscard: "true" }, { ...freshLootSettings(), maxDiscardGrade: 21 }]) assert.equal(validLootSettings(bad), false);
   const original = freshLootSettings(), copy = normalizeLootSettings(original); copy.minGrade = 4;
   assert.equal(original.minGrade, 1);
 });

@@ -186,7 +186,7 @@ async function win(p, id) {
     await p.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await p.locator("html").getAttribute("data-version"),
-      "0.27.0",
+      "0.28.0",
     );
     await click(p, '[data-faction="gaibang"]');
     await click(p, "#join-sect");
@@ -420,7 +420,7 @@ async function win(p, id) {
     await click(p, "#town-btn");
     await step(p);
     await seed(p, (s) => {
-      s.player.level = 160;
+      s.player.level = 200;
       s.player.attack = 1000000;
       s.player.defense = 1000000;
       s.player.idle.inTown = true;

@@ -2474,10 +2474,10 @@ h2 {
 .potion-button { width: 34px; height: 34px; font-size: 9px; }
 .town-button { right: 0; bottom: 0; width: 42px; height: 42px; font-size: 9px; line-height: 11px; }
 .arena-chat { position: absolute; left: 7px; bottom: 8px; width: calc(100% - 177px); max-width: 300px; z-index: 3; }
-#arena-log-toggle { display: flex; align-items: center; gap: 5px; width: 100%; height: 27px; padding: 3px 5px; color: #e4dcc0; border: 1px solid #998052; border-radius: 3px; background: #0b130fdf; text-align: left; }
-#arena-log-toggle > span:first-child { flex: none; color: #e1c680; font-size: 15px; }
-#arena-log-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
-#arena-log-toggle b { color: #bca976; font-size: 9px; }
+#chat-toggle { display: flex; align-items: center; gap: 5px; width: 100%; height: 27px; padding: 3px 5px; color: #e4dcc0; border: 1px solid #998052; border-radius: 3px; background: #0b130fdf; text-align: left; }
+#chat-toggle > span:first-child { flex: none; color: #e1c680; font-size: 15px; }
+#chat-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+#chat-toggle b { color: #bca976; font-size: 9px; }
 .arena-left-buttons { position: static; display: flex; flex-wrap: wrap; margin: 7px 0; }
 .game-layout { position: absolute; inset: auto 0 var(--nav-height); height: min(52dvh, 480px); border: 1px solid #8a794e; border-radius: 8px 8px 0 0; background: #102018f5; z-index: 5; }
 .app-shell[data-page="log"] .game-layout { display: none; }
@@ -3215,3 +3215,21 @@ h2 {
 .wheel-odds .rare-wheel-prize { color: var(--prize-color); border-color: var(--prize-color); background: #241a15; }
 .rare-wheel-prize :is(.gear-art, .gem-art) { flex: none; width: 26px; height: 26px; }
 .lucky-wheel > span { font-size: 9px; width: 42px; }
+
+/* Chat opens above the combat controls; its text uses DOM nodes, never HTML. */
+.arena-chat.chat-open { width: calc(100% - 14px); max-width: 460px; z-index: 4; }
+.chat-open #chat-toggle b { transform: rotate(180deg); }
+#chat-body { padding: 8px; border: 1px solid #998052; border-top: 0; border-radius: 0 0 5px 5px; background: #091610f5; color: #e8e3cd; box-shadow: 0 3px 14px #0008; }
+.chat-heading { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+#chat-mode { flex: 1; color: #a5beaa; font-size: 10px; }
+#chat-close { width: 28px; height: 28px; padding: 2px; }
+#chat-messages { height: min(150px, 22dvh); overflow-y: auto; overscroll-behavior: contain; margin: 5px 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+#chat-messages p { margin: 3px 0; }
+#chat-messages b { color: #e7c47a; }
+#chat-messages .chat-bot b { color: #85c7b2; }
+#chat-messages .chat-system { color: #aed1ad; }
+#chat-form { display: flex; gap: 5px; margin: 0; }
+#chat-input { flex: 1; min-width: 0; width: 0; height: 36px; padding: 6px; font-size: 16px; }
+#chat-form button { flex: none; min-width: 48px; padding: 5px; }
+#chat-help { display: block; margin-top: 5px; font-size: 10px; color: #c7bd9d; }
+@media (max-height: 450px) { #chat-messages { height: 66px; } #chat-help { display: none; } }

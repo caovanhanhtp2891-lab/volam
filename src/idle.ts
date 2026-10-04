@@ -122,7 +122,6 @@ export interface IdleProgress {
   autoEquip: boolean;
   autoAttributes: boolean;
   autoSkillPoints: boolean;
-  speed: 1 | 1.5 | 2.5;
   attributePoints: number;
   attributes: Record<Attribute, number>;
   dailyClaim: string;
@@ -151,7 +150,6 @@ export function normalizeIdle(value?: Partial<IdleProgress>, legacy = false): Id
     autoEquip: bool("autoEquip", true),
     autoAttributes: bool("autoAttributes", false),
     autoSkillPoints: bool("autoSkillPoints", false),
-    speed: source.speed === 1.5 || source.speed === 2.5 ? source.speed : 1,
     attributePoints: integer(source.attributePoints, 0, 0, 1e5),
     attributes: Object.fromEntries(
       Object.keys(ATTRIBUTES).map((key) => [key, integer(source.attributes?.[key as Attribute], 0, 0, 1e5)]),
@@ -216,14 +214,13 @@ export function spendAttribute(progress: IdleProgress, attribute: Attribute, del
   }
   return true;
 }
-export function dailyDate(now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
+const dailyFormatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
-}
+  });
+export function dailyDate(now = new Date()): string { return dailyFormatter.format(now); }
 export function claimDaily(
   progress: IdleProgress,
   today = dailyDate(),

@@ -40,6 +40,7 @@ interface Session {
   axisX: number;
   axisY: number;
   inputSequence: number;
+  lastChatAt: number;
 }
 
 interface ProtocolMessage {
@@ -161,6 +162,7 @@ function createGuest(name: string, resumeToken: string | null): { sessionToken: 
         axisX: 0,
         axisY: 0,
         inputSequence: 0,
+        lastChatAt: 0,
       };
       sessions.set(tokenHash, session);
       return { sessionToken: resumeToken, accountId: session.accountId, characterId: session.characterId };
@@ -182,7 +184,7 @@ function createGuest(name: string, resumeToken: string | null): { sessionToken: 
   };
   const sessionToken = randomBytes(32).toString("base64url");
   const tokenHash = hashToken(sessionToken);
-  sessions.set(tokenHash, { tokenHash, accountId, characterId, expiresAt: Date.now() + SESSION_TTL_MS, socket: null, axisX: 0, axisY: 0, inputSequence: 0 });
+  sessions.set(tokenHash, { tokenHash, accountId, characterId, expiresAt: Date.now() + SESSION_TTL_MS, socket: null, axisX: 0, axisY: 0, inputSequence: 0, lastChatAt: 0 });
   store.sessions[tokenHash] = { accountId, characterId };
   storeDirty = true;
   return { sessionToken, accountId, characterId };
@@ -222,6 +224,21 @@ function handleMessage(session: Session, raw: RawData): void {
   }
   if (message.protocolVersion !== 1 || typeof message.type !== "string") return rejectCommand(session.socket!, message.requestId, "invalid-protocol");
   const payload = message.payload ?? {};
+  if (message.type === "chat.send") {
+    const text = typeof payload.text === "string" ? payload.text.trim() : "";
+    const character = characterForSession(session);
+    if (!character || !text || text.length > 160 || /[\u0000-\u001f\u007f]/.test(text) || text.startsWith("/"))
+      return rejectCommand(session.socket!, message.requestId, "chat-invalid");
+    const now = Date.now();
+    if (now - session.lastChatAt < 1000)
+      return rejectCommand(session.socket!, message.requestId, "chat-rate-limit");
+    session.lastChatAt = now;
+    const chat = { id: randomUUID(), name: character.name, text, kind: "player", at: now };
+    for (const recipient of sessions.values()) {
+      if (recipient.socket && recipient.expiresAt > now) send(recipient.socket, "chat.message", chat);
+    }
+    return;
+  }
   if (message.type === "world.input") {
     const sequence = Number(payload.sequence);
     const axisX = clamp(Number(payload.axisX), -1, 1);

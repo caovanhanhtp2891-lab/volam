@@ -1,9 +1,10 @@
 import { RARITIES, RARITY_NAMES } from "./equipment";
 
+import { MAX_GEAR_GRADE } from "./level-limits";
 export function lootSettingsMarkup(): string {
   const grades = (all: boolean) =>
     Array.from(
-      { length: 16 },
+      { length: MAX_GEAR_GRADE },
       (_, i) =>
         `<option value="${i + 1}">${all && i === 0 ? "Mọi bậc · " : ""}Bậc ${i + 1} · cấp ${i * 10 + 1}–${i * 10 + 10}</option>`,
     ).join("");

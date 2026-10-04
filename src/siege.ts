@@ -1,3 +1,4 @@
+import { MAX_LEVEL, validExperienceBuff } from "./level-limits.ts";
 import { territoryOf, type TerritoryId } from "./military.ts";
 import type { Point } from "./combat.ts";
 
@@ -106,7 +107,7 @@ export function validSiegeProgress(value: unknown): boolean {
         ) &&
         integer(r.at, 0, 1e15) &&
         integer(r.silver, 0, 10000) &&
-        integer(r.xp, 0, 1120000) &&
+        integer(r.xp, 0, MAX_LEVEL * 7 * 1000) &&
         integer(r.stones, 0, 2),
     ) &&
     (!p.pending ||
@@ -155,9 +156,9 @@ export function settleSiege(
     !progress.pending ||
     progress.pending.id !== id ||
     progress.history.some((r) => r.id === id) ||
-    !integer(level, 1, 160) ||
+    !integer(level, 1, MAX_LEVEL) ||
     !integer(now, 0, 1e15) ||
-    ![1, 5, 10, 100, 1000].includes(xpMultiplier) ||
+    !validExperienceBuff(xpMultiplier) ||
     !["victory", "defeat", "retreat", "timeout", "interrupted"].includes(
       outcome,
     )

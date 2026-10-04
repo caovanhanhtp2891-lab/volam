@@ -5,6 +5,7 @@ import {
   type EquipmentData,
 } from "./equipment.ts";
 
+import { MAX_GEAR_GRADE } from "./level-limits.ts";
 export interface LootSettings {
   minRarity: number;
   minGrade: number;
@@ -33,13 +34,13 @@ export function validLootSettings(value: unknown): boolean {
     p.minRarity < RARITIES.length &&
     Number.isInteger(p.minGrade) &&
     p.minGrade >= 1 &&
-    p.minGrade <= 16 &&
+    p.minGrade <= MAX_GEAR_GRADE &&
     Number.isInteger(p.maxDiscardRarity) &&
     p.maxDiscardRarity >= 0 &&
     p.maxDiscardRarity < RARITIES.length &&
     Number.isInteger(p.maxDiscardGrade) &&
     p.maxDiscardGrade >= 1 &&
-    p.maxDiscardGrade <= 16 &&
+    p.maxDiscardGrade <= MAX_GEAR_GRADE &&
     typeof p.autoDiscard === "boolean" &&
     typeof p.weakerOnly === "boolean" &&
     (p.protectSpecial === undefined || typeof p.protectSpecial === "boolean")

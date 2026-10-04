@@ -14,6 +14,7 @@ async function seed(page, change) {
 async function tab(page, name) { await page.locator(`[data-idle-tab="${name}"]`).click(); }
 async function clock(page, delta) { await page.evaluate(delta => window.__now += delta, delta); await page.waitForTimeout(200); }
 async function killBandit(page) {
+  if (await page.locator("#world-panel-close").isVisible()) await page.locator("#world-panel-close").click();
   const before = await save(page);
   await page.waitForTimeout(250);
   const point = await page.evaluate(key => {
@@ -29,6 +30,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
 (async () => {
   const { TITLES, MAX_LEVEL, xpToNext, REBIRTH_BONUS } = await import("../src/character-progression.ts");
   const { SECTS } = await import("../src/sects.ts");
+  const { loadoutStats } = await import("../src/equipment.ts");
   const { offlineReward } = await import("../src/idle.ts");
   const school = SECTS["thien-vuong"];
   const browser = await chromium.launch({ executablePath: process.env.VOLAM_CHROMIUM_PATH || "/usr/bin/chromium", headless: true, args: ["--no-sandbox"] });
@@ -47,20 +49,20 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.27.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.28.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;
-    assert.equal(old.preferences.xpMultiplier, 1); assert.equal(old.journey.rebirths, 0); assert.equal(old.journey.activeTitle, "");
+    assert.equal(old.experienceBuff, 1); assert.equal(old.journey.rebirths, 0); assert.equal(old.journey.activeTitle, "");
     const oldCp = await page.locator('#header-combat-power').textContent(); await page.reload({ waitUntil: 'networkidle' }); assert.equal(await page.locator('#header-combat-power').textContent(), oldCp);
     console.log("PASS old saves receive safe settings and journey defaults without altering strength or equipping a title");
 
-    for (const rate of [1,5,10,100,1000]) {
+    for (const rate of [1,5,7,10,100,1000]) {
       await seed(page, s => {
         Object.assign(s.player, { level: 100, xp: 0, attack: 10000, defense: 10000, x: 560, y: 330, questKills: 0, bossDefeated: false, questRewardClaimed: false });
         Object.assign(s.player.idle, { enabled: false, inTown: false, autoSkills: false, autoLoot: false, autoEquip: false }); s.groundLoot = []; s.campfires = []; delete s.wildElite;
       });
-      await tab(page,'more'); await page.locator('#xp-multiplier').selectOption(String(rate)); assert.equal((await read(page)).player.preferences.xpMultiplier, rate);
+      await tab(page,'log'); if (await page.locator('#world-panel-close').isVisible()) await page.locator('#world-panel-close').click(); await page.locator('#chat-toggle').click(); await page.locator('#chat-input').fill(`/kn ${rate}`); await page.locator('#chat-input').press('Enter'); await page.locator('#chat-close').click(); assert.equal((await read(page)).player.experienceBuff, rate);
       await tab(page,'log'); const killed = await killBandit(page); assert.equal(killed.player.xp, 58 * rate);
       await seed(page, s => {
         s.player.xp = 0; s.player.idle.inTown = false;
@@ -71,28 +73,28 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
       const reward = offlineReward(await page.evaluate(() => Date.now() - 60000), await page.evaluate(() => Date.now()), 1);
       assert.equal((await read(page)).player.xp, reward.xp * rate);
     }
-    await page.reload({ waitUntil:'networkidle' }); await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').inputValue(),'1000');
-    console.log("PASS all five settings multiply real normal-kill, campfire and offline XP exactly and survive reload");
+    await page.reload({ waitUntil:'networkidle' }); assert.equal((await read(page)).player.experienceBuff,1000);
+    console.log("PASS all six chat multipliers multiply real normal-kill, campfire and offline XP exactly and survive reload");
 
     await seed(page, s => {
       Object.assign(s.player, { level: 100, xp: 0, x: 560, y: 330, questKills: 4, bossDefeated: true, questRewardClaimed: false });
-      s.player.preferences.xpMultiplier = 10; s.player.idle.enabled = false; s.player.idle.inTown = false; s.groundLoot=[]; s.campfires=[]; delete s.wildElite;
+      s.player.experienceBuff = 10; s.player.idle.enabled = false; s.player.idle.inTown = false; s.groundLoot=[]; s.campfires=[]; delete s.wildElite;
     });
     await tab(page,'log'); const quest = await killBandit(page); assert.equal(quest.player.xp, 1580); assert.equal(quest.player.questRewardClaimed,true);
-    await seed(page, s => { s.player.level = 159; s.player.xp = xpToNext(159) - 1; s.player.questRewardClaimed = true; s.player.journey.kills=99; s.groundLoot=[]; s.campfires=[]; delete s.wildElite; });
+    await seed(page, s => { s.player.level = 199; s.player.xp = xpToNext(199) - 1; s.player.questRewardClaimed = true; s.player.journey.kills=99; s.groundLoot=[]; s.campfires=[]; delete s.wildElite; });
     const skillPoints = (await read(page)).player.skillPoints, attributes = (await read(page)).player.idle.attributePoints;
-    const capped = await killBandit(page); assert.equal(capped.player.level,160); assert.equal(capped.player.xp,0);
+    const capped = await killBandit(page); assert.equal(capped.player.level,200); assert.equal(capped.player.xp,0);
     assert.equal(capped.player.skillPoints,skillPoints+1); assert.equal(capped.player.idle.attributePoints,attributes+5);
     assert.ok(capped.player.journey.unlockedTitles.includes('grandmaster')); assert.ok(capped.player.journey.unlockedTitles.includes('hunter'));
     await page.waitForFunction(()=>document.querySelector('#xp-label').textContent.includes('MAX'));
     assert.match(await page.locator('#xp-label').textContent(), /MAX/); assert.equal(await page.locator('#xp-bar').evaluate(el=>el.style.width),'100%');
-    console.log("PASS quest XP uses the multiplier; cap 160 discards overflow, grants level points once and opens earned titles");
+    console.log("PASS quest XP uses the multiplier; cap 200 discards overflow, grants level points once and opens earned titles");
 
     await seed(page, s => {
       s.player.idle.inTown=true; s.player.idle.enabled=true; s.player.idle.maxStage=120;
       s.player.inventory=[gear('keep-bag')]; s.player.equipment={ weapon:gear('keep-weapon','weapon',10) }; s.player.pendingItems=[gear('keep-pending','armor')];
       s.player.skillRanks={skill1:10,skill2:5,ultimate:3}; s.player.gold=1234; s.player.refiningStones=45;
-      s.player.attack=school.baseAttack+159*3; s.player.defense=school.baseDefense+159*2;
+      s.player.attack=school.baseAttack+199*3; s.player.defense=school.baseDefense+199*2;
       s.groundLoot=[{id:'keep-ground',x:300,y:300,item:gear('keep-ground-item','boots'),gold:15,stones:2}];
     });
     await tab(page,'char'); await page.locator('#rebirth-btn').click();
@@ -104,8 +106,9 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     assert.deepEqual(reborn.skillRanks,before.skillRanks); assert.equal(reborn.skillPoints,before.skillPoints); assert.deepEqual(reborn.idle.attributes,before.idle.attributes); assert.equal(reborn.idle.attributePoints,before.idle.attributePoints);
     assert.deepEqual(reborn.equipment,before.equipment); assert.ok(reborn.inventory.some(i=>i.id==='keep-ground-item')); assert.equal(reborn.pendingItems[0].id,'keep-pending');
     assert.equal(reborn.gold,before.gold+15); assert.equal(reborn.refiningStones,before.refiningStones+2); assert.ok(reborn.journey.unlockedTitles.includes('reborn'));
-    const backup = await page.evaluate(key=>JSON.parse(localStorage.getItem(`${key}-backup`)),key); assert.equal(backup.player.level,160); assert.equal(backup.player.journey.rebirths,0);
-    assert.equal(await stat(page,'Công kích'),(school.baseAttack + 30 + reborn.idle.attributes.strength*2 + REBIRTH_BONUS.attack)*100);
+    const backup = await page.evaluate(key=>JSON.parse(localStorage.getItem(`${key}-backup`)),key); assert.equal(backup.player.level,200); assert.equal(backup.player.journey.rebirths,0);
+    const gearAttack = loadoutStats(Object.values(reborn.equipment), 'kim').attack;
+    assert.equal(await stat(page,'Công kích'),(school.baseAttack + gearAttack + reborn.idle.attributes.strength*2 + REBIRTH_BONUS.attack)*100);
     const cp = await page.locator('#header-combat-power').textContent(); await page.reload({waitUntil:'networkidle'}); assert.equal(await page.locator('#header-combat-power').textContent(),cp);
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.equal(await page.locator('#confirm-rebirth').isDisabled(),true); await page.locator('#utility-close').click();
     console.log("PASS rebirth preview/cancel, replay guard, permanent stats, backup, loot recovery, possessions and stage unlocks survive reload");
@@ -142,34 +145,34 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
       assert.equal(await page.evaluate(()=>window.__damageLabels>0),visible);
     }
     console.log("PASS damage-number setting changes actual combat rendering while kills and XP continue");
-    await seed(page,s=>{s.player.level=160;s.player.attack=school.baseAttack+159*3;s.player.defense=school.baseDefense+159*2;s.player.idle.inTown=true;s.player.inventory=Array.from({length:60},(_,i)=>gear(`full-${i}`));s.groundLoot=[{id:'full-ground',x:300,y:300,item:gear('full-ground-item','boots'),gold:0,stones:0}];});
+    await seed(page,s=>{s.player.level=200;s.player.attack=school.baseAttack+199*3;s.player.defense=school.baseDefense+199*2;s.player.idle.inTown=true;s.player.inventory=Array.from({length:60},(_,i)=>gear(`full-${i}`));s.groundLoot=[{id:'full-ground',x:300,y:300,item:gear('full-ground-item','boots'),gold:0,stones:0}];});
     await tab(page,'char'); await page.locator('#rebirth-btn').click();
     await page.evaluate(()=>{window.__setItem=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key.endsWith('-backup'))throw Error('test quota');return window.__setItem.call(this,key,value);};});
-    await page.locator('#confirm-rebirth').click(); assert.equal((await read(page)).player.level,160); assert.equal((await read(page)).player.journey.rebirths,1);
+    await page.locator('#confirm-rebirth').click(); assert.equal((await read(page)).player.level,200); assert.equal((await read(page)).player.journey.rebirths,1);
     await page.evaluate(()=>Storage.prototype.setItem=window.__setItem); await page.locator('#confirm-rebirth').click();
     assert.equal((await read(page)).player.journey.rebirths,2); assert.equal((await read(page)).player.level,1);
     assert.equal((await read(page)).player.inventory.length,60); assert.ok((await read(page)).player.pendingItems.some(item=>item.id==='full-ground-item'));
-    assert.equal(await stat(page,'Công kích'),(school.baseAttack+30+reborn.idle.attributes.strength*2+REBIRTH_BONUS.attack*2)*100);
+    assert.equal(await stat(page,'Công kích'),(school.baseAttack+gearAttack+reborn.idle.attributes.strength*2+REBIRTH_BONUS.attack*2)*100);
     console.log("PASS failed backup leaves the old character intact; a second valid rebirth adds exactly one further bonus set");
 
-    await seed(page,s=>{s.player.level=100;s.player.xp=0;s.player.preferences.xpMultiplier=5;s.player.attack=100000;s.player.defense=10000;s.player.idle.inTown=true;s.player.idle.autoLoot=false;s.player.goldenClears=[];});
+    await seed(page,s=>{s.player.level=100;s.player.xp=0;s.player.experienceBuff=5;s.player.attack=100000;s.player.defense=10000;s.player.idle.inTown=true;s.player.idle.autoLoot=false;s.player.goldenClears=[];});
     await tab(page,'inv'); await page.locator('[data-tab="dungeon"]').click(); await page.locator('[data-dungeon-action="enter"][data-dungeon-id="tomb"]').click();
-    await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').isDisabled(),true); assert.equal(await page.locator('#skill-effects-quality').isDisabled(),true);
+    await tab(page,'more'); assert.equal(await page.locator('#xp-multiplier').count(),0); assert.equal(await page.locator('#skill-effects-quality').isDisabled(),true);
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.match(await page.locator('#rebirth-blocked').textContent(),/Rời trận hiện tại trước khi trùng sinh/); await page.locator('#utility-close').click();
     await page.locator('#titles-btn').click(); assert.equal(await page.locator('[data-wear-title="novice"]').isDisabled(),true); await page.locator('#utility-close').click();
-    await tab(page,'log'); await page.locator('#mobile-auto').click();
+    await tab(page,'log'); if (await page.locator('#world-panel-close').isVisible()) await page.locator('#world-panel-close').click(); await page.locator('#mobile-auto').click();
     await tab(page,'inv'); await page.locator('[data-tab="dungeon"]').click();
     await page.waitForSelector('[data-dungeon-action="claim"]',{timeout:45000});
     const xpBeforeClaim=Number((await page.locator('#xp-label').textContent()).split(' / ')[0].replace(/\./g,''));
     await page.locator('[data-dungeon-action="claim"]').click(); assert.equal((await read(page)).player.xp,xpBeforeClaim+320*5);
     console.log("PASS dungeon reward uses x5 and unsaved encounters block preference, title and rebirth transactions");
 
-    await seed(page,s=>{s.player.idle.inTown=true;s.player.xp=0;s.player.preferences.xpMultiplier=10;s.player.gold=100;s.player.goldenClears=[];s.groundLoot=[];s.campfires=[];});
+    await seed(page,s=>{s.player.idle.inTown=true;s.player.xp=0;s.player.experienceBuff=10;s.player.gold=100;s.player.goldenClears=[];s.groundLoot=[];s.campfires=[];});
     await page.evaluate(()=>window.__now=Date.parse('2026-10-03T12:00:00+07:00'));
     await tab(page,'log'); if (!(await page.locator('.game-layout').isVisible())) await tab(page,'log'); await page.locator('#golden-boss-btn').click(); await page.locator('#golden-enter').click();
     await tab(page,'char'); await page.locator('#rebirth-btn').click(); assert.match(await page.locator('#rebirth-blocked').textContent(),/Hoàng Kim/); await page.locator('#utility-close').click();
     await page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).player.goldenClears.length>0,key,{timeout:12000});
-    assert.equal((await read(page)).player.xp,900*10); assert.ok((await read(page)).player.journey.unlockedTitles.includes('golden')); await tab(page,'log'); await page.locator('#town-btn').click();
+    assert.equal((await read(page)).player.xp,900*10); assert.ok((await read(page)).player.journey.unlockedTitles.includes('golden')); await tab(page,'log'); if (await page.locator('#world-panel-close').isVisible()) await page.locator('#world-panel-close').click(); await page.locator('#town-btn').click();
     console.log("PASS Golden boss reward uses x10, opens its title and prevents rebirth during the encounter");
 
     for (const [width,height] of [[320,568],[360,640],[390,844],[430,932],[844,390],[1280,900]]) {

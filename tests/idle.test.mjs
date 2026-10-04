@@ -45,7 +45,7 @@ test("invalid saved progression cannot unlock regions, create negative points or
   assert.equal(progress.stage, 1);
   assert.equal(progress.maxStage, 1);
   assert.equal(progress.wave, 4);
-  assert.equal(progress.speed, 1);
+  assert.equal("speed" in progress, false);
   assert.equal(progress.attributePoints, 0);
   assert.equal(progress.attributes.strength, 0);
   assert.equal(progress.attributes.dexterity, 0);

@@ -5,6 +5,8 @@ import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
 import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
+import { MAX_GEAR_GRADE, normalizeExperienceBuff, validExperienceBuff } from "./level-limits";
+import { appendChat, parseChatInput, type ChatMessage } from "./chat";
 import { installFixedViewport } from "./fixed-viewport";
 import { queueWorldKill, currentWorldAnnouncement, worldKillText, type WorldAnnouncement } from "./world-announcements";
 installFixedViewport();
@@ -111,7 +113,7 @@ import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSki
 import { drawSectEffect, drawSkillFlight, drawSkillReach, skillIconMarkup } from "./sect-effects";
 import { SKILL_PALETTES } from "./skill-art";
 import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
-import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, TITLE_RARITIES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
+import { MAX_LEVEL, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, TITLE_RARITIES, titleProgress, unlockTitles, wornTitle, progressionBonuses, type GamePreferences, type Journey } from "./character-progression";
 import { drawTitleEffect } from "./title-art";
 import { drawMilitaryDragons } from "./military-vfx";
 import { realmStyle, titleStyle, militaryStyle, prestigeWidth, fitPrestigeLabel, placePrestigeLabels, drawPrestigeLabel, type PrestigeLabel } from "./prestige-art";
@@ -199,6 +201,7 @@ interface Player {
   goldenClears: string[];
   eliteHunt: EliteHunt;
   preferences: GamePreferences;
+  experienceBuff: number;
   journey: Journey;
   military: MilitaryProgress;
   lucky: LuckyProgress;
@@ -442,6 +445,8 @@ let SAVE_KEY = slotKey(activeSlot);
 let idlePage = "log";
 let idleNextWave = 0;
 let lastAutoSave = 0;
+let progressSavePending = false;
+let nextProgressSaveAt = 0;
 let lastAutoAction = 0;
 let lastLootMaintenance = 0;
 let botSafeUntil = 0;
@@ -537,7 +542,7 @@ const joystickKnob = document.querySelector<HTMLDivElement>("#joystick-knob")!;
 const mobilePickup =
   document.querySelector<HTMLButtonElement>("#mobile-pickup")!;
 const mobileAuto = document.querySelector<HTMLButtonElement>("#mobile-auto")!;
-const arenaLogText = document.querySelector<HTMLElement>("#arena-log-text")!;
+
 const inventoryPanel = document.querySelector<HTMLElement>(".inventory-panel")!;
 const mobileSheetBackdrop = document.querySelector<HTMLDivElement>(
   "#mobile-sheet-backdrop",
@@ -588,6 +593,8 @@ const onlineClient = new OnlineClient({
       addLog(`Online: ${detail}`);
     }
   },
+  onChat: receiveChat,
+  onChatError: code => addChatSystem(code === "chat-rate-limit" ? "Chờ một giây trước khi gửi tin online tiếp." : "Máy chủ chưa nhận được tin nhắn. Hãy thử lại."),
   onSnapshot: (snapshot: OnlineSnapshot) => {
     if (!game) return;
     game.onlinePlayers = snapshot.players.filter(
@@ -663,12 +670,13 @@ const randomBetween = (min: number, max: number) =>
   Math.random() * (max - min) + min;
 const randomInt = (min: number, max: number) =>
   Math.floor(randomBetween(min, max + 1));
-const formatNumber = (value: number) =>
-  Math.floor(value).toLocaleString("vi-VN");
+const numberFormatter = new Intl.NumberFormat("vi-VN");
+const compactFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
+const formatNumber = (value: number) => numberFormatter.format(Math.floor(value));
 const compactNumber = (value: number) => {
   const units: [number, string][] = [[1e12, "nghìn tỷ"], [1e9, "tỷ"], [1e6, "tr"], [1e3, "K"]];
   const unit = units.find(([min]) => value >= min);
-  return unit ? `${(value / unit[0]).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} ${unit[1]}` : formatNumber(value);
+  return unit ? `${compactFormatter.format(value / unit[0])} ${unit[1]}` : formatNumber(value);
 };
 const nowMs = () => performance.now();
 
@@ -957,6 +965,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     goldenClears: [],
     eliteHunt: normalizeEliteHunt(undefined),
     preferences: normalizePreferences(),
+    experienceBuff: 1,
     journey: normalizeJourney(),
     military: freshMilitary(),
     lucky: freshLuckyProgress(), botSettings: freshBotSettings(), lootSettings: freshLootSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(), companions: freshCompanions(),
@@ -1279,8 +1288,13 @@ function refreshMountUi(): void {
   document.getElementById("game-canvas")!.dataset.mounted = String(mounted);
 }
 
+let statsOwner: Player | undefined;
+let cachedGear: GearStats | undefined, cachedCharacter: GearStats | undefined;
+function invalidateStats(): void { cachedGear = undefined; cachedCharacter = undefined; statsOwner = game?.player; }
+function ensureStatsOwner(): void { if (statsOwner !== game?.player) invalidateStats(); }
 function equipmentBonuses(): GearStats {
-  return loadoutStats(
+  ensureStatsOwner();
+  return cachedGear ??= loadoutStats(
     game ? Object.values(game.player.equipment) : [],
     game ? factionOf(game.player.factionId).element : undefined,
   );
@@ -1289,9 +1303,11 @@ function equipmentAttack(): number { return equipmentBonuses().attack; }
 function equipmentDefense(): number { return equipmentBonuses().defense; }
 function characterBonuses(): GearStats {
   if (!game) return emptyStats();
+  ensureStatsOwner();
+  if (cachedCharacter) return cachedCharacter;
   const stats = progressionBonuses(game.player.journey), seal = militaryBonuses(game.player.military), bond = companionBonuses(game.player.companions), passive = passiveBonuses(game.player.passiveRanks, playerSect(game.player).id);
   for (const key of Object.keys(stats) as GearStat[]) stats[key] += seal[key] + bond[key] + passive[key];
-  return stats;
+  return cachedCharacter = stats;
 }
 function combinedStats(gear = equipmentBonuses(), bonus = characterBonuses()): GearStats {
   return Object.fromEntries((Object.keys(STAT_LABELS) as GearStat[]).map(key => [key, gear[key] + bonus[key]])) as GearStats;
@@ -1476,7 +1492,7 @@ function makeTerritoryEnemies(id: TerritoryId, wave: number): Enemy[] {
   const positions = wave === 2 ? [[950, 420]] : [[840, 540], [1060, 570], [950, 420]];
   return positions.map(([x, y], index) => {
     const kind = wave === 2 ? "boss" : wave === 1 && index === 0 ? "elite" : "normal";
-    const enemy = createEnemy(`territory-${id}-${wave}-${index}`, `${land.name} · ${kind === "boss" ? "Thống lĩnh" : kind === "elite" ? "Phó tướng" : wave === 0 ? "Tiền quân" : "Cấm vệ"}`, kind, x, y, Math.min(160, land.level + wave), land.color);
+    const enemy = createEnemy(`territory-${id}-${wave}-${index}`, `${land.name} · ${kind === "boss" ? "Thống lĩnh" : kind === "elite" ? "Phó tướng" : wave === 0 ? "Tiền quân" : "Cấm vệ"}`, kind, x, y, Math.min(MAX_LEVEL, land.level + wave), land.color);
     enemy.element = (["kim", "moc", "thuy", "hoa", "tho"] as const)[TERRITORIES.indexOf(land) % 5];
     return enemy;
   });
@@ -2594,7 +2610,7 @@ function leaveTerritory(message = "Đã rút quân. Thành chưa chiếm không 
   collectIdleLoot(true);
   const encounter = game.territoryEncounter;
   const awardLevel = game.player.level;
-  const record = encounter.siege ? settleSiege(game.player.sieges, encounter.siege.id, outcome, awardLevel, Date.now(), game.player.preferences.xpMultiplier) : null;
+  const record = encounter.siege ? settleSiege(game.player.sieges, encounter.siege.id, outcome, awardLevel, Date.now(), game.player.experienceBuff) : null;
   game.botContext = ""; game.botHits = []; game.bots = [];
   game.territoryEncounter = undefined; game.mapMode = "world";
   game.enemies = encounter.enemies; game.loot = encounter.loot;
@@ -2979,6 +2995,7 @@ function collectPendingItems(): void {
 
 function syncStats(fullHeal = false): void {
   if (!game) return;
+  invalidateStats();
   const player = game.player;
   const sect = playerSect(player);
   const oldMaxHp = player.maxHp;
@@ -3344,9 +3361,9 @@ function castSkill(key: SkillKey, automatic = false): void {
 function rewardExperience(base: number): number {
   if (!game) return 0;
   const player = game.player;
-  const { amount, levels } = applyExperience(player, base, player.preferences.xpMultiplier);
+  const { amount, levels } = applyExperience(player, base, player.experienceBuff);
   player.journey.highestLevel = Math.max(player.journey.highestLevel, player.level);
-  if (amount) addFloatingText(player.x, player.y - 35, `+${formatNumber(amount)} XP${player.preferences.xpMultiplier > 1 ? ` · x${player.preferences.xpMultiplier}` : ""}`, "#a9e8a8", 13);
+  if (amount) addFloatingText(player.x, player.y - 35, `+${formatNumber(amount)} XP${player.experienceBuff > 1 ? ` · x${player.experienceBuff}` : ""}`, "#a9e8a8", 13);
   if (levels) {
     if (player.idle.autoAttributes) applyAttributeRecommendation(player.idle, player.factionId);
     if (player.idle.autoSkillPoints) applySkillRecommendation(player);
@@ -3362,7 +3379,7 @@ function rewardExperience(base: number): number {
       `Bạn đã đạt cấp ${player.level}. Chỉ số được tăng và hồi đầy sinh lực.`,
     );
     addLog(`Nhận ${levels} điểm võ học và ${levels * 5} điểm tiềm năng.`);
-    if (player.level === MAX_LEVEL) addLog("Đã đạt cấp 160! Mở Nhân vật → Trùng sinh để nhận chỉ số vĩnh viễn.");
+    if (player.level === MAX_LEVEL) addLog(`Đã đạt cấp ${MAX_LEVEL}! Mở Nhân vật → Trùng sinh để nhận chỉ số vĩnh viễn.`);
     if (player.level >= 3 && player.skillRanks.skill2 === 0) {
       player.skillRanks.skill2 = 1;
       addLog(`Đã mở ${playerSect(player).skills[1]} — nhấn phím 2.`);
@@ -3487,16 +3504,16 @@ function killEnemy(enemy: Enemy): void {
     addLog(
       `Đã thu hồi đồ rơi cũ đạt bộ lọc vào túi/Đồ chờ nhận${overflow.length > accepted.length ? `; bỏ ${overflow.length - accepted.length} món dưới bộ lọc` : ""}.`,
     );
-    persistGame();
+    requestProgressSave();
   }
   if (enemy.kind === "elite") {
     game.campfires = game.campfires.filter(fire => fire.expiresAt > Date.now());
     game.campfires.push(createCampfire(`camp-${enemy.id}-${Date.now()}`, huntArea(), enemy.x, enemy.y, enemy.level, Date.now()));
     game.campfires = game.campfires.slice(-MAX_CAMPFIRES);
-    addLog(`Hạ tinh anh! Lửa trại cháy 90 giây. Ở trong vòng sáng nhận ${campfireXp(enemy.level) * player.preferences.xpMultiplier} XP mỗi 3 giây.`);
+    addLog(`Hạ tinh anh! Lửa trại cháy 90 giây. Ở trong vòng sáng nhận ${campfireXp(enemy.level) * player.experienceBuff} XP mỗi 3 giây.`);
   }
   if (huntEligible && recordNormalKill(game.player.eliteHunt, game.enemies.some(other => !other.dead && other.wildElite))) spawnWildElite(enemy);
-  if (huntEligible || enemy.kind === "elite") persistGame();
+  if (huntEligible || enemy.kind === "elite") requestProgressSave();
 }
 
 function damagePlayer(amount: number, source: string, pkKiller?: string): void {
@@ -3698,7 +3715,7 @@ function spawnWildElite(source: Enemy): void {
     const nx = source.x + Math.cos(angle) * 65, ny = source.y + Math.sin(angle) * 65;
     if (!isBlocked(nx, ny, radius)) { x = nx; y = ny; break; }
   }
-  const elite = createEnemy(`wild-elite-${Date.now()}-${game.player.eliteHunt.spawned}`, `${source.name} tinh anh`, "elite", x, y, Math.min(160, source.level + 2), "#ffbf68");
+  const elite = createEnemy(`wild-elite-${Date.now()}-${game.player.eliteHunt.spawned}`, `${source.name} tinh anh`, "elite", x, y, Math.min(MAX_LEVEL, source.level + 2), "#ffbf68");
   elite.wildElite = true; elite.element = source.element; elite.monsterId = source.monsterId; elite.ranged = source.ranged;
   for (const enemy of game.enemies) if (enemy.wildElite && enemy.dead) game.combat.enemyMotions.delete(enemy.id);
   game.enemies = game.enemies.filter(enemy => !enemy.wildElite || !enemy.dead);
@@ -3717,7 +3734,7 @@ function refreshHuntUi(): void {
   if (!game) return;
   const fire = nearestCampfire(), hunt = game.player.eliteHunt;
   const elite = game.enemies.some(enemy => !enemy.dead && enemy.wildElite);
-  const message = fire ? `${nearCampfire(fire, game.player) ? "Đang hưởng" : "Lửa trại"}: +${game.player.level === MAX_LEVEL ? 0 : campfireXp(fire.level) * game.player.preferences.xpMultiplier} XP/3s · còn ${countdown(fire.expiresAt - Date.now())}` : elite ? "Tinh anh đã xuất hiện · Hạ quái để nhóm lửa trại." : hunt.normalKills < ELITE_MIN_KILLS ? `Quái thường ${hunt.normalKills}/${ELITE_MIN_KILLS} · Tích lũy cơ hội gặp tinh anh` : `Đã hạ ${hunt.normalKills} quái · Cơ hội lượt tới ${Math.round(eliteChance(hunt.normalKills + 1) * 100)}%`;
+  const message = fire ? `${nearCampfire(fire, game.player) ? "Đang hưởng" : "Lửa trại"}: +${game.player.level === MAX_LEVEL ? 0 : campfireXp(fire.level) * game.player.experienceBuff} XP/3s · còn ${countdown(fire.expiresAt - Date.now())}` : elite ? "Tinh anh đã xuất hiện · Hạ quái để nhóm lửa trại." : hunt.normalKills < ELITE_MIN_KILLS ? `Quái thường ${hunt.normalKills}/${ELITE_MIN_KILLS} · Tích lũy cơ hội gặp tinh anh` : `Đã hạ ${hunt.normalKills} quái · Cơ hội lượt tới ${Math.round(eliteChance(hunt.normalKills + 1) * 100)}%`;
   document.getElementById("elite-hunt-status")!.textContent = message;
   document.querySelector<HTMLButtonElement>("#campfire-btn")!.disabled = !fire;
 }
@@ -3746,6 +3763,108 @@ function enhanceItem(index: number, equippedSlot?: ItemSlot): void {
   if (item) openEnhancement(item);
 }
 
+const chatMessages: ChatMessage[] = [];
+let chatOwner: Player | undefined, chatSerial = 0, chatLastSendAt = -Infinity;
+let chatReply: { name: string; text: string; at: number } | undefined;
+function ensureChatOwner(): void {
+  if (chatOwner === game?.player) return;
+  chatOwner = game?.player; chatMessages.length = 0; chatReply = undefined; chatLastSendAt = -Infinity;
+  document.getElementById("chat-messages")!.replaceChildren();
+  appendChat(chatMessages, { id: `welcome-${++chatSerial}`, name: "Hệ thống", text: "Chào mừng đến chat Giang hồ. Gõ /kn x để đặt buff XP (1–1000); /kn 1 trở lại bình thường.", kind: "system", at: Math.floor(Date.now()) });
+}
+function receiveChat(message: ChatMessage): void {
+  ensureChatOwner();
+  if (appendChat(chatMessages, message)) refreshChat();
+}
+function addChatSystem(text: string): void {
+  receiveChat({ id: `system-${++chatSerial}`, name: "Hệ thống", text, kind: "system", at: Math.floor(Date.now()) });
+}
+function refreshChat(): void {
+  ensureChatOwner();
+  const root = document.getElementById("chat-messages")!, preview = document.getElementById("chat-preview")!;
+  const last = chatMessages.at(-1);
+  const summary = last ? `[${last.name}] ${last.text}` : "[Chat] Chạm để trò chuyện · /kn x";
+  if (preview.textContent !== summary) preview.textContent = summary;
+  const mode = document.getElementById("chat-mode")!;
+  const status = onlineClient.getStatus() === "online" ? "Thế giới · Online" : "Chat cục bộ · BOT";
+  if (mode.textContent !== status) mode.textContent = status;
+  if (root.dataset.lastMessage === last?.id) return;
+  const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 40;
+  const existing = new Set(Array.from(root.children, child => (child as HTMLElement).dataset.id));
+  for (const message of chatMessages) {
+    if (existing.has(message.id)) continue;
+    const row = document.createElement("p"), name = document.createElement("b"), body = document.createElement("span");
+    row.className = `chat-message chat-${message.kind}`; row.dataset.id = message.id;
+    name.textContent = `${message.name}${message.kind === "bot" ? " · BOT" : ""}: `;
+    body.textContent = message.text; row.append(name, body); root.append(row);
+  }
+  while (root.children.length > chatMessages.length) root.firstElementChild!.remove();
+  root.dataset.lastMessage = last?.id ?? "";
+  if (nearBottom) root.scrollTop = root.scrollHeight;
+}
+function toggleChat(open = document.getElementById("chat-toggle")!.getAttribute("aria-expanded") !== "true"): void {
+  const button = document.getElementById("chat-toggle")!;
+  button.setAttribute("aria-expanded", String(open)); button.querySelector("b")!.textContent = open ? "⌄" : "⌃";
+  document.getElementById("chat-body")!.classList.toggle("hidden", !open);
+  document.getElementById("mobile-chat")!.classList.toggle("chat-open", open);
+  refreshChat();
+  if (!open) document.querySelector<HTMLInputElement>("#chat-input")!.blur();
+  if (open) {
+    keys.clear(); resetJoystick();
+    document.getElementById("chat-messages")!.scrollTop = document.getElementById("chat-messages")!.scrollHeight;
+    document.querySelector<HTMLInputElement>("#chat-input")!.focus({ preventScroll: true });
+  }
+}
+function persistExperienceBuff(): boolean {
+  if (!game) return false;
+  if (game.mapMode === "world") return persistGame();
+  // Keep the pre-encounter world save intact, updating only the chat setting.
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null");
+    if (!snapshot?.player || snapshot.player.name !== game.player.name || snapshot.player.factionId !== game.player.factionId) throw new Error("chat-save-invalid");
+    snapshot.player.experienceBuff = game.player.experienceBuff;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
+    return true;
+  } catch { return false; }
+}
+function submitChat(): void {
+  if (!game) return addChatSystem("Hãy gia nhập môn phái trước khi trò chuyện.");
+  const input = document.querySelector<HTMLInputElement>("#chat-input")!, command = parseChatInput(input.value);
+  if (command.kind === "error") return addChatSystem(command.text);
+  if (command.kind === "experience") {
+    const previous = game.player.experienceBuff;
+    game.player.experienceBuff = command.multiplier;
+    if (!persistExperienceBuff()) {
+      game.player.experienceBuff = previous;
+      return addChatSystem("Không lưu được buff XP. Hệ số trước đó vẫn được giữ; hãy kiểm tra dung lượng lưu trữ.");
+    }
+    input.value = "";
+    addChatSystem(command.multiplier === 1 ? "Đã tắt buff kinh nghiệm · XP bình thường." : `Đã bật x${command.multiplier} kinh nghiệm cho nhân vật. Mọi nguồn XP đều áp dụng.`);
+    refreshUi(true); return;
+  }
+  if (nowMs() - chatLastSendAt < 600) return addChatSystem("Chờ một chút trước khi gửi tin tiếp.");
+  chatLastSendAt = nowMs(); input.value = "";
+  if (onlineClient.sendChat(command.text)) return;
+  receiveChat({ id: `local-${++chatSerial}`, name: game.player.name, text: command.text, kind: "player", at: Math.floor(Date.now()) });
+  if (game.player.botSettings.enabled) {
+    const bot = game.bots.find(bot => bot.hp > 0) ?? { profile: BOT_TEMPLATES[1] };
+    chatReply = { name: bot.profile.name, text: game.player.idle.inTown ? "Nghỉ chân trong thành, sửa soạn trang bị rồi cùng lên đường nhé!" : "Ta đang hành tẩu gần đây. Cẩn thận quái tinh anh và cao thủ đồ sát!", at: nowMs() + 1500 };
+  }
+}
+function tickChat(now: number): void {
+  if (!chatReply || now < chatReply.at) return;
+  const reply = chatReply; chatReply = undefined;
+  if (!game?.player.botSettings.enabled || onlineClient.getStatus() === "online") return;
+  receiveChat({ id: `bot-chat-${++chatSerial}`, name: reply.name, text: reply.text, kind: "bot", at: Math.floor(Date.now()) });
+}
+function requestProgressSave(): void { if (game?.mapMode === "world") progressSavePending = true; }
+function flushProgressSave(now: number): void {
+  if (!progressSavePending || now < nextProgressSaveAt) return;
+  nextProgressSaveAt = now + 1000;
+  persistGame();
+}
+window.addEventListener("pagehide", () => { if (progressSavePending) persistGame(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden && progressSavePending) persistGame(); });
 function persistGame(): boolean {
   if (!game || game.mapMode !== "world") return false;
   updateTitles();
@@ -3772,6 +3891,7 @@ function persistGame(): boolean {
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot));
+    progressSavePending = false; nextProgressSaveAt = nowMs() + 1000;
     return true;
   } catch {
     showToast(
@@ -4390,7 +4510,7 @@ function update(dt: number, now: number): void {
     (floatingText) => now - floatingText.startedAt < floatingText.duration,
   );
   game.loot = game.loot.filter((loot) => loot.expiresAt > now);
-  const follow = 1 - Math.exp((-12 * dt) / player.idle.speed);
+  const follow = 1 - Math.exp(-12 * dt);
   game.cameraX +=
     (clamp(player.x - VIEW_WIDTH / 2, 0, WORLD_WIDTH - VIEW_WIDTH) -
       game.cameraX) *
@@ -4448,6 +4568,10 @@ function drawOutlinedText(text: string, x: number, y: number): void {
   ctx.restore();
 }
 
+function inWorldView(point: { x: number; y: number }, margin = 180): boolean {
+  return Boolean(game && point.x >= game.cameraX - margin && point.x <= game.cameraX + VIEW_WIDTH + margin && point.y >= game.cameraY - margin && point.y <= game.cameraY + VIEW_HEIGHT + margin);
+}
+const groundEffects = new Set(["burst", "heal", "shield"]);
 function drawWorld(now: number): void {
   ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   if (!game) {
@@ -4524,15 +4648,15 @@ function drawWorld(now: number): void {
       const info = stageInfo(player.idle.stage);
       drawRegionWeather(ctx, info.region, now, game.cameraX, game.cameraY, VIEW_WIDTH, VIEW_HEIGHT, player.preferences.skillEffects === "simple");
     } else if (!game.goldenEncounter) drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
-    if (!playerIdleActive() && !game.goldenEncounter && !exploring()) for (const npc of NPCS) drawNpc(npc, now);
+    if (!playerIdleActive() && !game.goldenEncounter && !exploring()) for (const npc of NPCS) if (inWorldView(npc)) drawNpc(npc, now);
   }
 
   for (const fire of activeCampfires()) drawCampfire(fire, now);
   for (const zone of game.zones) drawSectEffect(ctx, { ...zone, kind: zone.kind as EffectMotif, quality: game.player.preferences.skillEffects }, ((now - zone.startedAt) % 1200) / 1200, true);
-  const groundEffects = new Set(["burst", "heal", "shield"]);
   for (const effect of game.effects)
     if (groundEffects.has(effect.kind)) drawSkillEffect(effect, now);
   for (const corpse of game.combat.corpses) {
+    if (!inWorldView(corpse.enemy)) continue;
     const t = (now - corpse.at) / 650;
     ctx.save();
     ctx.translate(corpse.enemy.x, corpse.enemy.y);
@@ -4551,12 +4675,12 @@ function drawWorld(now: number): void {
     )
       drawLoot(loot, now);
   const actors = [
-    ...(game.companion ? [{y:game.companion.y,draw:()=>drawCompanionActor(now)}] : []),
+    ...(game.companion && inWorldView(game.companion) ? [{y:game.companion.y,draw:()=>drawCompanionActor(now)}] : []),
     ...game.enemies
-      .filter((enemy) => !enemy.dead)
+      .filter((enemy) => !enemy.dead && inWorldView(enemy))
       .map((enemy) => ({ y: enemy.y, draw: () => drawEnemy(enemy, now) })),
-    ...game.bots.filter(b => b.hp > 0).map(bot => ({ y: bot.y, draw: () => drawBot(bot, now) })),
-    ...game.onlinePlayers.map((remote) => ({
+    ...game.bots.filter(b => b.hp > 0 && inWorldView(b)).map(bot => ({ y: bot.y, draw: () => drawBot(bot, now) })),
+    ...game.onlinePlayers.filter(remote => inWorldView(remote)).map((remote) => ({
       y: remote.y,
       draw: () => drawRemotePlayer(remote, now),
     })),
@@ -5228,7 +5352,7 @@ function refreshUi(force = false): void {
     document.querySelector("#header-combat-power")!.textContent = "⚔ 0";
     document.querySelector("#character-sect")!.textContent =
       "Chưa gia nhập môn phái";
-    arenaLogText.textContent = "[Hệ thống] Chọn môn phái để bắt đầu hành trình.";
+    refreshChat();
     mobileAuto.classList.remove("active");
     targetPanel.classList.remove("has-target");
     return;
@@ -5250,7 +5374,7 @@ function refreshUi(force = false): void {
   );
   const setText = (selector: string, value: string) => {
     const element = document.querySelector(selector);
-    if (element) element.textContent = value;
+    if (element && element.textContent !== value) element.textContent = value;
   };
   setText("#character-name", player.name);
   refreshIdleUi();
@@ -5258,7 +5382,7 @@ function refreshUi(force = false): void {
   setText("#level-label", `Cấp ${player.level}/${MAX_LEVEL} · Trùng sinh ${player.journey.rebirths}`);
   setText(
     "#xp-label",
-    player.level === MAX_LEVEL ? "MAX · Có thể trùng sinh" : `${formatNumber(player.xp)} / ${formatNumber(xpToNext(player.level))} XP${player.preferences.xpMultiplier > 1 ? ` · x${player.preferences.xpMultiplier}` : ""}`,
+    player.level === MAX_LEVEL ? "MAX · Có thể trùng sinh" : `${formatNumber(player.xp)} / ${formatNumber(xpToNext(player.level))} XP${player.experienceBuff > 1 ? ` · x${player.experienceBuff}` : ""}`,
   );
   setText(
     "#hp-label",
@@ -5281,7 +5405,8 @@ function refreshUi(force = false): void {
     "aria-label",
     game.autoBattle ? "Tắt tự động chiến đấu" : "Bật tự động chiến đấu",
   );
-  mobileAuto.innerHTML = `<span>⚔</span><small>${game.autoBattle ? "Tự động" : "Thủ công"}</small>`;
+  const autoLabel = game.autoBattle ? "Tự động" : "Thủ công";
+  if (mobileAuto.querySelector("small")?.textContent !== autoLabel) mobileAuto.innerHTML = `<span>⚔</span><small>${autoLabel}</small>`;
   setText(
     "#mobile-map-name",
     game.goldenEncounter ? "HOÀNG KIM" : game.mapMode === "world"
@@ -5358,7 +5483,7 @@ function refreshUi(force = false): void {
     if (bar) bar.style.width = width;
   }
   const statGrid = document.querySelector<HTMLDivElement>("#stat-grid")!;
-  statGrid.innerHTML = [
+  if (force || idlePage === "char") statGrid.innerHTML = [
     ["weapon", "Công kích", formatNumber(effectiveAttack()), "#7ecfff"],
     ["armor", "Phòng ngự", formatNumber(effectiveDefense()), "#d0c978"],
     ["pendant", "Sinh lực", formatNumber(player.maxHp), "#ff8b74"],
@@ -5374,35 +5499,38 @@ function refreshUi(force = false): void {
     .join("");
   if (target) {
     targetContent.classList.remove("target-empty");
-    const status =
-      target.kind === "boss"
-        ? "BOSS · CƠ CHẾ ĐANG HOẠT ĐỘNG"
-        : target.kind === "elite"
-          ? "TINH ANH"
-          : "ĐANG GIAO CHIẾN";
-    const ailmentTime = nowMs();
-    const ailments = [[target.burnUntil > ailmentTime, "Thiêu đốt"], [target.corrodedUntil > ailmentTime, "Ăn mòn giáp"], [target.poisonUntil > ailmentTime, "Trúng độc"], [target.frozenUntil > ailmentTime, "Đóng băng"]].filter(([active]) => active).map(([, label]) => label).join(" · ");
-    targetContent.innerHTML = `
-      <div class="target-heading"><div class="target-orb" style="--target-color:${target.color}"></div><div><strong>${escapeHtml(target.name)}</strong><span>${status} · Cấp ${target.level}</span></div></div>
-      <div class="target-hp-row"><span>HP</span><strong>${formatNumber(target.hp)} / ${formatNumber(target.maxHp)}</strong></div>
-      <div class="meter enemy-meter"><span style="width:${(target.hp / target.maxHp) * 100}%"></span></div>
-      ${ailments ? `<small class="target-ailments">${ailments}</small>` : ""}
-      <div class="target-meta"><span>Phòng ${formatNumber(enemyDefense(target))}</span><span>Khoảng cách ${Math.floor(distance(player, target))}</span></div>
-    `;
+    if (targetContent.dataset.target !== target.id) {
+      targetContent.dataset.target = target.id;
+      targetContent.innerHTML = `<div class="target-heading"><div class="target-orb"></div><div><strong></strong><span></span></div></div><div class="target-hp-row"><span>HP</span><strong></strong></div><div class="meter enemy-meter"><span></span></div><small class="target-ailments hidden"></small><div class="target-meta"><span></span><span></span></div>`;
+    }
+    const targetText = (selector: string, value: string) => { const e = targetContent.querySelector(selector)!; if (e.textContent !== value) e.textContent = value; };
+    targetText(".target-heading strong", target.name);
+    targetText(".target-heading span", `${target.kind === "boss" ? "BOSS · CƠ CHẾ ĐANG HOẠT ĐỘNG" : target.kind === "elite" ? "TINH ANH" : "ĐANG GIAO CHIẾN"} · Cấp ${target.level}`);
+    targetContent.querySelector<HTMLElement>(".target-orb")!.style.setProperty("--target-color", target.color);
+    targetText(".target-hp-row strong", `${formatNumber(target.hp)} / ${formatNumber(target.maxHp)}`);
+    targetContent.querySelector<HTMLElement>(".enemy-meter span")!.style.width = `${target.hp / target.maxHp * 100}%`;
+    const ailmentTime = nowMs(), ailments = [[target.burnUntil > ailmentTime, "Thiêu đốt"], [target.corrodedUntil > ailmentTime, "Ăn mòn"], [target.poisonUntil > ailmentTime, "Trúng độc"], [target.frozenUntil > ailmentTime, "Đóng băng"]].filter(([active]) => active).map(([, label]) => label).join(" · ");
+    targetText(".target-ailments", ailments); targetContent.querySelector(".target-ailments")!.classList.toggle("hidden", !ailments);
+    targetText(".target-meta span:first-child", `Phòng ${formatNumber(enemyDefense(target))}`);
+    targetText(".target-meta span:last-child", `Khoảng cách ${Math.floor(distance(player, target))}`);
     combatStatusText.textContent = `${target.name} · ${formatNumber(target.hp)} HP`;
   } else {
     targetContent.classList.add("target-empty");
-    targetContent.innerHTML = `<div class="target-empty">Click vào quái để chọn mục tiêu</div>`;
-    combatStatusText.textContent = "Chưa có mục tiêu";
+    if (targetContent.dataset.target !== "none") { targetContent.dataset.target = "none"; targetContent.innerHTML = `<div class="target-empty">Click vào quái để chọn mục tiêu</div>`; }
+    if (combatStatusText.textContent !== "Chưa có mục tiêu") combatStatusText.textContent = "Chưa có mục tiêu";
   }
   renderSkillBar();
-  renderInventory();
-  logList.innerHTML = game.logs
+  if (force || idlePage === "inventory") renderInventory();
+  const logKey = game.logs.join("\u0000");
+  if (logList.dataset.logKey !== logKey) {
+    logList.dataset.logKey = logKey;
+    logList.innerHTML = game.logs
     .map(
       (log) => `<div class="log-entry"><span>›</span>${escapeHtml(log)}</div>`,
     )
     .join("");
-  arenaLogText.textContent = `[Giang hồ] ${game.logs.at(-1) ?? "Chào mừng đến giang hồ."}`;
+  }
+  refreshChat();
 }
 
 function skillGlyphMarkup(skill: SkillKey, _sectId: string): string {
@@ -5816,7 +5944,7 @@ function collectIdleLoot(force = false, recover = force): void {
   storeRewardItems(game.player, items);
   if (game.player.idle.autoEquip) autoEquipBest();
   discardAutomaticLoot();
-  persistGame();
+  requestProgressSave();
 }
 function autoEquipBest(): number {
   if (!game) return 0;
@@ -5837,12 +5965,12 @@ function openDiscardFilter(): void {
   if (!game) return;
   if (game.mapMode !== "world") return showToast("Rời trận hiện tại trước khi vứt đồ.");
   discardPreview = null;
-  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đã cường hóa/khảm ngọc và Đồ chờ nhận. Chọn bậc và phẩm chất rồi xem danh sách trước khi xác nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Bậc trang bị tối đa<select id="discard-level">${Array.from({length:16}, (_,i) => `<option value="${(i+1)*10}" ${i+1 === Math.ceil(game!.player.level/10) ? "selected" : ""}>Bậc ${i+1} · cấp ${i*10+1}–${i*10+10}</option>`).join("")}</select></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label><label class="discard-check"><input id="discard-protected" type="checkbox" checked> Giữ đồ bộ và đồ Vàng/Cam/Đỏ</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
+  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đã cường hóa/khảm ngọc và Đồ chờ nhận. Chọn bậc và phẩm chất rồi xem danh sách trước khi xác nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Bậc trang bị tối đa<select id="discard-level">${Array.from({length:MAX_GEAR_GRADE}, (_,i) => `<option value="${(i+1)*10}" ${i+1 === Math.ceil(game!.player.level/10) ? "selected" : ""}>Bậc ${i+1} · cấp ${i*10+1}–${i*10+10}</option>`).join("")}</select></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label><label class="discard-check"><input id="discard-protected" type="checkbox" checked> Giữ đồ bộ và đồ Vàng/Cam/Đỏ</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
 }
 function previewDiscard(): void {
   if (!game) return;
   const maxLevel = Number(document.querySelector<HTMLInputElement>("#discard-level")!.value);
-  if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > 160) return showToast("Cấp trang bị phải từ 1 đến 160.");
+  if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > MAX_LEVEL) return showToast(`Cấp trang bị phải từ 1 đến ${MAX_LEVEL}.`);
   const filter = { maxRarity: Number(document.querySelector<HTMLSelectElement>("#discard-rarity")!.value), maxLevel, weakerOnly: document.querySelector<HTMLInputElement>("#discard-weaker")!.checked, protectSpecial: document.querySelector<HTMLInputElement>("#discard-protected")!.checked };
   const items = discardCandidates(game.player, filter);
   discardPreview = { filter, ids: new Set(items.map(item => item.id)) };
@@ -5890,7 +6018,7 @@ function enterGoldenBoss(): void {
   if (!status.active || status.defeated) return showToast("Boss chưa xuất hiện hoặc bạn đã nhận thưởng lượt này.");
   persistGame();
   game.goldenEncounter = { window: status.active, enemies: game.enemies, loot: game.loot, x: game.player.x, y: game.player.y, inTown: game.player.idle.inTown, autoBattle: game.autoBattle };
-  const enemy = createEnemy(`golden-${status.active.id}`, status.active.boss.name, "boss", 950, 490, Math.min(160, game.player.level + 2), itemColor("Hoàng Kim"));
+  const enemy = createEnemy(`golden-${status.active.id}`, status.active.boss.name, "boss", 950, 490, Math.min(MAX_LEVEL, game.player.level + 2), itemColor("Hoàng Kim"));
   enemy.element = status.active.boss.element;
   enemy.maxHp = Math.floor(enemy.maxHp * 1.8); enemy.hp = enemy.maxHp;
   enemy.attack = Math.floor(enemy.attack * 1.25);
@@ -6007,7 +6135,8 @@ function refreshIdleUi(): void {
   const faction = factionOf(player.factionId, player.sect),
     element = ELEMENTS[faction.element];
   const text = (id: string, value: string) => {
-    document.getElementById(id)!.textContent = value;
+    const node = document.getElementById(id)!;
+    if (node.textContent !== value) node.textContent = value;
   };
   text("idle-level", String(player.level));
   const battleStatus = document.querySelector(".territory-battle-status");
@@ -6077,8 +6206,7 @@ function refreshIdleUi(): void {
   text("title-count", `Đã mở ${player.journey.unlockedTitles.length}/${TITLES.length} · Chỉ cộng danh hiệu đang đeo`);
   text("rebirth-label", `Trùng sinh ${player.journey.rebirths} lần`);
   text("rebirth-status", player.level === MAX_LEVEL ? "Đã đủ cấp · Về cấp 1, nhận chỉ số vĩnh viễn" : `Cần cấp ${MAX_LEVEL} · Hiện tại ${player.level}`);
-  text("xp-buff-status", `Đang dùng x${player.preferences.xpMultiplier} XP${player.level === MAX_LEVEL ? " · Cấp đã tối đa" : ""}`);
-  document.querySelector<HTMLSelectElement>("#xp-multiplier")!.disabled = game.mapMode !== "world";
+
   document.querySelector<HTMLSelectElement>("#skill-effects-quality")!.disabled = game.mapMode !== "world";
   document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.disabled = game!.mapMode !== "world");
   document.querySelector(".mobile-map-card")!.classList.toggle("hidden", !player.preferences.minimap);
@@ -6226,10 +6354,6 @@ function hydrateSettings(): void {
     game.player.name;
   document.querySelector<HTMLSelectElement>("#settings-sex")!.value =
     game.player.sex;
-  document.querySelector<HTMLSelectElement>("#game-speed")!.value = String(
-    game.player.idle.speed,
-  );
-  document.querySelector<HTMLSelectElement>("#xp-multiplier")!.value = String(game.player.preferences.xpMultiplier);
   document.querySelector<HTMLSelectElement>("#skill-effects-quality")!.value = game.player.preferences.skillEffects;
   document.querySelectorAll<HTMLInputElement>("[data-preference]").forEach(input => input.checked = game!.player.preferences[input.dataset.preference as keyof GamePreferences] === true);
   document
@@ -6438,7 +6562,7 @@ function validateSave(value: unknown): {
   if (
     !Number.isInteger(player.level) ||
     player.level < 1 ||
-    player.level > 160 ||
+    player.level > MAX_LEVEL ||
     player.maxHp < 1 ||
     player.maxMp < 1
   )
@@ -6468,6 +6592,8 @@ function validateSave(value: unknown): {
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
   player.eliteHunt = normalizeEliteHunt(player.eliteHunt);
   player.preferences = normalizePreferences(player.preferences);
+  if (player.experienceBuff !== undefined && !validExperienceBuff(player.experienceBuff)) throw new Error("save-invalid");
+  player.experienceBuff = normalizeExperienceBuff(player.experienceBuff);
   const history = normalizeIdle(player.idle);
   const clears = player.dungeonClears;
   player.journey = normalizeJourney(player.journey, { level: player.level, kills: Math.max(history.totalKills, player.questKills || 0), bosses: Math.max(history.bossKills, (player.bossDefeated ? 1 : 0) + (clears?.tomb ?? 0) + (clears?.bamboo ?? 0) + player.goldenClears.length) });
@@ -6518,7 +6644,7 @@ function validateSave(value: unknown): {
         (item.balanceVersion === undefined || item.balanceVersion === 0 || item.balanceVersion === EQUIPMENT_BALANCE_VERSION) &&
         Number.isInteger(item.level) &&
         item.level >= 1 &&
-        item.level <= 160 &&
+        item.level <= MAX_LEVEL &&
         typeof item.icon === "string" &&
         item.icon.length <= 30 &&
         typeof item.color === "string" &&
@@ -6657,7 +6783,9 @@ function bindIdleUi(): void {
   document.getElementById("settings-shortcut")!.addEventListener("click", () => showIdlePage("more"));
   document.getElementById("hero-status")!.addEventListener("click", () => showIdlePage("char"));
   document.getElementById("world-panel-close")!.addEventListener("click", () => showIdlePage("log"));
-  document.getElementById("arena-log-toggle")!.addEventListener("click", () => openUtility("Nhật ký giang hồ", `<div class="battle-log-history">${game ? game.logs.map(log => `<p>${escapeHtml(log)}</p>`).join("") : "Chọn môn phái để bắt đầu."}</div>`));
+  document.getElementById("chat-toggle")!.addEventListener("click", () => toggleChat());
+  document.getElementById("chat-close")!.addEventListener("click", () => toggleChat(false));
+  document.getElementById("chat-form")!.addEventListener("submit", event => { event.preventDefault(); submitChat(); });
   document.getElementById("arena-quest-toggle")!.addEventListener("click", event => {
     const button = event.currentTarget as HTMLButtonElement;
     const open = button.getAttribute("aria-expanded") !== "true";
@@ -7116,20 +7244,6 @@ function bindIdleUi(): void {
     persistGame();
     refreshUi(true);
     showToast("Đã lưu thông tin nhân vật.");
-  });
-  document.getElementById("game-speed")!.addEventListener("change", (event) => {
-    if (!game) return;
-    const value = Number((event.target as HTMLSelectElement).value);
-    game.player.idle.speed = value === 1.5 || value === 2.5 ? value : 1;
-    persistGame();
-  });
-  document.getElementById("xp-multiplier")!.addEventListener("change", event => {
-    if (!game) return;
-    if (game.mapMode !== "world") { hydrateSettings(); return showToast("Rời phụ bản trước khi đổi cài đặt."); }
-    const value = Number((event.target as HTMLSelectElement).value);
-    game.player.preferences.xpMultiplier = XP_MULTIPLIERS.includes(value as GamePreferences["xpMultiplier"]) ? value as GamePreferences["xpMultiplier"] : 1;
-    persistGame(); refreshUi(true);
-    showToast(`Đã bật x${game.player.preferences.xpMultiplier} kinh nghiệm.`);
   });
   document.getElementById("skill-effects-quality")!.addEventListener("change", event => {
     if (!game) return;
@@ -7713,6 +7827,7 @@ try {
 const worldAnnouncements: WorldAnnouncement[] = [];
 function announceWorldKill(killer: string, victim: string): void {
   const message = queueWorldKill(worldAnnouncements, killer, victim, nowMs());
+  addChatSystem(worldKillText(message));
   addLog(worldKillText(message));
   refreshWorldAnnouncement(nowMs());
 }
@@ -7732,7 +7847,9 @@ function frame(now: number): void {
   refreshWorldAnnouncement(now);
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
-  update(dt * (game?.player.idle.speed ?? 1), now);
+  update(dt, now);
+  tickChat(now);
+  flushProgressSave(now);
   if (game && now - lastAutoSave > 10000) {
     persistGame();
     lastAutoSave = now;
@@ -7756,7 +7873,7 @@ function frame(now: number): void {
         },
         now,
       );
-    else if (idlePage !== "inventory" || expanded) drawWorld(now);
+    else if (idlePage === "log" || expanded) drawWorld(now);
     drawSectPreview(now);
     drawSkillArtPreview(now);
     drawTitlePreview(now);

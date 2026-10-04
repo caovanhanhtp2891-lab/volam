@@ -1,3 +1,4 @@
+import { MAX_GEAR_GRADE } from "./level-limits.ts";
 import { paintedItemMarkup, paintedItemReady, drawPaintedItem } from "./item-art.ts";
 import { MAX_ENHANCEMENT, rarityTier, type EquipmentData } from "./equipment.ts";
 import {
@@ -54,7 +55,7 @@ function palette(art: GearDesign): readonly string[] {
     ? [tint(art.enamel, 0.48), art.enamel, tint(art.enamel, -0.55)]
     : MATERIAL_PALETTES[art.material];
 }
-const gradeOf = (level = 1) => Math.max(1, Math.min(16, Math.ceil(level / 10)));
+const gradeOf = (level = 1) => Math.max(1, Math.min(MAX_GEAR_GRADE, Math.ceil(level / 10)));
 const enhanceOf = (value = 0) => Math.max(0, Math.min(MAX_ENHANCEMENT, value));
 export function equipmentEffectLabel(rarity?: string, enhancement = 0): string {
   const tier = equipmentTier(rarity),

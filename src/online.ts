@@ -1,3 +1,4 @@
+import { validChatMessage, type ChatMessage } from "./chat";
 export type OnlineStatus = "offline" | "connecting" | "online";
 
 export interface OnlineSnapshot {
@@ -29,6 +30,8 @@ interface GuestResponse {
 }
 
 interface OnlineClientOptions {
+  onChat?: (message: ChatMessage) => void;
+  onChatError?: (code: string) => void;
   onStatus: (status: OnlineStatus, detail?: string) => void;
   onSnapshot: (snapshot: OnlineSnapshot) => void;
 }
@@ -115,6 +118,12 @@ export class OnlineClient {
     this.send({ type: "combat.cast", requestId: `cast-${Date.now()}-${this.inputSequence}`, payload: { skillId } });
   }
 
+  public sendChat(text: string): boolean {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
+    this.send({ type: "chat.send", requestId: `chat-${crypto.randomUUID()}`, payload: { text } });
+    return true;
+  }
+
   private send(message: { type: string; requestId: string; payload: Record<string, unknown> }): void {
     this.socket?.send(JSON.stringify({ protocolVersion: 1, ...message }));
   }
@@ -122,8 +131,10 @@ export class OnlineClient {
   private handleMessage(raw: unknown): void {
     if (typeof raw !== "string") return;
     try {
-      const message = JSON.parse(raw) as { type?: string; payload?: OnlineSnapshot };
-      if (message.type === "world.snapshot" && message.payload) this.options.onSnapshot(message.payload);
+      const message = JSON.parse(raw) as { type?: string; requestId?: string; payload?: unknown };
+      if (message.type === "world.snapshot" && message.payload) this.options.onSnapshot(message.payload as OnlineSnapshot);
+      else if (message.type === "chat.message" && validChatMessage(message.payload)) this.options.onChat?.(message.payload);
+      else if (message.type === "command.error" && message.requestId?.startsWith("chat-")) this.options.onChatError?.((message.payload as { code?: string })?.code ?? "chat-error");
     } catch {
       this.setStatus("offline", "Snapshot không hợp lệ");
     }

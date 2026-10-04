@@ -1,17 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_LEVEL, XP_MULTIPLIERS, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, titleProgress, unlockTitles, wornTitle, progressionBonuses } from "../src/character-progression.ts";
+import { MAX_LEVEL, xpToNext, normalizePreferences, normalizeJourney, applyExperience, REBIRTH_BONUS, rebirthBonuses, rebirthCharacter, TITLES, titleProgress, unlockTitles, wornTitle, progressionBonuses } from "../src/character-progression.ts";
 
 const fighter = () => ({ level: 1, xp: 0, attack: 20, defense: 10, skillPoints: 0, idle: { attributePoints: 0 }, journey: normalizeJourney(), inventory: [], equipment: {}, pendingItems: [], dungeonClears: { tomb: 0, bamboo: 0 }, goldenClears: [] });
-test("XP preferences accept only the requested rates and preserve independent display toggles", () => {
+test("legacy XP preferences are removed while independent display toggles survive", () => {
   assert.equal(normalizePreferences({ skillEffects: "simple" }).skillEffects, "simple");
   for (const skillEffects of [null, false, "unknown"]) assert.equal(normalizePreferences({ skillEffects }).skillEffects, "full");
-  for (const xpMultiplier of XP_MULTIPLIERS) assert.equal(normalizePreferences({ xpMultiplier }).xpMultiplier, xpMultiplier);
-  for (const xpMultiplier of [0, -1, 2, "1000", Infinity, NaN]) assert.equal(normalizePreferences({ xpMultiplier }).xpMultiplier, 1);
-  assert.deepEqual(normalizePreferences({ minimap: false, titleEffects: false }), { xpMultiplier: 1, skillEffects: "full", damageNumbers: true, minimap: false, titleEffects: false, titleVisible: true });
+  for (const xpMultiplier of [1, 2, 7, 5, 10, 100, 1000]) assert.equal("xpMultiplier" in normalizePreferences({ xpMultiplier }), false);
+  for (const xpMultiplier of [0, -1, 2, "1000", Infinity, NaN]) assert.equal("xpMultiplier" in normalizePreferences({ xpMultiplier }), false);
+  assert.deepEqual(normalizePreferences({ minimap: false, titleEffects: false }), { skillEffects: "full", damageNumbers: true, minimap: false, titleEffects: false, titleVisible: true });
 });
 test("every XP multiplier conserves XP across multiple levels and grants each level's points once", () => {
-  for (const multiplier of XP_MULTIPLIERS) {
+  for (const multiplier of [1, 2, 7, 5, 10, 100, 1000]) {
     const player = fighter(), result = applyExperience(player, 120, multiplier);
     assert.equal(result.amount, 120 * multiplier);
     let spent = 0; for (let i = 1; i < player.level; i++) spent += xpToNext(i);
@@ -21,8 +21,8 @@ test("every XP multiplier conserves XP across multiple levels and grants each le
     assert.equal(player.attack, 20 + result.levels * 3); assert.equal(player.defense, 10 + result.levels * 2);
   }
 });
-test("large XP awards stop at level 160, discard overflow and cannot mint points again while capped", () => {
-  const player = fighter(); player.level = 159;
+test("large XP awards stop at level 200, discard overflow and cannot mint points again while capped", () => {
+  const player = fighter(); player.level = 199;
   assert.equal(applyExperience(player, 1e9, 1000).levels, 1);
   assert.equal(player.level, MAX_LEVEL); assert.equal(player.xp, 0); assert.equal(player.skillPoints, 1);
   const before = JSON.stringify(player);
@@ -38,7 +38,7 @@ test("old journeys migrate known kills, boss victories and historical levels wit
   const journey = normalizeJourney(undefined, { level: 80, kills: 110, bosses: 12 });
   assert.equal(journey.rebirths, 0); assert.equal(journey.kills, 110); assert.equal(journey.bosses, 12); assert.equal(journey.highestLevel, 80);
   const normalized = normalizeJourney({ rebirths: -1, kills: Infinity, highestLevel: 1000, unlockedTitles: ["novice", "novice", "invalid"], activeTitle: "invalid" });
-  assert.equal(normalized.rebirths, 0); assert.equal(normalized.kills, 0); assert.equal(normalized.highestLevel, 160); assert.deepEqual(normalized.unlockedTitles, ["novice"]); assert.equal(normalized.activeTitle, "");
+  assert.equal(normalized.rebirths, 0); assert.equal(normalized.kills, 0); assert.equal(normalized.highestLevel, MAX_LEVEL); assert.deepEqual(normalized.unlockedTitles, ["novice"]); assert.equal(normalized.activeTitle, "");
 });
 test("rebirth requires max level, resets level-derived bases and preserves earned possessions and points", () => {
   const player = fighter(); player.inventory.push({ id: "keep" }); player.gold = 300; player.skillPoints = 100; player.idle.attributePoints = 795;
@@ -47,7 +47,7 @@ test("rebirth requires max level, resets level-derived bases and preserves earne
   player.level = MAX_LEVEL; player.xp = 123456; player.attack = 497; player.defense = 328;
   assert.equal(rebirthCharacter(player, { attack: 20, defense: 10 }), true);
   assert.equal(player.level, 1); assert.equal(player.xp, 0); assert.equal(player.attack, 20); assert.equal(player.defense, 10);
-  assert.equal(player.journey.rebirths, 1); assert.equal(player.journey.highestLevel, 160);
+  assert.equal(player.journey.rebirths, 1); assert.equal(player.journey.highestLevel, MAX_LEVEL);
   assert.deepEqual(player.inventory, [{ id: "keep" }]); assert.equal(player.gold, 300); assert.equal(player.skillPoints, 100); assert.equal(player.idle.attributePoints, 795);
   assert.equal(rebirthCharacter(player, { attack: 20, defense: 10 }), false); assert.equal(player.journey.rebirths, 1);
 });
@@ -75,7 +75,7 @@ test("elite, boss, dungeon, Golden and enhancement titles use actual distinct ac
   assert.deepEqual(unlockTitles(player).map(t => t.id), ["dungeon", "weapon"]);
 });
 test("only the worn unlocked title grants bonuses, and swapping or removing changes the bonus set", () => {
-  const player = fighter(); player.journey.rebirths = 5; player.level = 160; unlockTitles(player);
+  const player = fighter(); player.journey.rebirths = 5; player.level = MAX_LEVEL; unlockTitles(player);
   player.journey.activeTitle = "grandmaster";
   assert.equal(wornTitle(player.journey).name, "Nhất Đại Tông Sư");
   const base = rebirthBonuses(5), first = progressionBonuses(player.journey);
@@ -87,7 +87,7 @@ test("only the worn unlocked title grants bonuses, and swapping or removing chan
 });
 test("expanded title collection retains every original unlock condition and saved title", () => {
   assert.equal(TITLES.length, 28); assert.equal(new Set(TITLES.map(t => t.motif)).size, 18);
-  const player = fighter(); player.level = 160; Object.assign(player.journey, { kills: 100, elites: 5, bosses: 10, rebirths: 5 });
+  const player = fighter(); player.level = MAX_LEVEL; Object.assign(player.journey, { kills: 100, elites: 5, bosses: 10, rebirths: 5 });
   player.dungeonClears = { tomb: 1, bamboo: 1 }; player.goldenClears = ["golden"]; player.inventory = [{ enhance: 10 }];
   unlockTitles(player);
   for (const title of TITLES.slice(0, 12)) assert.ok(player.journey.unlockedTitles.includes(title.id));

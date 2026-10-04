@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.27.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.28.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -169,9 +169,9 @@ async function fit(page, width, height) {
     snapshot = await state(page);
     assert.equal(snapshot.player.name, "WASD Lữ");
     assert.equal(snapshot.player.sex, "female");
-    await page.locator("#game-speed").selectOption("2.5");
+    assert.equal(await page.locator("#game-speed").count(), 0);
     await page.locator('[data-setting="autoSkills"]').uncheck();
-    assert.equal((await state(page)).player.idle.speed, 2.5);
+    assert.equal("speed" in (await state(page)).player.idle, false);
     assert.equal((await state(page)).player.idle.autoSkills, false);
     const beforeInvalid = await state(page);
     const malformed = structuredClone(beforeInvalid);

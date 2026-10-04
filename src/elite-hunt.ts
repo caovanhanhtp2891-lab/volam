@@ -1,3 +1,4 @@
+import { MAX_LEVEL } from "./level-limits.ts";
 import { MONSTERS, type SpeciesId } from "./bestiary.ts";
 export const ELITE_MIN_KILLS = 6;
 export const ELITE_PITY_KILLS = 20;
@@ -14,7 +15,7 @@ export interface SavedWildElite { monsterId?: SpeciesId; id: string; name: strin
 export function validWildElite(value: unknown): boolean {
   if (value === undefined) return true;
   const e = value as SavedWildElite;
-  return Boolean(e && typeof e.id === "string" && e.id.startsWith("wild-elite-") && e.id.length <= 180 && typeof e.name === "string" && e.name.length <= 150 && validHuntArea(e.area) && Number.isFinite(e.x) && e.x >= 24 && e.x <= (e.area.startsWith("explore-") ? 3576 : 1876) && Number.isFinite(e.y) && e.y >= 24 && e.y <= (e.area.startsWith("explore-") ? 2376 : 1176) && Number.isInteger(e.level) && e.level >= 1 && e.level <= 160 && Number.isFinite(e.hp) && e.hp > 0 && e.hp <= 1e9 && (e.monsterId === undefined || Object.hasOwn(MONSTERS,e.monsterId)) && (e.element === undefined || ["kim", "moc", "thuy", "hoa", "tho"].includes(e.element)));
+  return Boolean(e && typeof e.id === "string" && e.id.startsWith("wild-elite-") && e.id.length <= 180 && typeof e.name === "string" && e.name.length <= 150 && validHuntArea(e.area) && Number.isFinite(e.x) && e.x >= 24 && e.x <= (e.area.startsWith("explore-") ? 3576 : 1876) && Number.isFinite(e.y) && e.y >= 24 && e.y <= (e.area.startsWith("explore-") ? 2376 : 1176) && Number.isInteger(e.level) && e.level >= 1 && e.level <= MAX_LEVEL && Number.isFinite(e.hp) && e.hp > 0 && e.hp <= 1e9 && (e.monsterId === undefined || Object.hasOwn(MONSTERS,e.monsterId)) && (e.element === undefined || ["kim", "moc", "thuy", "hoa", "tho"].includes(e.element)));
 }
 export const validHuntArea = (area: unknown): area is string => typeof area === "string" && (area === "world" || /^stage-([1-9]|[1-9]\d|1[0-5]\d|160)$/.test(area) || /^dungeon-(tomb|bamboo|wolfden|venom|necropolis|forest|inferno|desert|thunder|frost|abyss|celestial)$/.test(area) || /^explore-([0-9]|1[0-5])$/.test(area));
 export function normalizeEliteHunt(value: unknown): EliteHunt {
@@ -54,7 +55,7 @@ export function tickCampfires(fires: readonly Campfire[], area: string, point: {
   return xp;
 }
 export function validCampfires(value: unknown): boolean {
-  return value === undefined || (Array.isArray(value) && value.length <= MAX_CAMPFIRES && value.every(fire => fire && typeof fire.id === "string" && fire.id.length <= 180 && validHuntArea(fire.area) && Number.isFinite(fire.x) && fire.x >= 24 && fire.x <= (fire.area.startsWith("explore-") ? 3576 : 1876) && Number.isFinite(fire.y) && fire.y >= 24 && fire.y <= (fire.area.startsWith("explore-") ? 2376 : 1176) && Number.isInteger(fire.level) && fire.level >= 1 && fire.level <= 160 && Number.isSafeInteger(fire.expiresAt) && fire.expiresAt >= 0 && Number.isSafeInteger(fire.nextTickAt) && fire.nextTickAt >= 0));
+  return value === undefined || (Array.isArray(value) && value.length <= MAX_CAMPFIRES && value.every(fire => fire && typeof fire.id === "string" && fire.id.length <= 180 && validHuntArea(fire.area) && Number.isFinite(fire.x) && fire.x >= 24 && fire.x <= (fire.area.startsWith("explore-") ? 3576 : 1876) && Number.isFinite(fire.y) && fire.y >= 24 && fire.y <= (fire.area.startsWith("explore-") ? 2376 : 1176) && Number.isInteger(fire.level) && fire.level >= 1 && fire.level <= MAX_LEVEL && Number.isSafeInteger(fire.expiresAt) && fire.expiresAt >= 0 && Number.isSafeInteger(fire.nextTickAt) && fire.nextTickAt >= 0));
 }
 export function restoreCampfires(value: Campfire[] | undefined, now: number): Campfire[] {
   return (value ?? []).filter(fire => fire.expiresAt > now).slice(-MAX_CAMPFIRES).map(fire => ({ ...fire, expiresAt: Math.min(fire.expiresAt, now + CAMPFIRE_DURATION), nextTickAt: now + CAMPFIRE_INTERVAL }));
