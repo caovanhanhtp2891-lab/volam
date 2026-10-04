@@ -1,6 +1,7 @@
 import { drawImpactBloom } from "./skill-radiance.ts";
 import { drawElementalMotion, elementalMotionKind } from "./elemental-motion.ts";
-import type { EffectMotif, SectId, SkillKey, SkillDefinition } from "./sects.ts";
+import type { EffectMotif, SectId, SkillKey, SkillDefinition, MartialArt } from "./sects.ts";
+import { drawMartialEffect, drawMartialProjectile, martialPalette } from "./martial-effects.ts";
 import { SKILL_PALETTES, SECT_SIGILS, type SkillPalette } from "./skill-art.ts";
 import { drawSetCrest } from "./set-art.ts";
 import { drawGlow } from "./battle-vfx.ts";
@@ -10,6 +11,7 @@ export { skillIconMarkup } from "./skill-art.ts";
 
 export type SkillQuality = "full" | "simple";
 export interface SectEffect {
+  art?: MartialArt;
   x: number; y: number; radius: number; color: string; kind: EffectMotif;
   angle?: number; skill?: SkillKey; sect?: SectId;
   phase?: "cast" | "release" | "impact"; quality?: SkillQuality;
@@ -195,6 +197,7 @@ export function drawSkillImpact(c: CanvasRenderingContext2D, effect: SectEffect,
 // Bounded vectors and cached 96px light sprites. No dynamic gradients, blur,
 // filters, random particle systems or screen-wide flashes.
 export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, progress: number, persistent = false): void {
+  if (effect.art && effect.sect) return drawMartialEffect(c, { ...effect, sect: effect.sect, art: effect.art }, progress, persistent);
   if (effect.phase === "impact") return drawSkillImpact(c, effect, progress);
   const p = Math.max(0, Math.min(1, progress));
   if (!persistent && (p <= 0 || p >= 1)) return;
@@ -397,8 +400,8 @@ export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, 
   c.restore();
 }
 
-export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, progress: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
-  const t = Math.max(0, Math.min(1, progress)), palette = SKILL_PALETTES[sect];
+export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, progress: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full", art?: MartialArt, motif?: EffectMotif): void {
+  const t = Math.max(0, Math.min(1, progress)), palette = art ? martialPalette(art, sect) : SKILL_PALETTES[sect];
   const point = (p: number) => skillFlightPoint(from, to, p, sect);
   const at = point(t), tangent = point(Math.max(0, t - .025));
   c.save(); c.lineCap = "round"; c.lineJoin = "round";
@@ -417,10 +420,11 @@ export function drawSkillFlight(c: CanvasRenderingContext2D, from: { x: number; 
     }
   }
   c.restore();
-  drawSectProjectile(c, at.x, at.y, Math.atan2(at.y - tangent.y, at.x - tangent.x), sect, key, now, quality);
+  drawSectProjectile(c, at.x, at.y, Math.atan2(at.y - tangent.y, at.x - tangent.x), sect, key, now, quality, art, motif);
 }
 
-export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full"): void {
+export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: number, angle: number, sect: SectId, key: SkillKey | undefined, now: number, quality: SkillQuality = "full", art?: MartialArt, motif?: EffectMotif): void {
+  if (art) return drawMartialProjectile(c, x, y, angle, sect, art, key, now, quality === "simple", motif);
   const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 24 : 16;
   c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
   if (sect === "thuy-yen") { drawIceMissile(c, r, now, !full); c.restore(); return; }

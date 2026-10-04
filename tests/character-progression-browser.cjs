@@ -49,7 +49,7 @@ async function stat(page, name) { return Number((await page.locator('#stat-grid 
     const page = await context.newPage();
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (r.status() >= 400 && r.url().startsWith(url)) errors.push(`${r.status()} ${r.url()}`); });
-    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.28.0');
+    await page.goto(url, { waitUntil: "networkidle" }); assert.equal(await page.locator('html').getAttribute('data-version'), '0.29.0');
     await page.locator('[data-faction="tianwang"]').click(); await page.locator("#join-sect").click();
     await seed(page, s => { delete s.player.preferences; delete s.player.journey; s.player.idle.inTown = true; });
     const old = (await read(page)).player;

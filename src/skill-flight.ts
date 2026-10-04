@@ -1,6 +1,7 @@
 import type { SectId, SkillDefinition } from "./sects";
 import type { Point } from "./combat";
 export function skillUsesFlight(skill: SkillDefinition): boolean {
+  if (skill.projectile !== undefined) return skill.projectile && skill.damage > 0 && !skill.dash;
   return (
     skill.damage > 0 &&
     !skill.dash &&

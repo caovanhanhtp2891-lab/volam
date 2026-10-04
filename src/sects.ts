@@ -1,5 +1,6 @@
 export type SectId = "thieu-lam" | "thien-vuong" | "duong-mon" | "ngu-doc" | "nga-mi" | "thuy-yen" | "cai-bang" | "thien-nhan" | "vo-dang" | "con-lon";
 export type SkillKey = "skill1" | "skill2" | "ultimate";
+export type MartialArt = "staff" | "saber" | "hammer" | "spear" | "dart" | "bolts" | "poison-saber" | "poison-palm" | "ice-swords" | "lotus-palm" | "ice-saber" | "ice-twins" | "dragon-palm" | "dog-staff" | "fire-rain" | "fire-spear" | "sword-array" | "qi" | "wind-saber" | "thunder";
 export type EffectMotif = "staff" | "bell" | "spear" | "arrows" | "trap" | "poison" | "lotus" | "fan" | "frost" | "dragon" | "spiral" | "blades" | "shadow" | "taiji" | "swords" | "lightning";
 export const HERO_SIZE = { width: 56, height: 76, radius: 12 } as const;
 export const SKILL_KEYS: SkillKey[] = ["skill1", "skill2", "ultimate"];
@@ -11,6 +12,11 @@ export const SECT_BY_FACTION: Record<string, SectId> = {
 };
 
 export interface SkillDefinition {
+  sectId?: SectId;
+  pathId?: string;
+  art?: MartialArt;
+  sourceId?: number;
+  projectile?: boolean;
   name: string;
   description: string;
   motif: EffectMotif;

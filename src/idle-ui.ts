@@ -48,7 +48,7 @@ export function idleShell(): string {
         <p class="equipment-help">Chạm ô trang bị để xem chi tiết · Ô ấn mở sắc phong quân hàm</p>
         <div class="card mount-card"><span>♞</span><div><b id="mount-name">Chưa có ngựa</b><small id="mount-info"></small></div><button class="mini-button" data-mount-toggle aria-pressed="false">Đến Tiệm</button></div>
         <div class="profile-resources"><div class="profile-meter profile-hp"><span id="profile-hp-bar"></span><small id="profile-hp-label"></small></div><div class="profile-meter profile-mp"><span id="profile-mp-bar"></span><small id="profile-mp-label"></small></div></div>
-        <div class="character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small></div><span id="character-element" class="element-badge">金</span></div>
+        <div class="character-heading"><div><b id="character-sect">Chưa gia nhập môn phái</b><small id="level-label">Cấp 1</small></div><button class="mini-button" data-open-martial-paths>Đổi võ công</button><span id="character-element" class="element-badge">金</span></div>
         <div class="profile-power">Lực chiến <strong id="combat-power">0</strong></div>
         <div id="stat-grid" class="stat-grid"></div>
         <button id="combat-stats-btn" class="mini-button combat-stats-button">Chỉ số chiến đấu nâng cao</button>

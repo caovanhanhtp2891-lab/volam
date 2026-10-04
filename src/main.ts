@@ -1,3 +1,4 @@
+import { MARTIAL_PATHS, martialPath, martialSect, martialSkillNamed, validMartialPath } from "./martial-paths";
 import { drawGemMine } from "./landscape-art";
 import { HEALTH_COLORS, playerHealthRelation } from "./health-bars";
 import { COMBAT_SCALE_VERSION, toCombat, toCore, displayedStat, migrateCombatScale, scaledOutgoingDamage, scaledIncomingDamage } from "./combat-scale";
@@ -109,7 +110,7 @@ import {
   type DungeonId as RegularDungeonId,
 } from "./progression";
 
-import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, skillReachLabel, type Sect as School, type SectId as SchoolId, type SkillDefinition, type EffectMotif } from "./sects";
+import { SECTS as SCHOOL_KITS, SECT_BY_FACTION, SKILL_KEYS, HERO_SIZE, selectSkillTargets, skillReachLabel, type Sect as School, type SectId as SchoolId, type SkillDefinition, type EffectMotif, type MartialArt } from "./sects";
 import { drawSectEffect, drawSkillFlight, drawSkillReach, skillIconMarkup } from "./sect-effects";
 import { SKILL_PALETTES } from "./skill-art";
 import { ELITE_MIN_KILLS, CAMPFIRE_RADIUS, MAX_CAMPFIRES, normalizeEliteHunt, eliteChance, recordNormalKill, createCampfire, campfireXp, nearCampfire, tickCampfires, validCampfires, restoreCampfires, validWildElite, type EliteHunt, type Campfire, type SavedWildElite } from "./elite-hunt";
@@ -157,6 +158,7 @@ interface Item extends GearIdentity {
 }
 
 interface Player {
+  martialPath?: string;
   mounted: boolean;
   name: string;
   sex: "male" | "female";
@@ -295,6 +297,7 @@ interface Telegraph {
 }
 
 interface SkillEffect {
+  art?: MartialArt;
   x: number;
   y: number;
   radius: number;
@@ -311,10 +314,12 @@ interface SkillEffect {
 }
 
 interface SkillZone extends SkillEffect {
+  definition?: SkillDefinition;
   nextTick: number; multiplier: number; slow: number; source: string;
 }
 
 interface Projectile {
+  art?: MartialArt;
   visualLeader?: boolean;
   visualFrom?: { x: number; y: number };
   sect: School["id"];
@@ -565,6 +570,7 @@ let lastUiUpdate = 0;
 let toastTimer = 0;
 let renderedSkillSect: string | null = null;
 let selectedFaction: FactionId = "shaolin";
+const selectedMartialPaths: Partial<Record<SchoolId, string>> = {};
 let previewSkill: SkillKey = "skill1";
 let previewCanvas: HTMLCanvasElement | null = null;
 let pendingSaleId: string | null = null;
@@ -927,6 +933,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
         ? "female"
         : "male",
     factionId: faction.id,
+    martialPath: martialPath(sect.id, selectedMartialPaths[sect.id]).id,
     idle: normalizeIdle(),
     radius: HERO_SIZE.radius,
     sect: sectId,
@@ -2173,9 +2180,15 @@ function refreshSiegeHud(): void {
   document.getElementById("siege-objective-health")!.style.width =
     `${encounter.wave === 1 && objective?.dead ? siege.capture.progress / SIEGE_CAPTURE_SECONDS * 100 : objective && !objective.dead ? (objective.hp / objective.maxHp) * 100 : 0}%`;
 }
+function botSchool(profile: BotTemplate): School {
+  const id = SECT_BY_FACTION[profile.faction], paths = MARTIAL_PATHS[id];
+  return martialSect(id, paths.find(p => p.weapon === profile.weapon)?.id);
+}
 function botAppearance(profile: BotTemplate): HeroAppearance {
+  const school = botSchool(profile), route = martialPath(school.id, school.kit.skill1.pathId);
   return {
-    weaponVariant: profile.weapon,
+    weaponVariant: route.weapon,
+    unarmed: !route.weapon,
     weaponColor: profile.color,
     armorColor: "",
     auraColor: profile.color,
@@ -2221,7 +2234,7 @@ function botImpact(
   skill: SkillKey | undefined,
   now: number,
 ): void {
-  const school = SCHOOL_KITS[SECT_BY_FACTION[profile.faction]],
+  const school = botSchool(profile),
     def = school.kit[skill ?? "skill1"];
   addSkillEffect({
     x,
@@ -2230,7 +2243,7 @@ function botImpact(
     skill,
     radius: 30,
     color: profile.color,
-    kind: def.motif,
+    kind: def.motif, art: def.art,
     angle: 0,
     phase: "impact",
     duration: 420,
@@ -2249,7 +2262,7 @@ function queueBotAttack(
     "motion" in source
       ? source.motion
       : game.combat.enemyMotions.get(source.id)!;
-  const school = SCHOOL_KITS[SECT_BY_FACTION[profile.faction]],
+  const school = botSchool(profile),
     d = distance(source, target);
   const projectile =
     profile.role === "ranged" ||
@@ -2504,7 +2517,7 @@ function updateBotHits(now: number): void {
       enemy.hitFlash = 0.16;
       if (hit.skill && !enemy.structure) {
         const def =
-          SCHOOL_KITS[SECT_BY_FACTION[hit.profile.faction]].kit[hit.skill];
+          botSchool(hit.profile).kit[hit.skill];
         if (def.slow) {
           enemy.slowUntil = now + 2200;
           enemy.slowFactor = def.slow;
@@ -2553,7 +2566,7 @@ function updateBotHits(now: number): void {
       }
       if (hit.skill && bot.hp > 0) {
         const def =
-          SCHOOL_KITS[SECT_BY_FACTION[hit.profile.faction]].kit[hit.skill];
+          botSchool(hit.profile).kit[hit.skill];
         if (def.slow) {
           bot.slowUntil = now + 2000;
           bot.slowFactor = def.slow;
@@ -2587,7 +2600,8 @@ function drawBotFlights(now: number): void {
       SECT_BY_FACTION[hit.profile.faction],
       hit.skill,
       now,
-      game.player.preferences.skillEffects,
+      game.player.preferences.skillEffects, botSchool(hit.profile).kit[hit.skill ?? "skill1"].art,
+      botSchool(hit.profile).kit[hit.skill ?? "skill1"].motif,
     );
   }
 }
@@ -3084,7 +3098,7 @@ function nearestEnemy(
   return result;
 }
 
-function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect?: School["id"]): void {
+function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect?: School["id"], visualDefinition?: SkillDefinition): void {
   if (!game || enemy.dead) return;
   const critical = Math.random() < criticalChance() / 100;
   const raw =
@@ -3105,13 +3119,15 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect
   enemy.hitFlash = 0.16;
   const enemyMotion = game.combat.enemyMotions.get(enemy.id);
   if (enemyMotion) enemyMotion.hurtUntil = nowMs() + 150;
-  const sect = SCHOOL_KITS[visualSect ?? playerSect(game.player).id];
-  const skill = SKILL_KEYS.find(key => sect.kit[key].name === source);
+  const sect = visualSect ? SCHOOL_KITS[visualSect] : playerSect(game.player);
+  const named = martialSkillNamed(sect.id, source);
+  const skill = named?.key ?? SKILL_KEYS.find(key => sect.kit[key].name === source);
+  const definition = visualDefinition ?? named?.definition ?? sect.kit[skill ?? "skill1"];
   const tick = source === "Độc" || source === "Thiêu đốt";
   addSkillEffect({
     x: enemy.x, y: enemy.y - 24, sect: sect.id, skill,
     radius: tick ? 14 : skill === "ultimate" ? 52 : critical ? 40 : skill ? 34 : 24,
-    color: SKILL_PALETTES[sect.id].color, kind: sect.kit[skill ?? "skill1"].motif,
+    color: SKILL_PALETTES[sect.id].color, kind: definition.motif, art: definition.art,
     angle: Math.atan2(enemy.y - game.player.y, enemy.x - game.player.x),
     phase: "impact", duration: tick ? 250 : skill === "ultimate" ? 600 : skill ? 460 : 320,
   });
@@ -3195,6 +3211,7 @@ function launchProjectile(
   const from = { x: game.player.x + offset.x, y: game.player.y + offset.y };
   game.combat.projectiles.push({
     sect: playerSect(game.player).id,
+    art: playerSect(game.player).kit.skill1.art,
     from,
     target,
     startedAt: nowMs() + 110,
@@ -3237,14 +3254,14 @@ function playerBasicAttack(): void {
       color,
       duration: 450,
       sect: playerSect(game.player).id,
-      kind: playerSect(game.player).kit.skill1.motif,
+      kind: playerSect(game.player).kit.skill1.motif, art: playerSect(game.player).kit.skill1.art,
       phase: "release",
       angle: Math.atan2(target.y - game.player.y, target.x - game.player.x),
     });
   } else {
     launchProjectile(target, 1, "Đánh thường");
     addSkillEffect({ x: game.player.x, y: game.player.y - 24, radius: 18, color,
-      sect: playerSect(game.player).id, kind: playerSect(game.player).kit.skill1.motif,
+      sect: playerSect(game.player).id, kind: playerSect(game.player).kit.skill1.motif, art: playerSect(game.player).kit.skill1.art,
       phase: "cast", duration: 200 });
   }
 }
@@ -3267,7 +3284,7 @@ function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier:
   if (definition.breakArmor) enemy.defenseDownUntil = Math.max(enemy.defenseDownUntil, now + definition.breakArmor * 1000);
   if (definition.slow) { enemy.slowUntil = now + 3000; enemy.slowFactor = definition.slow; }
   if (definition.stun) enemy.stunUntil = now + Math.min(definition.stun, enemy.kind === "boss" ? .35 : 2) * 1000;
-  if (definition.motif === "fan" || definition.motif === "frost") {
+  if (definition.motif === "fan" || definition.motif === "frost" || definition.art?.startsWith("ice")) {
     if (definition.slow) enemy.chilledUntil = enemy.slowUntil;
     if (definition.stun) enemy.frozenUntil = enemy.stunUntil;
   }
@@ -3315,7 +3332,7 @@ function castSkill(key: SkillKey, automatic = false): void {
       if (skillUsesFlight(definition)) {
         launchProjectile(enemy, multiplier * falloff, definition.name);
         const projectile = game.combat.projectiles[game.combat.projectiles.length - 1];
-        projectile.definition = definition; projectile.skill = key;
+        projectile.definition = definition; projectile.skill = key; projectile.art = definition.art;
         projectile.visualLeader = index === 0 && hit === 0;
         if (definition.shape === "chain" && index > 0 && previousFlight) {
           const previous = selection.targets[index - 1];
@@ -3340,14 +3357,14 @@ function castSkill(key: SkillKey, automatic = false): void {
     player.shieldUntil = now + 5000;
   }
   const visualRadius = definition.shape === "line" ? definition.range : definition.shape === "target" || definition.shape === "chain" ? 45 : definition.radius;
-  const visual = { ...selection.center, radius: Math.min(280, visualRadius), color: SKILL_PALETTES[sect.id].color, sect: sect.id, kind: definition.motif, skill: key, angle: selection.angle, duration: key === "ultimate" ? 850 : 600 };
+  const visual = { ...selection.center, radius: Math.min(280, visualRadius), color: SKILL_PALETTES[sect.id].color, sect: sect.id, kind: definition.motif, art: definition.art, skill: key, angle: selection.angle, duration: key === "ultimate" ? 850 : 600 };
   const ranged = skillUsesFlight(definition);
   const reach = automatic ? undefined : { x: player.x, y: player.y, definition };
   const hand = actorCastOffset(sect.id, player.sex, game.combat.motion.facingX, player.mounted);
   addSkillEffect({ ...visual, reach, x: player.x + (ranged ? hand.x : 0), y: player.y + (ranged ? hand.y : -24), radius: 30, phase: "cast", duration: ranged ? 300 : 170 });
   if (!ranged) addSkillEffect({ ...visual, phase: "release", delay: 110 });
   if (definition.zone && !ranged) {
-    game.zones.push({ ...visual, ...selection.center, radius: definition.radius, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
+    game.zones.push({ ...visual, definition, ...selection.center, radius: definition.radius, startedAt: now, duration: definition.zone * 1000, nextTick: now + 1000, multiplier: skillScale(key, .4), slow: definition.slow ?? 1, source: definition.name });
     if (game.zones.length > 6) game.zones.shift();
   }
   // Damage ticks build rage; casting an ultimate itself always consumes all rage.
@@ -4130,7 +4147,7 @@ function updateCombat(now: number): void {
       )
       {
         if (strike.definition) applySkillStatus(strike.target, strike.definition, strike.multiplier, now, strike.sect);
-        dealDamage(strike.target, strike.multiplier, strike.source);
+        dealDamage(strike.target, strike.multiplier, strike.source, strike.sect, strike.definition);
         if (strike.healing && !strike.healing.used) {
           strike.healing.used = true;
           const player = game.player;
@@ -4162,7 +4179,7 @@ function updateCombat(now: number): void {
         addSkillEffect({ x: target.x, y: target.y - 24,
           radius: projectile.definition.radius,
           color: SKILL_PALETTES[projectile.sect].color, sect: projectile.sect,
-          kind: projectile.definition.motif, skill: projectile.skill, phase: "release",
+          kind: projectile.definition.motif, art: projectile.definition.art, skill: projectile.skill, phase: "release",
           duration: projectile.skill === "ultimate" ? 700 : 450 });
       }
       if (projectile.visualLeader && projectile.definition?.zone && projectile.skill) {
@@ -4170,7 +4187,7 @@ function updateCombat(now: number): void {
         game.zones.push({
           x: target.x, y: target.y, radius: definition.radius,
           color: SKILL_PALETTES[projectile.sect].color, sect: projectile.sect,
-          kind: definition.motif, skill: projectile.skill, startedAt: now,
+          kind: definition.motif, art: definition.art, definition, skill: projectile.skill, startedAt: now,
           duration: definition.zone! * 1000, nextTick: now + 1000,
           multiplier: skillScale(projectile.skill, .4), slow: definition.slow ?? 1,
           source: definition.name,
@@ -4186,7 +4203,7 @@ function updateCombat(now: number): void {
           projectile.multiplier,
           projectile.source,
         );
-      else dealDamage(target, projectile.multiplier, projectile.source, projectile.sect);
+      else dealDamage(target, projectile.multiplier, projectile.source, projectile.sect, projectile.definition);
     }
 
   }
@@ -4230,6 +4247,11 @@ function update(dt: number, now: number): void {
     }
   }
   tickCompanion(dt, now);
+  player.attackCooldown = Math.max(0, player.attackCooldown - dt);
+  player.cooldowns.skill1 = Math.max(0, player.cooldowns.skill1 - dt);
+  player.cooldowns.skill2 = Math.max(0, player.cooldowns.skill2 - dt);
+  player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
+  player.potionCooldown = Math.max(0, player.potionCooldown - dt);
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
       player.x - VIEW_WIDTH / 2,
@@ -4253,11 +4275,6 @@ function update(dt: number, now: number): void {
       return;
     }
   }
-  player.attackCooldown = Math.max(0, player.attackCooldown - dt);
-  player.cooldowns.skill1 = Math.max(0, player.cooldowns.skill1 - dt);
-  player.cooldowns.skill2 = Math.max(0, player.cooldowns.skill2 - dt);
-  player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
-  player.potionCooldown = Math.max(0, player.potionCooldown - dt);
   const regeneration = combatModifiers(combinedStats());
   player.hp = Math.min(player.maxHp, player.hp + dt * toCombat(regeneration.hpRegen));
   player.mp = Math.min(player.maxMp, player.mp + dt * toCombat(0.7 + regeneration.mpRegen));
@@ -4481,8 +4498,8 @@ function update(dt: number, now: number): void {
     zone.nextTick += 1000;
     for (const enemy of game.enemies) if (!enemy.dead && distance(zone, enemy) <= zone.radius + enemy.radius) {
       if (zone.slow < 1) { enemy.slowUntil = now + 1500; enemy.slowFactor = zone.slow; }
-      dealDamage(enemy, zone.multiplier, zone.source, zone.sect);
-      if (zone.sect && zone.skill) applySkillStatus(enemy, SCHOOL_KITS[zone.sect].kit[zone.skill], zone.multiplier, now, zone.sect);
+      dealDamage(enemy, zone.multiplier, zone.source, zone.sect, zone.definition);
+      if (zone.sect && zone.skill) applySkillStatus(enemy, zone.definition ?? SCHOOL_KITS[zone.sect].kit[zone.skill], zone.multiplier, now, zone.sect);
     }
   }
   game.zones = game.zones.filter(zone => now - zone.startedAt <= zone.duration);
@@ -4961,7 +4978,7 @@ function drawProjectile(projectile: Projectile, now: number): void {
   const t = clamp((now - projectile.startedAt) / projectile.duration, 0, 1);
   const to = { x: projectile.target.x, y: projectile.target.y - 24 };
   const from = projectile.visualFrom ?? projectile.from;
-  drawSkillFlight(ctx, from, to, t, projectile.sect, projectile.skill, now, game?.player.preferences.skillEffects);
+  drawSkillFlight(ctx, from, to, t, projectile.sect, projectile.skill, now, game?.player.preferences.skillEffects, projectile.art, projectile.definition?.motif);
 }
 
 function drawPickupFlight(
@@ -5220,7 +5237,8 @@ function currentHeroAppearance(): HeroAppearance {
     element: set ? GEAR_SETS[set.id].element : equipment.weapon?.element,
     pieces: set?.pieces ?? 0,
     setId: set?.id,
-    weaponVariant: equipment.weapon?.variant ? variantOf(equipment.weapon) : undefined,
+    weaponVariant: game ? martialPath(playerSect(game.player).id, game.player.martialPath).weapon : undefined,
+    unarmed: game ? !martialPath(playerSect(game.player).id, game.player.martialPath).weapon : false,
     weapon: equipment.weapon,
     armor: equipment.armor,
     helmet: equipment.helmet,
@@ -5360,6 +5378,8 @@ function refreshUi(force = false): void {
   if (!force && performance.now() - lastUiUpdate < 120) return;
   lastUiUpdate = performance.now();
   refreshSiegeHud();
+  const pathControl = document.querySelector<HTMLButtonElement>("[data-apply-path]");
+  if (pathControl) { const active = pathControl.dataset.applyPath === game.player.martialPath; pathControl.disabled = active || !canChangeMartialPath(); pathControl.textContent = active ? "Đang tu luyện" : !canChangeMartialPath() ? "Về thành · Chờ hết hồi chiêu để đổi" : `Tu luyện ${martialPath(playerSect(game.player).id, pathControl.dataset.applyPath).name}`; }
   updateLuckyPresentation(game.player.lucky, game.player.gold, Date.now());
   const shell = document.querySelector<HTMLElement>(".app-shell")!;
   if (shell.dataset.effects !== game.player.preferences.skillEffects) shell.dataset.effects = game.player.preferences.skillEffects;
@@ -5534,7 +5554,7 @@ function refreshUi(force = false): void {
 }
 
 function skillGlyphMarkup(skill: SkillKey, _sectId: string): string {
-  const sect = game ? playerSect(game.player) : SCHOOL_KITS[SECT_BY_FACTION[selectedFaction]];
+  const sect = game ? playerSect(game.player) : martialSect(SECT_BY_FACTION[selectedFaction], selectedMartialPaths[SECT_BY_FACTION[selectedFaction]]);
   return `<span class="skill-glyph" style="--skill-color:${sect.color}">${skillIconMarkup(sect.kit[skill], skill, sect.color)}</span>`;
 }
 
@@ -5561,14 +5581,14 @@ function renderSkillBar(): void {
     },
     { key: "ultimate" as const, number: "3", name: sect.ultimate, icon: "✦" },
   ];
-  if (renderedSkillSect !== player.factionId) {
+  if (renderedSkillSect !== `${player.factionId}/${player.martialPath}`) {
     skillBar.innerHTML = skillData
       .map(
         (skill) =>
           `<button class="skill-button" data-skill="${skill.key}" title="${skill.name} · ${skillReachLabel(sect.kit[skill.key])} · ${formatNumber(toCombat(sect.kit[skill.key].mp))} MP · ${sect.kit[skill.key].cooldown}s"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`,
       )
       .join("");
-    renderedSkillSect = player.factionId;
+    renderedSkillSect = `${player.factionId}/${player.martialPath}`;
     skillBar.insertAdjacentHTML(
       "beforeend",
       `<button class="skill-button" data-basic-attack title="Đánh thường (4)" aria-label="Đánh thường"><span class="skill-number">4</span>${skillIconMarkup(sect.kit.skill1, "skill1", sect.color)}<span class="skill-cooldown">ĐÁNH</span></button>`,
@@ -5658,6 +5678,7 @@ function renderInventory(): void {
     pendingSaleId,
     player.sect,
     player.factionId,
+    player.martialPath,
     player.level,
     player.gold,
     player.refiningStones,
@@ -5722,6 +5743,7 @@ function renderInventory(): void {
     const skillRows = SKILL_KEYS.map(key => ({ key, ...sect.kit[key] }));
 
     inventoryContent.innerHTML = `
+      <div class="martial-current"><b>${sect.name} · ${sect.title}</b><p>${sect.description}</p><button class="mini-button" data-open-martial-paths>Hai hướng võ công · Xem / đổi</button></div>
       <div class="skill-points-card"><span class="skill-points-icon">✦</span><div><strong>${player.skillPoints} điểm võ học</strong><p>Mỗi lần lên cấp nhận 1 điểm. Tối đa bậc 20.</p></div><button class="mini-button" data-show-skill-art>Xem chiêu</button></div>
       <div class="skill-list">${skillRows
         .map((skill) => {
@@ -5802,8 +5824,26 @@ function renderInventory(): void {
 
 function playerSect(player: Player): Sect {
   const faction = factionOf(player.factionId, player.sect);
-  const school = SCHOOL_KITS[SECT_BY_FACTION[faction.id]];
+  const school = martialSect(SECT_BY_FACTION[faction.id], player.martialPath);
   return { ...school, skills: [school.kit.skill1.name, school.kit.skill2.name], ultimate: school.kit.ultimate.name };
+}
+
+function martialChoiceMarkup(id: SchoolId, chosen: string, action: "select" | "preview"): string {
+  return `<div class="martial-choices" role="group" aria-label="Hai hướng võ công">${MARTIAL_PATHS[id].map(p => `<button class="martial-choice" data-${action}-path="${p.id}" aria-pressed="${p.id === chosen}" style="--path-color:${SCHOOL_KITS[id].color}">${skillIconMarkup(p.kit.ultimate, "ultimate", SCHOOL_KITS[id].color)}<span><b>${p.name}</b><small>${p.weaponLabel} · Tầm đánh thường ${p.basicRange}</small></span></button>`).join("")}</div>`;
+}
+function canChangeMartialPath(): boolean {
+  return Boolean(game && game.mapMode === "world" && game.player.idle.inTown && !game.goldenEncounter && !actionLocked() && Object.values(game.player.cooldowns).every(cd => cd <= 0));
+}
+function changeMartialPath(id: string): void {
+  if (!game || !canChangeMartialPath()) return showToast("Về thành và chờ hết hồi chiêu để đổi hướng võ công.");
+  const school = playerSect(game.player).id;
+  if (!MARTIAL_PATHS[school].some(p => p.id === id) || game.player.martialPath === id) return;
+  const old = game.player.martialPath;
+  game.player.martialPath = id;
+  if (!persistGame()) { game.player.martialPath = old; return; }
+  renderedSkillSect = null; inventoryRenderKey = "";
+  addLog(`Đổi sang ${playerSect(game.player).name} · ${playerSect(game.player).title}. Giữ nguyên điểm võ học và trang bị.`);
+  refreshUi(true); openMartialPaths(id);
 }
 
 function playerIdleActive(): boolean {
@@ -6567,6 +6607,9 @@ function validateSave(value: unknown): {
     player.maxMp < 1
   )
     throw new Error("save-invalid");
+  const martialSchool = SECT_BY_FACTION[factionOf(player.factionId, player.sect).id];
+  if (!validMartialPath(martialSchool, player.martialPath)) throw new Error("save-invalid");
+  player.martialPath = martialPath(martialSchool, player.martialPath).id;
   if (!validExploration(player.exploration)) throw new Error("save-invalid");
   player.exploration = normalizeExploration(player.exploration);
   if (!validCompanions(player.companions)) throw new Error("save-invalid");
@@ -6801,6 +6844,7 @@ function bindIdleUi(): void {
     if (target.closest("[data-open-gem-bag]")) openGemBag();
     const gemRealmButton = target.closest<HTMLButtonElement>("[data-gem-realm-enter]");
     if (gemRealmButton && !gemRealmButton.disabled && isGemRealm(gemRealmButton.dataset.gemRealmEnter)) { closeUtility(); enterDungeon(gemRealmButton.dataset.gemRealmEnter); }
+    if (target.closest("[data-open-martial-paths]")) openMartialPaths();
     const socketButton = target.closest<HTMLButtonElement>("[data-open-sockets]");
     if (socketButton && !socketButton.disabled) openSockets(socketButton.dataset.openSockets!);
     const socketAction = target.closest<HTMLButtonElement>("[data-socket-insert],[data-socket-remove]");
@@ -7111,8 +7155,12 @@ function bindIdleUi(): void {
         syncStats(); persistGame(); refreshUi(true); openGearSets(id);
         showToast(`Đã mặc ${count} món bộ ${GEAR_SETS[id].name}. Đồ cũ giữ trong túi.`);
       }
+    const pathPreview = target.closest<HTMLButtonElement>("[data-preview-path]");
+    if (pathPreview) openMartialPaths(pathPreview.dataset.previewPath);
+    const pathApply = target.closest<HTMLButtonElement>("[data-apply-path]");
+    if (pathApply && !pathApply.disabled) changeMartialPath(pathApply.dataset.applyPath!);
       const skillPreview = target.closest<HTMLButtonElement>("[data-art-skill]");
-      if (skillPreview) openSkillArt(skillPreview.dataset.artSkill as SkillKey);
+      if (skillPreview) { if (artPreviewPath) openMartialPaths(artPreviewPath, skillPreview.dataset.artSkill as SkillKey); else openSkillArt(skillPreview.dataset.artSkill as SkillKey); }
       const preview = target.closest<HTMLButtonElement>("[data-preview-title]");
       if (preview) openTitles(preview.dataset.previewTitle);
       const wear = target.closest<HTMLButtonElement>("[data-wear-title]");
@@ -7405,32 +7453,41 @@ function selectionSex(id: SchoolId): CharacterSex {
   return value === "male" || value === "female" ? value : defaultCharacterSex(id);
 }
 function renderSectDetail(): void {
-  const school = SCHOOL_KITS[SECT_BY_FACTION[selectedFaction]], definition = school.kit[previewSkill];
+  const school = martialSect(SECT_BY_FACTION[selectedFaction], selectedMartialPaths[SECT_BY_FACTION[selectedFaction]]), definition = school.kit[previewSkill];
   for (const button of sectCards.querySelectorAll<HTMLButtonElement>("[data-faction]")) button.setAttribute("aria-pressed", String(button.dataset.faction === selectedFaction));
-  document.querySelector("#sect-detail")!.innerHTML = `<strong>${school.name} · ${school.title}</strong><div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><b>${definition.name}</b><span>${definition.description}</span><small class="skill-range">${skillReachLabel(definition)}</small><small>${formatNumber(toCombat(definition.mp))} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
+  document.querySelector("#sect-detail")!.innerHTML = `<strong>${school.name} · ${school.title}</strong>${martialChoiceMarkup(school.id, martialPath(school.id, selectedMartialPaths[school.id]).id, "select")}<div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><b>${definition.name}</b><span>${definition.description}</span><small class="skill-range">${skillReachLabel(definition)}</small><small>${formatNumber(toCombat(definition.mp))} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
   previewCanvas = document.querySelector<HTMLCanvasElement>("#sect-preview");
-  document.querySelector("#join-sect")!.textContent = `Gia nhập ${school.name}`;
+  document.querySelector("#join-sect")!.textContent = `Gia nhập ${school.name} · ${school.title}`;
 }
 function drawSectPreview(now: number): void {
   if (!previewCanvas || sectOverlay.classList.contains("hidden")) return;
-  const pc = previewCanvas.getContext("2d")!, school = SCHOOL_KITS[SECT_BY_FACTION[selectedFaction]], definition = school.kit[previewSkill];
+  const pc = previewCanvas.getContext("2d")!, school = martialSect(SECT_BY_FACTION[selectedFaction], selectedMartialPaths[SECT_BY_FACTION[selectedFaction]]), definition = school.kit[previewSkill];
   pc.clearRect(0, 0, 128, 86);
-  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: school.color, sect: school.id, kind: definition.motif, skill: previewSkill }, (now % 1800) / 1800);
-  drawSprite(pc, school.id, 56, 76, HERO_SIZE.width, HERO_SIZE.height, false, selectionSex(school.id));
+  drawSectEffect(pc, { x: 66, y: 46, radius: 34, color: school.color, sect: school.id, kind: definition.motif, art: definition.art, skill: previewSkill }, (now % 1800) / 1800);
+  pc.save(); pc.translate(56, 76); const chosen = martialPath(school.id, selectedMartialPaths[school.id]);
+  drawAnimatedHero(pc, selectedFaction, selectionSex(school.id), freshMotion(), now, { weaponVariant: chosen.weapon, unarmed: !chosen.weapon, weaponColor: school.color, armorColor: "", auraColor: school.color, tier: 0, enhancement: 0 }); pc.restore();
 }
 
 let artPreviewSkill: SkillKey = "skill1";
-function openSkillArt(key: SkillKey = "skill1"): void {
+let artPreviewPath: string | undefined;
+function openMartialPaths(pathId = game?.player.martialPath, key: SkillKey = "skill1"): void {
   if (!game) return;
-  artPreviewSkill = key;
-  const sect = playerSect(game.player), skill = sect.kit[key];
-  openUtility(`Võ công · ${sect.name}`, `<div class="skill-art-preview"><canvas id="skill-art-canvas" width="360" height="210" aria-label="Hiệu ứng ${skill.name}"></canvas><div class="sect-preview-skills">${SKILL_KEYS.map(k => `<button data-art-skill="${k}" aria-pressed="${k === key}">${skillIconMarkup(sect.kit[k], k, sect.color)}<span>${sect.kit[k].name}</span></button>`).join("")}</div><p><b>${skill.name}</b> · ${formatNumber(toCombat(skill.mp))} MP · Hồi ${skill.cooldown}s</p><p class="skill-range">${skillReachLabel(skill)}</p><p class="dim">${skill.description}</p><small class="dim">Nét đứt minh họa tầm đánh. Xem thử không tốn nội lực hoặc nộ. Hiệu ứng ${game.player.preferences.skillEffects === "simple" ? "gọn" : "đầy đủ"}; đổi tại Cài đặt.</small></div>`);
+  openSkillArt(key, pathId);
+  const sect = playerSect(game.player), chosen = martialPath(sect.id, pathId);
+  document.getElementById("utility-content")!.insertAdjacentHTML("afterbegin", `${martialChoiceMarkup(sect.id, chosen.id, "preview")}<p class="dim">Đổi miễn phí tại thành, khi đã hết hồi chiêu. Hai hướng dùng chung điểm và bậc của ba ô kỹ năng; trang bị, ngọc và tâm pháp giữ nguyên. Thế cầm vũ khí theo hướng đã chọn.</p><button class="outline-button" data-apply-path="${chosen.id}" ${!canChangeMartialPath() || game.player.martialPath === chosen.id ? "disabled" : ""}>${game.player.martialPath === chosen.id ? "Đang tu luyện" : !canChangeMartialPath() ? "Về thành · Chờ hết hồi chiêu để đổi" : `Tu luyện ${chosen.name}`}</button>`);
+}
+function openSkillArt(key: SkillKey = "skill1", previewPath?: string): void {
+  if (!game) return;
+  artPreviewSkill = key; artPreviewPath = previewPath;
+  const sect = previewPath ? martialSect(playerSect(game.player).id, previewPath) : playerSect(game.player), skill = sect.kit[key];
+  openUtility(`Võ công · ${sect.name} · ${sect.title}`, `<div class="skill-art-preview"><canvas id="skill-art-canvas" width="360" height="210" aria-label="Hiệu ứng ${skill.name}"></canvas><div class="sect-preview-skills">${SKILL_KEYS.map(k => `<button data-art-skill="${k}" aria-pressed="${k === key}">${skillIconMarkup(sect.kit[k], k, sect.color)}<span>${sect.kit[k].name}</span></button>`).join("")}</div><p><b>${skill.name}</b> · ${formatNumber(toCombat(skill.mp))} MP · Hồi ${skill.cooldown}s</p><p class="skill-range">${skillReachLabel(skill)}</p><p class="dim">${skill.description}</p><small class="dim">Nét đứt minh họa tầm đánh. Xem thử không tốn nội lực hoặc nộ. Hiệu ứng ${game.player.preferences.skillEffects === "simple" ? "gọn" : "đầy đủ"}; đổi tại Cài đặt.</small></div>`);
 }
 function drawSkillArtPreview(now: number): void {
   if (!game || document.getElementById("utility-overlay")!.classList.contains("hidden")) return;
   const preview = document.querySelector<HTMLCanvasElement>("#skill-art-canvas");
   if (!preview) return;
-  const c = preview.getContext("2d")!, sect = playerSect(game.player), skill = sect.kit[artPreviewSkill];
+  const c = preview.getContext("2d")!, sect = artPreviewPath ? martialSect(playerSect(game.player).id, artPreviewPath) : playerSect(game.player), skill = sect.kit[artPreviewSkill];
+  preview.dataset.path = skill.pathId; preview.dataset.martialArt = skill.art;
   c.clearRect(0, 0, 360, 210);
   c.fillStyle = "#132b26"; c.fillRect(0, 0, 360, 210);
   c.strokeStyle = "#28443a"; c.lineWidth = 1;
@@ -7448,12 +7505,12 @@ function drawSkillArtPreview(now: number): void {
   const motion = freshMotion();
   motion.action = skill.dash ? "dash" : "cast";
   motion.actionAt = now - p * 1600; motion.actionDuration = 650;
-  drawAnimatedHero(c, game.player.factionId, game.player.sex, motion, now, { ...currentHeroAppearance(), riding: false });
+  drawAnimatedHero(c, game.player.factionId, game.player.sex, motion, now, { ...currentHeroAppearance(), riding: false, weaponVariant: martialPath(sect.id, artPreviewPath ?? game.player.martialPath).weapon, unarmed: !martialPath(sect.id, artPreviewPath ?? game.player.martialPath).weapon });
   c.restore();
   if (skill.damage > 0) {
     drawSprite(c, "bandit", victim.x, victim.y + 24, 44, 58);
     if (p >= .55) {
-      const cold = skill.motif === "fan" || skill.motif === "frost", activeUntil = now + 1000;
+      const cold = skill.motif === "fan" || skill.motif === "frost" || Boolean(skill.art?.startsWith("ice")), activeUntil = now + 1000;
       c.save(); c.translate(victim.x, victim.y + 10);
       drawEnemyStatus(c, {
         radius: 17, slowUntil: skill.slow ? activeUntil : 0,
@@ -7464,11 +7521,11 @@ function drawSkillArtPreview(now: number): void {
       c.restore();
     }
   }
-  const base = { color: sect.color, sect: sect.id, kind: skill.motif, skill: artPreviewSkill, angle: 0, quality };
+  const base = { color: sect.color, sect: sect.id, kind: skill.motif, art: skill.art, skill: artPreviewSkill, angle: 0, quality };
   const hand = actorCastOffset(sect.id, game.player.sex, 1);
   const origin = { x: actor.x + hand.x, y: actor.y + 12 + hand.y };
   if (p < .2) drawSectEffect(c, { ...base, ...(ranged ? origin : actor), radius: 28, phase: "cast" }, p / .2);
-  if (ranged && p >= .15 && p < .55) drawSkillFlight(c, origin, victim, (p - .15) / .4, sect.id, artPreviewSkill, now, quality);
+  if (ranged && p >= .15 && p < .55) drawSkillFlight(c, origin, victim, (p - .15) / .4, sect.id, artPreviewSkill, now, quality, skill.art, skill.motif);
   if (!ranged && p >= .2 && p < .55) {
     drawSectEffect(c, { ...base, x: actor.x + dash, y: actor.y, radius: skill.shape === "line" ? 130 : Math.min(110, Math.max(60, skill.radius * .7)), phase: "release" }, (p - .2) / .35);
   }
@@ -7813,6 +7870,8 @@ onlineButton.addEventListener("click", () => {
 bindIdleUi();
 document.querySelector("#join-sect")!.addEventListener("click", () => { const faction = factionOf(selectedFaction); startGame(faction.archetype, faction.id); });
 document.querySelector("#sect-detail")!.addEventListener("click", event => {
+  const selection = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-select-path]");
+  if (selection) { selectedMartialPaths[SECT_BY_FACTION[selectedFaction]] = selection.dataset.selectPath; previewSkill = "skill1"; renderSectDetail(); return; }
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-preview-skill]");
   if (button) { previewSkill = button.dataset.previewSkill as SkillKey; renderSectDetail(); }
 });

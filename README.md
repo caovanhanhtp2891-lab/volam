@@ -3,6 +3,14 @@
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
 
+## Thập phái · Song tu · v0.29.0
+
+- **10 phái × 2 hướng × 3 chiêu:** Thiếu Lâm côn/đao, Thiên Vương thương/chùy, Đường Môn phi đao/tụ tiễn, Ngũ Độc đao/chưởng, Nga Mi kiếm/chưởng, Thúy Yên đơn đao/song đao, Cái Bang chưởng/bổng, Thiên Nhẫn đao/kích, Võ Đang kiếm/khí, Côn Lôn đao/kiếm. Tên chiêu và họ vũ khí được đối chiếu dữ liệu JX1 công khai; xem [bảng chiêu và nguồn tra cứu](docs/martial-paths.md).
+- **Chọn và xem thử:** chọn ngay khi tạo nhân vật; **Nhân vật / Võ công → Đổi võ công** để xem thử rồi áp dụng trong thành khi hết hồi chiêu. Hai hướng dùng chung bậc và điểm ba ô kỹ năng, giữ trang bị/ngọc/tâm pháp/Tri kỷ và file lưu cũ. Vũ khí cầm, biểu tượng và kỹ năng theo hướng đã chọn; chỉ số món đang mặc vẫn giữ nguyên.
+- **20 họ hiệu ứng riêng:** rồng Cái Bang chưởng, bổng ảnh Cái Bang bổng; mưa lửa Ma nhẫn, kích đỏ Chiến nhẫn; ám khí độc, băng đao, kiếm khí, hoa sen, Thái cực và lôi điện. Có lấy đà, ra chiêu, vệt bay và hiệu ứng trúng theo đúng họ chiêu. Mỗi chiêu hiển thị tầm đánh thật. Đây là hình vẽ mới theo phong cách võ công VLTK; thông số chiến đấu được điều chỉnh cho game idle.
+
+Kiểm tra: 246 kiểm tra logic, typecheck, build production `/volam/`, `tests/martial-paths-browser.cjs` cho 20 hướng/60 chiêu thật và giữ file lưu; hồi quy chat/cấp 200, ngọc/tâm pháp, bot và công thành.
+
 ## Chat giang hồ · Cấp 200 · Tối ưu hiệu năng · v0.28.0
 
 - **Giảm giật:** cache tổng chỉ số trang bị/Tri kỷ/bị động, chỉ tính lại khi đổi chỉ số; tái sử dụng bộ định dạng số/ngày. Chỉ cập nhật nội dung HUD thay đổi, giữ nguyên các nút/ô mục tiêu, không dựng lại bảng Nhân vật và Túi đồ khi đang đóng. Ngừng vẽ sân bị che bởi bảng khác; bỏ vẽ NPC/quái/bot ngoài vùng nhìn nhưng vẫn chạy chiến đấu/tuần tra. Gom lưu tự động khi đánh/nhặt đồ tối đa một lần mỗi giây, flush khi ẩn/đóng trang; giao dịch vòng quay, cường hóa, đổi bản đồ và thao tác lưu vẫn lưu ngay.

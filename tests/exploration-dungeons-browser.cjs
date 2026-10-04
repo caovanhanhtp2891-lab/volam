@@ -164,7 +164,7 @@ async function worldClick(page, point) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.28.0",
+      "0.29.0",
     );
     await click(page, '[data-faction="gaibang"]');
     await click(page, "#join-sect");

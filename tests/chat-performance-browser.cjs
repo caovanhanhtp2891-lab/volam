@@ -85,7 +85,7 @@ async function command(p, value) {
     await p.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await p.locator("html").getAttribute("data-version"),
-      "0.28.0",
+      "0.29.0",
     );
     await click(p, '[data-faction="tianwang"]');
     await click(p, "#join-sect");

@@ -1,4 +1,4 @@
-import { SECTS, SKILL_KEYS, type SectId, type SkillDefinition, type SkillKey } from "./sects.ts";
+import { SECTS, SKILL_KEYS, type SectId, type SkillDefinition, type SkillKey, type MartialArt } from "./sects.ts";
 import type { SetCrest } from "./gear-catalog";
 import { SET_CREST_PATHS } from "./set-art.ts";
 export const SECT_SIGILS: Record<SectId, SetCrest> = {
@@ -22,7 +22,7 @@ export const SKILL_PALETTES: Record<SectId, SkillPalette> = {
 };
 const byName = new Map<string, { sect: SectId; key: SkillKey }>();
 for (const sect of Object.values(SECTS)) for (const key of SKILL_KEYS) byName.set(sect.kit[key].name, { sect: sect.id, key });
-export const visualIdentity = (skill: SkillDefinition) => byName.get(skill.name);
+export const visualIdentity = (skill: SkillDefinition) => skill.sectId ? { sect: skill.sectId, key: "skill1" as SkillKey } : byName.get(skill.name);
 let serial = 0;
 const rotate = (content: string, angle: number, x = 32, y = 32) => `<g transform="translate(${x} ${y}) rotate(${angle})">${content}</g>`;
 const lance = '<path d="M0-25-5-14-2-8v29h4V-8l3-6z"/><path d="M0-22V16" fill="none" stroke-width="1"/><path d="M-6-6H6M-4 17h8" fill="none"/>';
@@ -33,6 +33,26 @@ const blade = '<path d="M0-23C14-10 12 4-3 14L0-7-8 17-12 19l3-9z"/><path d="M-1
 const bolt = '<path d="m3-25-14 27h10l-4 23L14-5H4l6-20z"/>';
 const dragon = '<path d="M-25 17C-12 23 6 10-3 3S-19-7-7-12s17 7 24-3l9 4-8 11-8-1C0 3 20 21-2 25" fill="none" stroke-width="7"/><path d="m10-16 3-11 5 10 6-7-2 11m-10 7 11-2m-8 0 8 8M-12-6l5 4-5 4M-2 12l5 3-4 4M4 1l9 6 4-3m-4 3 2 5" fill="none"/><path d="M23-9q13-9 5-15M22-5q13 6 8 14" fill="none" stroke-width="1"/><circle cx="19" cy="-12" r="3" fill="#3c1c14"/><circle cx="20" cy="-13" r="1.6" fill="#fff7db" stroke="none"/>';
 const fire = '<path d="M32 8c1 12-15 15-13 28 1 17 28 19 28 0 0-7-5-12-7-15 1 10-4 10-4 10 3-12-4-15-4-23Z"/><path d="M32 30c-1 6-8 9-7 14 2 8 14 8 14-1 0-4-4-6-3-11-1 3-3 4-4 5z" fill="#fff1bc" stroke="none"/>';
+
+function martialIcon(art: MartialArt, key: SkillKey, motif?: string): string {
+  const ult = key === "ultimate", count = ult ? 3 : key === "skill2" ? 2 : 1;
+  if (art === "saber" && motif === "bell") return '<circle cx="32" cy="32" r="22" fill="none"/><circle cx="32" cy="32" r="17" fill="none"/><path d="m20 25 5-8h14l5 8-3 15-9 7-9-7zM24 27l5 2m11-2-5 2M28 36h8" fill="none"/>';
+  const crescents = Array.from({ length: count }, (_, i) => `<g transform="translate(32 32) rotate(${i * 45 - 25})"><path d="M-20 16C-21-14 6-25 23-12C3-17-9 3-20 16Z"/><path d="M-17 15C-6-1 9-8 20-10" fill="none"/></g>`).join("");
+  if (["saber", "poison-saber", "ice-saber", "wind-saber"].includes(art)) return crescents + (art === "wind-saber" ? '<path d="M8 47q22 10 45-9M8 53q15 8 29 0" fill="none"/>' : '');
+  if (art === "ice-twins") return rotate(blade, -35, 23, 32) + rotate(blade, 145, 43, 32) + '<path d="M12 52 52 12M32 6v7m0 38v7" fill="none"/>';
+  if (art === "staff" || art === "dog-staff") return Array.from({ length: count }, (_, i) => `<g transform="translate(32 32) rotate(${i * 35 - 35})"><path d="M-2-23h4v46h-4z"/><path d="M-5-18h10M-5 18h10" fill="none"/></g>`).join('') + (ult ? '<ellipse cx="32" cy="40" rx="23" ry="12" fill="none"/>' : '');
+  if (art === "hammer") return '<path d="M29 28h6v27h-6zM14 13l8-5h20l8 5v18l-8 5H22l-8-5z"/><path d="M22 12v19m20-19v19M10 47l-5 6m49-6 5 6" fill="none"/>';
+  if (art === "spear" || art === "fire-spear") return Array.from({ length: count }, (_, i) => rotate(lance, -35 + i * 30, 23 + i * 9, 32)).join('') + (art === "fire-spear" ? '<path d="M50 30q12 10-2 26-9-4-2-12 4 1 4-14Z"/>' : '');
+  if (art === "dart") return Array.from({ length: count + 1 }, (_, i) => rotate(blade, -70 + i * 70, 32, 32)).join('');
+  if (art === "bolts") return Array.from({ length: ult ? 7 : 3 }, (_, i) => rotate(dagger, (i - (ult ? 3 : 1)) * 15, 32, 37)).join('');
+  if (art === "dragon-palm") return rotate(dragon, 0) + (ult ? '<path d="M8 51q22 12 43-1M8 56q21 8 41-1" fill="none"/>' : '');
+  if (art === "fire-rain") return key === "skill1" ? fire : '<path d="M10 9 29 31m-5-22 19 22m-4-19 18 20" fill="none" stroke-width="3"/>' + fire;
+  if (art === "poison-palm") return '<path d="M24 33V17q0-5 4-2v15-18q2-5 5 0v18-17q4-4 5 1v18-13q5-3 5 2v20q-1 15-17 13-9-1-13-14l-2-8q3-5 7 3l6 5z"/><circle cx="34" cy="42" r="7" fill="none"/>';
+  if (art === "lotus-palm") return iconArt("nga-mi", key, "#a0f0d9");
+  if (art === "ice-swords" || art === "sword-array") return Array.from({ length: count }, (_, i) => rotate(sword, (i - (count - 1) / 2) * 35, 32, 35)).join('') + (art === "ice-swords" ? '<path d="M10 13v8m-4-4h8M51 45v10m-5-5h10" fill="none"/>' : '');
+  if (art === "qi") return key === "skill1" ? rotate(bolt, 20) : iconArt("vo-dang", "skill2", "#a4efed");
+  return iconArt("con-lon", key, "#ffe177");
+}
 
 function iconArt(sect: SectId, key: SkillKey, accent: string): string {
   const ult = key === "ultimate", second = key === "skill2";
@@ -81,5 +101,5 @@ function iconArt(sect: SectId, key: SkillKey, accent: string): string {
 export function skillIconMarkup(skill: SkillDefinition, key: SkillKey, fallback: string): string {
   const identity = visualIdentity(skill), sect = identity?.sect ?? "vo-dang", palette = SKILL_PALETTES[sect];
   const id = `skill-art-${++serial}`, color = identity ? palette.color : fallback;
-  return `<svg viewBox="0 0 64 64" aria-hidden="true" data-motif="${skill.motif}" data-icon-skill="${key}" data-visual="${sect}-${key}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}-halo" cx=".42" cy=".36" r=".7"><stop stop-color="${color}" stop-opacity=".6"/><stop offset=".5" stop-color="${palette.dark}"/><stop offset="1" stop-color="#060e14"/></radialGradient><linearGradient id="${id}-ink" x2=".6" y2="1"><stop stop-color="${palette.light}"/><stop offset=".38" stop-color="${color}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#${id}-halo)" stroke="${key === "ultimate" ? "#ffe8a6" : color}" stroke-width="1.8"/><circle cx="32" cy="32" r="27" fill="none" stroke="${color}" stroke-opacity=".35"/><path d="M10 19A26 26 0 0 1 46 9M54 45A26 26 0 0 1 18 55" fill="none" stroke="${palette.light}" stroke-opacity=".65" stroke-width="1.2"/><path d="m32 2 3 5-3 3-3-3zm0 52 3 3-3 5-3-5z" fill="${key === "ultimate" ? "#ffe8a6" : palette.accent}"/><g fill="url(#${id}-ink)" stroke="${palette.light}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">${iconArt(sect,key,palette.accent)}</g><path d="m10 9 3 4-4-1m42 36 3 4-4-1" fill="${palette.light}" opacity=".8"/><g data-school-sigil="${sect}" transform="translate(11 11)"><circle r="7" fill="${palette.dark}" stroke="${palette.accent}" stroke-width=".8"/><path d="${SET_CREST_PATHS[SECT_SIGILS[sect]]}" transform="scale(.38)" fill="none" stroke="${palette.light}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+  return `<svg viewBox="0 0 64 64" aria-hidden="true" data-motif="${skill.motif}" data-icon-skill="${key}" data-visual="${sect}${skill.pathId ? `-${skill.pathId}` : ""}-${key}" data-path="${skill.pathId ?? ""}" data-martial-art="${skill.art ?? ""}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}-halo" cx=".42" cy=".36" r=".7"><stop stop-color="${color}" stop-opacity=".6"/><stop offset=".5" stop-color="${palette.dark}"/><stop offset="1" stop-color="#060e14"/></radialGradient><linearGradient id="${id}-ink" x2=".6" y2="1"><stop stop-color="${palette.light}"/><stop offset=".38" stop-color="${color}"/><stop offset="1" stop-color="${palette.accent}"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#${id}-halo)" stroke="${key === "ultimate" ? "#ffe8a6" : color}" stroke-width="1.8"/><circle cx="32" cy="32" r="27" fill="none" stroke="${color}" stroke-opacity=".35"/><path d="M10 19A26 26 0 0 1 46 9M54 45A26 26 0 0 1 18 55" fill="none" stroke="${palette.light}" stroke-opacity=".65" stroke-width="1.2"/><path d="m32 2 3 5-3 3-3-3zm0 52 3 3-3 5-3-5z" fill="${key === "ultimate" ? "#ffe8a6" : palette.accent}"/><g fill="url(#${id}-ink)" stroke="${palette.light}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">${skill.art ? martialIcon(skill.art, key, skill.motif) : iconArt(sect,key,palette.accent)}</g><path d="m10 9 3 4-4-1m42 36 3 4-4-1" fill="${palette.light}" opacity=".8"/><g data-school-sigil="${sect}" transform="translate(11 11)"><circle r="7" fill="${palette.dark}" stroke="${palette.accent}" stroke-width=".8"/><path d="${SET_CREST_PATHS[SECT_SIGILS[sect]]}" transform="scale(.38)" fill="none" stroke="${palette.light}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
 }

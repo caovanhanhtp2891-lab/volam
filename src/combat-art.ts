@@ -15,6 +15,7 @@ import { drawRiderLeg } from "./rider-art";
 import { weaponPose, bodyBreath, actorBodyPose } from "./actor-animation";
 export { drawEquipmentIcon } from "./equipment-art";
 export interface HeroAppearance extends GearAura, WearableAppearance {
+  unarmed?: boolean;
   weaponVariant?: GearVariant;
   weapon?: EquipmentVisual;
   riding?: boolean;
@@ -56,8 +57,7 @@ export function drawAnimatedHero(
     "vo-dang": "sword",
     "con-lon": "thundersword",
   };
-  const variant =
-    appearance.weaponVariant ?? defaultWeapon[school.id] ?? "sword";
+  const variant = appearance.unarmed ? "flute" : appearance.weaponVariant ?? defaultWeapon[school.id] ?? "sword";
   const pose = weaponPose(variant, motion, now);
   const body = actorBodyPose(motion, pose.family, now, !!appearance.riding);
   const direction = motion.facingX < 0 ? -1 : 1;
@@ -100,7 +100,7 @@ export function drawAnimatedHero(
     ctx.translate(body.torsoShift, HERO_SIZE.height * 0.22 - 12 + body.crouch);
   ctx.translate(rig.right.x, rig.right.y);
   ctx.rotate(pose.angle);
-  drawHeldWeapon(
+  if (!appearance.unarmed) drawHeldWeapon(
     ctx,
     variant,
     appearance.weapon ?? {
