@@ -248,7 +248,7 @@ test("bots walk with actual travel, honor obstacles, stun and slow, and have dis
     createBot(BOT_TEMPLATES[4], 0, 1, bot, stats).maxHp >
       createBot(BOT_TEMPLATES[1], 0, 1, bot, stats).maxHp,
   );
-  assert.deepEqual(freshBotSettings(), { enabled: true, assist: false });
+  assert.deepEqual(freshBotSettings(), { enabled: true, assist: false, pvp: true });
 });
 test("body actions have windup, release and recovery, return to rest, and keep mounted knees still", () => {
   const motion = {

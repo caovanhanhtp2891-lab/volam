@@ -2,6 +2,17 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Du hành · Chiến kỳ · v0.22.0
+
+- **Khác → Nhặt đồ · Tự vứt đồ**, hoặc **Hành trang → Lọc nhặt · Tự vứt**: chọn phẩm chất và bậc nhặt tối thiểu (16 bậc, mỗi bậc 10 cấp). Cả hai điều kiện cùng áp dụng cho tự nhặt; nhặt tay bỏ qua lọc. Bạc/đá đi kèm đồ bị lọc vẫn nhặt riêng, không nhận lặp. Đồ chưa đạt lọc còn trên đất; rời/chuyển trận và quá giới hạn đồ rơi sẽ thu hồi để không mất thưởng.
+- **Tự vứt đồ** mặc định tắt: bật để áp dụng ngay cho túi và đồ mới nhận, chọn phẩm chất tối đa (Trắng/Lục/Lam/Tím), bậc tối đa và tùy chọn chỉ vứt đồ yếu hơn hoặc bằng món đang mặc. Không nhận bạc khi vứt. Luôn giữ đồ bộ, đồ cường hóa, Hoàng Kim trở lên, đồ đang mặc và Đồ chờ nhận. Bộ lọc lưu riêng từng nhân vật; save cũ nhận mọi phẩm chất và chưa bật tự vứt. Nếu không lưu được lựa chọn, hoàn lại cài đặt và đồ vừa vứt.
+- **BOT tuần tra** chọn đích ngẫu nhiên trong toàn map, tìm đường quanh vật cản và đổi đích khi đến nơi hoặc đi quá lâu. BOT không trợ chiến đi độc lập với người chơi. **Đồ sát ngẫu nhiên** có thể bật/tắt trong Đồng hành BOT: mỗi lần đi vào tầm 190 có 12% cơ hội, chỉ xét một lần cho mỗi lượt gặp; phải ra xa 280 rồi gặp lại, cách nhau ít nhất 45 giây. Tối đa một BOT đồ sát cùng lúc. BOT dùng hình/chiêu môn phái, gây sát thương và nhận kỹ năng/hiệu ứng trạng thái thật; người chơi đánh trả hoặc chạy xa. Đồ sát hết sau 45 giây, BOT quay lại sau 60 giây. Trong thành/tổ đội trợ chiến an toàn; có 15 giây bảo vệ sau hồi sinh. BOT đồ sát không cho XP/đồ/thành tích quái và không làm mất trang bị.
+- **Công thành theo yêu cầu** có ba giai đoạn: phá cổng, phá chiến kỳ rồi giữ vòng cờ 12 giây, hạ Thống lĩnh cùng quân bảo vệ. Địch trong tầm 220 đẩy lùi tiến độ chiếm; người chơi hoặc đồng đội trong tầm 115 giữ cờ. Viện binh phản công ở mốc 4 và 8 giây, mỗi đợt chỉ xuất hiện một lần. Vòng chiếm, thanh tiến độ và lệnh BOT hiển thị ngay trên sân. Máu quân thủ thành tính theo sát thương sau giáp để phù hợp cả nhân vật phòng thủ cao.
+- Trận thắng nhận bạc/XP/2 đá như cũ và **một trang bị Cực phẩm (80%) hoặc Hoàng Kim (20%)**; túi đầy chuyển vào Đồ chờ nhận. Đủ cấp và chiếm đúng tuyến thì cũng chiếm lãnh thổ, nhận chiến công cùng thưởng chiếm thành lần đầu để nhận ấn. Chưa đủ điều kiện vẫn chơi được trận luyện tập, không vượt qua khóa cấp/tuyến thành. Đánh lại thành đã chiếm không nhận lại chiến công. Rút/thua/hết giờ/tải lại trận chưa hoàn thành không thưởng.
+- Bản đồ luyện công, thị trấn, phụ bản và khám phá vẽ ở độ phân giải gốc, thay cho bản đệm giảm một nửa; thêm chi tiết mặt đất theo 16 vùng và giảm phủ tối. Đường khám phá có viền sáng, mốc đá và bảng khu rõ hơn. Giới hạn bộ nhớ giữ hai sân luyện và một bản đồ khám phá trong cache; chỉ dựng cảnh khi chuyển vùng/tải ảnh.
+
+Kiểm tra: `pnpm test`, `pnpm typecheck`, `pnpm build --base=/volam/`; trình duyệt production: `node --experimental-strip-types tests/loot-patrol-siege-browser.cjs` và `tests/activities-browser.cjs`. Bao phủ lọc/cấp bậc, nhặt bạc riêng và nhặt tay, bảo vệ/tự vứt/lưu-tải, BOT đi xa/đồ sát/đánh trả/vùng an toàn, giữ cờ/viện binh/thưởng/chiếm lại, map gốc, save cũ và màn hình 320–1280px.
+
 ## Vinh danh · Long ấn · v0.21.0
 
 - Nhãn trên nhân vật xếp **quân hàm đang mang → danh hiệu đang đeo → cảnh giới → tên/cấp**. Chữ cảnh giới tăng từ 16 đến 21 đơn vị Canvas theo bậc; danh hiệu 16–24; quân hàm 18–25,8. Viền nền tối, chữ chuyển sắc, viền kép và tinh quang tăng ở bậc cao. Nhãn tự co và dịch trong vùng nhìn thấy để tránh bản đồ, bảng nhiệm vụ và thanh nhân vật; không cắt tên trên điện thoại. Giao diện Nhân vật dùng cùng màu và thứ tự.
@@ -227,7 +238,7 @@ Bộ này xem đủ 30 chiêu, kiểm tra ảnh có chuyển động và khác n
 - Tự lưu mỗi 10 giây và khi giao dịch. Ba ô nhân vật lưu độc lập; hỗ trợ file `.volamsave`, mã JSON, sao lưu trước khi nạp/tạo lại và khôi phục bản sao lưu. File không hợp lệ không thay thế nhân vật hiện tại.
 - Thưởng ngày chỉ nhận một lần cho mỗi nhân vật, tính theo giờ Việt Nam. Khi tải lại nhân vật đang luyện ải, nhận thưởng vắng mặt tối đa 4 giờ; ở thành không nhận thưởng luyện công.
 - Trong tab **Khác**, chọn **Rừng Trúc · Phiêu lưu** để trở lại nhiệm vụ, NPC và hai phụ bản của bản cũ. Save cũ tự chuyển sang chế độ phiêu lưu, giữ nhân vật và vật phẩm. Thẻ **Sân luyện mới đã sẵn sàng** trong Giang hồ có nút **Vào luyện công** để bật sân luyện tự động với nhân vật đó.
-- Tab **Khác** hiển thị bản **v0.21.0 · Vinh danh · Long ấn** để xác định bản đang tải.
+- Tab **Khác** hiển thị bản **v0.22.0 · Du hành · Chiến kỳ** để xác định bản đang tải.
 
 Ảnh đại diện, nhân vật của 10 phái, quái và NPC dùng một atlas WebP 28 KB; hiệu ứng và trang bị dưới đất được vẽ trên Canvas. Đây là triển khai vòng chơi và giao diện tương ứng; chưa thay thế toàn bộ dữ liệu kỹ năng, sprite/animation, bot, bộ trang bị và chế tác chuyên sâu của game tham chiếu.
 

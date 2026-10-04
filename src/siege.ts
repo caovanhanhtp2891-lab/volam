@@ -1,6 +1,21 @@
 import { territoryOf, type TerritoryId } from "./military.ts";
 import type { Point } from "./combat.ts";
 
+export const SIEGE_CAPTURE_SECONDS = 12;
+export interface SiegeCapture { progress: number; reinforcements: number }
+export const freshSiegeCapture = (): SiegeCapture => ({ progress: 0, reinforcements: 0 });
+export function tickSiegeCapture(state: SiegeCapture, dt: number, allied: boolean, contested: boolean): boolean {
+  if (!Number.isFinite(dt) || dt <= 0) return false;
+  const elapsed = Math.min(dt, 0.25);
+  state.progress = Math.max(0, Math.min(SIEGE_CAPTURE_SECONDS,
+    state.progress + (contested ? -elapsed * 0.5 : allied ? elapsed : 0)));
+  if (state.reinforcements < 2 && state.progress >= (state.reinforcements + 1) * 4) {
+    state.reinforcements++;
+    return true;
+  }
+  return false;
+}
+
 export function siegeBlocked(
   x: number,
   y: number,

@@ -113,10 +113,12 @@ export type BotOrder = "push" | "guard" | "rally";
 export interface BotSettings {
   enabled: boolean;
   assist: boolean;
+  pvp: boolean;
 }
 export const freshBotSettings = (): BotSettings => ({
   enabled: true,
   assist: false,
+  pvp: true,
 });
 export function validBotSettings(value: unknown): boolean {
   return (
@@ -125,11 +127,37 @@ export function validBotSettings(value: unknown): boolean {
       value &&
         typeof value === "object" &&
         typeof (value as BotSettings).enabled === "boolean" &&
-        typeof (value as BotSettings).assist === "boolean",
+        typeof (value as BotSettings).assist === "boolean" &&
+        ((value as BotSettings).pvp === undefined || typeof (value as BotSettings).pvp === "boolean"),
     )
   );
 }
+export function normalizeBotSettings(value?: unknown): BotSettings {
+  return value && validBotSettings(value) ? { ...freshBotSettings(), ...(value as BotSettings) } : freshBotSettings();
+}
+export const BOT_ENCOUNTER_CHANCE = 0.12;
+export interface BotEncounter { near: boolean; nextRollAt: number }
+// Roll once on entering an encounter, never once per animation frame.
+export function botEncounter(state: BotEncounter, distance: number, now: number, safe: boolean, random = Math.random): boolean {
+  if (safe) { state.near = false; state.nextRollAt = Math.max(state.nextRollAt, now + 10000); return false; }
+  if (distance > 280) state.near = false;
+  if (distance > 190 || state.near) return false;
+  state.near = true;
+  if (now < state.nextRollAt) return false;
+  state.nextRollAt = now + 45000;
+  return random() < BOT_ENCOUNTER_CHANCE;
+}
+export function randomPatrolGoal(bounds: { width: number; height: number }, blocked: (x: number, y: number) => boolean, fallback: Point, random = Math.random): Point {
+  for (let i = 0; i < 12; i++) {
+    const p = { x: 120 + random() * (bounds.width - 240), y: 160 + random() * (bounds.height - 320) };
+    if (!blocked(p.x, p.y)) return p;
+  }
+  return { ...fallback };
+}
 export interface BotActor extends Point {
+  patrolGoal?: Point;
+  patrolUntil: number;
+  encounter: BotEncounter;
   id: string;
   profile: BotTemplate;
   level: number;
@@ -183,6 +211,8 @@ export function createBot(
     cooldown: index * 0.12,
     skillCooldown: 0.8 + index * 0.3,
     respawnAt: 0,
+    patrolUntil: 0,
+    encounter: { near: false, nextRollAt: 0 },
     motion: freshMotion(),
     slowUntil: 0,
     slowFactor: 1,

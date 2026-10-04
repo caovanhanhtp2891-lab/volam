@@ -1,4 +1,5 @@
 import { TRAINING_ATLAS_URL, REGION_SCENES, regionFrame } from "./region-scenes";
+import { drawTerrainDetail } from "./terrain-detail";
 const trainingAtlas = new Image();
 trainingAtlas.decoding = "async";
 export let trainingArtRevision = 0;
@@ -31,7 +32,7 @@ export function createTerrainArt(
   const tileWidth = 900,
     tileHeight = 600;
   c.save();
-  c.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  c.setTransform(1, 0, 0, 1, 0, 0);
   for (let row = 0; row < Math.ceil(height / tileHeight); row++) {
     for (let col = 0; col < Math.ceil(width / tileWidth); col++) {
       c.save();
@@ -51,6 +52,7 @@ export function createTerrainArt(
         tileWidth,
         tileHeight,
       );
+      drawTerrainDetail(c, region, tileWidth, tileHeight);
       c.restore();
     }
   }
@@ -64,10 +66,9 @@ export function createTerrainArt(
 // center for combat and paths that remain readable on small portrait screens.
 export function createTrainingArt(region: number, width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  canvas.width = width / 2;
-  canvas.height = height / 2;
+  canvas.width = Math.ceil(width);
+  canvas.height = Math.ceil(height);
   const ctx = canvas.getContext("2d")!;
-  ctx.scale(0.5, 0.5);
   if (trainingAtlas.complete && trainingAtlas.naturalWidth) {
     const frame = regionFrame(region, trainingAtlas.naturalWidth, trainingAtlas.naturalHeight);
     ctx.imageSmoothingEnabled = true;
@@ -75,8 +76,9 @@ export function createTrainingArt(region: number, width: number, height: number)
     ctx.drawImage(trainingAtlas, frame.x, frame.y, frame.width, frame.height, 0, 0, width, height);
     // A subtle vignette keeps the center readable without hiding painted terrain.
     const shade = ctx.createRadialGradient(width / 2, height / 2, height * .2, width / 2, height / 2, width * .64);
-    shade.addColorStop(0, "#08132300"); shade.addColorStop(1, "#08132350");
+    shade.addColorStop(0, "#08132300"); shade.addColorStop(1, "#08132325");
     ctx.fillStyle = shade; ctx.fillRect(0, 0, width, height);
+    drawTerrainDetail(ctx, region, width, height);
     return canvas;
   }
   const palettes = [
@@ -232,7 +234,7 @@ export function drawRegionWeather(ctx: CanvasRenderingContext2D, region: number,
   ctx.restore();
 }
 
-// Static scenery is painted once at half resolution, then reused by the world
+// Static scenery is painted once at native resolution, then reused by the world
 // and minimap. This avoids image downloads and repeated geometry every frame.
 export function createMapArt(
   mode: "world" | "dungeon" | "bamboo",
@@ -241,8 +243,8 @@ export function createMapArt(
   obstacles: readonly MapObstacle[] = [],
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  canvas.width = Math.ceil(width / 2);
-  canvas.height = Math.ceil(height / 2);
+  canvas.width = Math.ceil(width);
+  canvas.height = Math.ceil(height);
   const context = canvas.getContext("2d")!;
   context.scale(canvas.width / width, canvas.height / height);
   context.fillStyle = mode === "world" ? "#5d8058" : mode === "bamboo" ? "#35543e" : "#222b37";

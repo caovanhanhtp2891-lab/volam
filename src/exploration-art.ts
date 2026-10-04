@@ -12,13 +12,14 @@ export function createExplorationArt(region: number): HTMLCanvasElement {
     ),
     c = canvas.getContext("2d")!;
   c.save();
-  c.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  c.setTransform(1, 0, 0, 1, 0, 0);
   const zones = explorationZones(region);
   c.lineCap = "round";
   c.lineJoin = "round";
   for (const [width, color] of [
-    [72, "#342e2455"],
-    [50, "#b4a47e77"],
+    [76, "#252820a0"],
+    [62, "#dac998a0"],
+    [48, "#a89870c0"],
   ] as const) {
     c.lineWidth = width;
     c.strokeStyle = color;
@@ -27,6 +28,17 @@ export function createExplorationArt(region: number): HTMLCanvasElement {
     c.closePath();
     c.stroke();
   }
+  // Stone markers give the road a sharp edge, without covering combat zones.
+  zones.forEach((z, i) => {
+    const next = zones[(i + 1) % zones.length];
+    const dx = next.x - z.x, dy = next.y - z.y, d = Math.hypot(dx, dy);
+    for (let t = 400; t < d - 400; t += 110) {
+      const x = z.x + dx * t / d, y = z.y + dy * t / d;
+      c.fillStyle = "#eee0b0a0";
+      c.fillRect(x - dy / d * 31 - 3, y + dx / d * 31 - 2, 6, 4);
+      c.fillRect(x + dy / d * 31 - 3, y - dx / d * 31 - 2, 6, 4);
+    }
+  });
   zones.forEach((z, i) => {
     const g = c.createRadialGradient(z.x, z.y, 80, z.x, z.y, 390);
     g.addColorStop(0, i === 3 ? "#9a64433d" : "#cdb78424");

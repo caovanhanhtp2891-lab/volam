@@ -122,7 +122,7 @@ async function startSiege(page, city = "hoang-thanh", size = 6) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.21.0",
+      "0.22.0",
     );
     await click(page, '[data-faction="gaibang"]');
     await click(page, "#join-sect");
@@ -330,7 +330,7 @@ async function startSiege(page, city = "hoang-thanh", size = 6) {
       victories: 0,
       history: [],
     });
-    assert.deepEqual(data.player.botSettings, { enabled: true, assist: false });
+    assert.deepEqual(data.player.botSettings, { enabled: true, assist: false, pvp: true });
     for (const viewport of [
       { width: 320, height: 740 },
       { width: 844, height: 390 },

@@ -9,8 +9,9 @@ import { EXPLORATION_WIDTH, EXPLORATION_HEIGHT, freshExploration, validExplorati
 import { createExplorationArt } from "./exploration-art";
 import { freshLuckyProgress, validLuckyProgress, normalizeLuckyProgress, playLuckyEvent, type LuckyGame, type LuckyProgress } from "./lucky-events";
 import { luckyMarkup, updateLuckyPresentation } from "./lucky-ui";
-import { BOT_TEMPLATES, createBot, chooseBotTarget, moveBot, freshBotSettings, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
-import { freshSiegeProgress, validSiegeProgress, normalizeSiegeProgress, beginSiege, settleSiege, siegeBlocked, siegeTravelGoal, SIEGE_PHASES, type SiegeProgress, type SiegeOutcome } from "./siege";
+import { freshLootSettings, normalizeLootSettings, validLootSettings, acceptsLoot, autoDiscardItems, type LootSettings } from "./loot-settings";
+import { BOT_TEMPLATES, createBot, chooseBotTarget, moveBot, freshBotSettings, normalizeBotSettings, botEncounter, randomPatrolGoal, validBotSettings, type BotActor, type BotTemplate, type BotOrder, type BotSettings } from "./bots";
+import { freshSiegeCapture, tickSiegeCapture, SIEGE_CAPTURE_SECONDS, type SiegeCapture, freshSiegeProgress, validSiegeProgress, normalizeSiegeProgress, beginSiege, settleSiege, siegeBlocked, siegeTravelGoal, SIEGE_PHASES, type SiegeProgress, type SiegeOutcome } from "./siege";
 import { createSiegeArt, drawSiegeStructure } from "./siege-art";
 import { idleShell } from "./idle-ui";
 import {
@@ -183,6 +184,7 @@ interface Player {
   military: MilitaryProgress;
   lucky: LuckyProgress;
   botSettings: BotSettings;
+  lootSettings: LootSettings;
   sieges: SiegeProgress;
   exploration: ExplorationProgress;
   tower: TowerProgress;
@@ -199,6 +201,7 @@ interface Npc {
 }
 
 interface Enemy {
+  rogueUntil?: number;
   monsterId?: SpeciesId;
   ranged?: boolean;
   home?: { x: number; y: number };
@@ -372,7 +375,7 @@ interface GameState {
   cameraY: number;
   lastBossDefeatedAt: number;
   mapMode: "world" | "dungeon" | "territory" | "tower";
-  territoryEncounter?: { siege?: { id: number; size: number; order: BotOrder }; id: TerritoryId; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
+  territoryEncounter?: { siege?: { id: number; size: number; order: BotOrder; capture: SiegeCapture }; id: TerritoryId; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
   dungeonReturn?: { x: number; y: number; inTown: boolean; autoBattle: boolean };
   towerEncounter?: { floor: number; wave: number; timeLeft: number; enemies: Enemy[]; loot: GroundLoot[]; x: number; y: number; inTown: boolean; autoBattle: boolean };
   dungeonTimeLeft: number;
@@ -415,6 +418,8 @@ let idlePage = "log";
 let idleNextWave = 0;
 let lastAutoSave = 0;
 let lastAutoAction = 0;
+let lastLootMaintenance = 0;
+let botSafeUntil = 0;
 let characterRenderKey = "";
 let setRenderKey = "";
 let setShopId: SetId = "kim-phong";
@@ -934,7 +939,7 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     preferences: normalizePreferences(),
     journey: normalizeJourney(),
     military: freshMilitary(),
-    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(),
+    lucky: freshLuckyProgress(), botSettings: freshBotSettings(), lootSettings: freshLootSettings(), sieges: freshSiegeProgress(), exploration: freshExploration(),
     tower: freshTower(),
     facingX: 1,
     facingY: 0,
@@ -1485,7 +1490,7 @@ function explorationArt(region: number): HTMLCanvasElement {
   const result = explorationArts.get(key)!;
   explorationArts.delete(key);
   explorationArts.set(key, result);
-  if (explorationArts.size > 2)
+  if (explorationArts.size > 1)
     explorationArts.delete(explorationArts.keys().next().value!);
   return result;
 }
@@ -1721,7 +1726,7 @@ function openBots(): void {
     blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
   openUtility(
     "Đồng hành giang hồ · BOT",
-    `<p class="dim">Bot là nhân vật do game điều khiển. Trong luyện công, bật Trợ chiến để tổ đội cùng đánh quái và chia phần thưởng cho nhân vật. Công thành luôn có đội bot riêng.</p><div class="btnrow"><button class="mini-button" data-bot-setting="enabled" ${blocked ? "disabled" : ""}>Bot trong map: ${settings.enabled ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="assist" ${blocked ? "disabled" : ""}>Trợ chiến: ${settings.assist ? "Bật" : "Tắt"}</button></div><div class="bot-roster">${BOT_TEMPLATES.map((profile) => `<article style="--bot-color:${profile.color}">${characterPortraitMarkup(SECT_BY_FACTION[profile.faction], profile.sex)}<div><b>${profile.name} <small>BOT</small></b><span>${factionOf(profile.faction).name} · ${botRoleLabel(profile.role)}</span><small>${GEAR_VARIANTS[profile.weapon].name}</small></div></article>`).join("")}</div><button class="outline-button" data-open-siege>Gọi đội công thành</button>`,
+    `<p class="dim">Bot là nhân vật do game điều khiển. Trong luyện công, bật Trợ chiến để tổ đội cùng đánh quái và chia phần thưởng cho nhân vật. BOT thường tuần tra ngẫu nhiên khắp map. Khi đến gần dưới 190, có 12% cơ hội bật Đồ sát; mỗi lần gặp chỉ xét một lần, cách nhau ít nhất 45 giây. Trong thành và tổ đội Trợ chiến luôn an toàn. Đồ sát kết thúc sau 45 giây, không làm mất trang bị. Công thành luôn có đội bot riêng.</p><div class="btnrow"><button class="mini-button" data-bot-setting="enabled" ${blocked ? "disabled" : ""}>Bot trong map: ${settings.enabled ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="assist" ${blocked ? "disabled" : ""}>Trợ chiến: ${settings.assist ? "Bật" : "Tắt"}</button><button class="mini-button" data-bot-setting="pvp" ${blocked ? "disabled" : ""}>Đồ sát ngẫu nhiên: ${settings.pvp ? "Bật" : "Tắt"}</button></div><div class="bot-roster">${BOT_TEMPLATES.map((profile) => `<article style="--bot-color:${profile.color}">${characterPortraitMarkup(SECT_BY_FACTION[profile.faction], profile.sex)}<div><b>${profile.name} <small>BOT</small></b><span>${factionOf(profile.faction).name} · ${botRoleLabel(profile.role)}</span><small>${GEAR_VARIANTS[profile.weapon].name}</small></div></article>`).join("")}</div><button class="outline-button" data-open-siege>Gọi đội công thành</button>`,
   );
 }
 function openRequestedSiege(): void {
@@ -1738,7 +1743,7 @@ function openRequestedSiege(): void {
   };
   openUtility(
     "Công thành theo yêu cầu",
-    `<p class="dim">Gọi trận bất cứ lúc nào, chọn mọi thành từ cấp 1. Hai phe đều có bot môn phái, thời gian 4 phút. Phá cổng → đoạt cờ → hạ Thống lĩnh và quân bảo vệ.</p><p class="dim">Thắng nhận bạc, XP và 2 đá tinh luyện. Chiến công lãnh thổ và ấn quân hàm nhận ở chiến dịch Tranh đoạt lãnh thổ.</p>${active ? `<div class="card"><b>${territoryOf(encounter.id)!.name} · ${SIEGE_PHASES[encounter.wave]}</b><p>${Math.ceil(encounter.timeLeft)} giây · ${game.bots.filter((b) => b.hp > 0).length}/${active.size} bot sống</p><div class="btnrow">${siegeOrderButtons(active.order)}</div><button class="outline-button" data-leave-territory>Rút quân</button></div>` : `<div class="card"><label class="form-row">Thành<select id="siege-city">${TERRITORIES.map((t) => `<option value="${t.id}">${t.name}</option>`).join("")}</select></label><label class="form-row">Đội bot<select id="siege-size"><option value="3">3 đồng đội</option><option value="6" selected>6 đồng đội</option><option value="9">9 đồng đội</option></select></label><button class="outline-button" data-start-siege ${blocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại để gọi trận" : "Xuất quân ngay"}</button></div>`}<h3>Chiến báo · ${game.player.sieges.victories} trận thắng</h3><div class="event-history">${
+    `<p class="dim">Gọi trận bất cứ lúc nào, chọn mọi thành từ cấp 1. Hai phe đều có bot môn phái, thời gian 4 phút. Phá cổng → phá chiến kỳ và giữ vùng cờ 12 giây (hai đợt viện binh) → hạ Thống lĩnh và quân bảo vệ. Địch đứng trong vòng cờ sẽ đẩy lùi tiến độ chiếm.</p><p class="dim">Thắng nhận bạc, XP, 2 đá tinh luyện và một trang bị Cực phẩm hoặc Hoàng Kim. Nếu đủ cấp và đã chiếm thành liền trước, trận thắng cũng chiếm lãnh thổ và nhận chiến công lần đầu. Các thành khác vẫn có thể gọi trận luyện tập từ cấp 1.</p>${active ? `<div class="card"><b>${territoryOf(encounter.id)!.name} · ${SIEGE_PHASES[encounter.wave]}</b><p>${Math.ceil(encounter.timeLeft)} giây · ${game.bots.filter((b) => b.hp > 0).length}/${active.size} bot sống</p><div class="btnrow">${siegeOrderButtons(active.order)}</div><button class="outline-button" data-leave-territory>Rút quân</button></div>` : `<div class="card"><label class="form-row">Thành<select id="siege-city">${TERRITORIES.map((t) => `<option value="${t.id}">${t.name}</option>`).join("")}</select></label><label class="form-row">Đội bot<select id="siege-size"><option value="3">3 đồng đội</option><option value="6" selected>6 đồng đội</option><option value="9">9 đồng đội</option></select></label><button class="outline-button" data-start-siege ${blocked ? "disabled" : ""}>${blocked ? "Rời trận hiện tại để gọi trận" : "Xuất quân ngay"}</button></div>`}<h3>Chiến báo · ${game.player.sieges.victories} trận thắng</h3><div class="event-history">${
       game.player.sieges.history
         .slice(0, 8)
         .map(
@@ -1781,9 +1786,10 @@ function makeRequestedSiegeEnemies(city: TerritoryId, wave: number): Enemy[] {
       profile.color,
     );
     enemy.botProfile = profile;
-    enemy.maxHp = enemy.hp = Math.floor(attack * (boss ? 35 : 7));
-    enemy.attack = Math.max(100, Math.floor(hp * (boss ? 0.045 : 0.025)));
     enemy.defense = Math.floor(effectiveDefense() * 0.15);
+    const hitDamage = scaledOutgoingDamage(attack, enemy.defense, game!.player.level, false, emptyStats());
+    enemy.maxHp = enemy.hp = Math.max(100, Math.floor(hitDamage * (boss ? 35 : 7)));
+    enemy.attack = Math.max(100, Math.floor(hp * (boss ? 0.045 : 0.025)));
     enemy.speed = 125;
     return enemy;
   });
@@ -1833,7 +1839,7 @@ function enterRequestedSiege(city: TerritoryId, size: number): void {
     y: game.player.y,
     inTown: game.player.idle.inTown,
     autoBattle: game.autoBattle,
-    siege: { id, size, order: "push" },
+    siege: { id, size, order: "push", capture: freshSiegeCapture() },
   };
   game.mapMode = "territory";
   game.enemies = makeRequestedSiegeEnemies(city, 0);
@@ -1863,6 +1869,20 @@ function enterRequestedSiege(city: TerritoryId, size: number): void {
   tickBots(0, nowMs());
   refreshUi(true);
 }
+function updateSiegeCapture(dt: number): void {
+  if (!game?.territoryEncounter?.siege || game.territoryEncounter.wave !== 1) return;
+  const encounter = game.territoryEncounter, siege = encounter.siege!, flag = { x: 950, y: 380 };
+  if (game.enemies.some(e => e.structure === "banner" && !e.dead)) return;
+  const allied = [game.player, ...game.bots].some(actor => actor.hp > 0 && distance(actor, flag) <= 115);
+  const contested = game.enemies.some(e => !e.dead && !e.structure && distance(e, flag) <= 220);
+  if (tickSiegeCapture(siege.capture, dt, allied, contested)) {
+    const reinforcements = makeRequestedSiegeEnemies(encounter.id, 1).filter(e => !e.structure).slice(0, 2);
+    reinforcements.forEach((enemy, i) => { enemy.id += `-reinforce-${siege.capture.reinforcements}`; enemy.x = 810 + i * 280; enemy.y = 300; });
+    game.enemies.push(...reinforcements);
+    addLog(`Viện binh thủ thành đợt ${siege.capture.reinforcements}/2! Giữ khu chiến kỳ để tiếp tục đoạt cờ.`);
+  }
+  if (game.autoBattle && !game.enemies.some(e => !e.dead) && !allied) game.moveTarget = flag;
+}
 function refreshSiegeHud(): void {
   if (!game) return;
   const encounter = game.territoryEncounter,
@@ -1871,7 +1891,7 @@ function refreshSiegeHud(): void {
   hud.classList.toggle("hidden", !siege);
   if (!siege) return;
   document.getElementById("siege-phase")!.textContent =
-    SIEGE_PHASES[encounter.wave];
+    encounter.wave === 1 && game.enemies.every(e => e.structure !== "banner" || e.dead) ? `Giữ chiến kỳ · ${siege.capture.progress.toFixed(1)}/${SIEGE_CAPTURE_SECONDS}s` : SIEGE_PHASES[encounter.wave];
   document.getElementById("siege-clock")!.textContent =
     `${Math.ceil(encounter.timeLeft)}s · BOT ${game.bots.filter((b) => b.hp > 0).length}/${siege.size}`;
   const orders = document.getElementById("siege-orders")!;
@@ -1881,7 +1901,7 @@ function refreshSiegeHud(): void {
   }
   const objective = game.enemies.find((e) => e.structure || e.kind === "boss");
   document.getElementById("siege-objective-health")!.style.width =
-    `${objective && !objective.dead ? (objective.hp / objective.maxHp) * 100 : 0}%`;
+    `${encounter.wave === 1 && objective?.dead ? siege.capture.progress / SIEGE_CAPTURE_SECONDS * 100 : objective && !objective.dead ? (objective.hp / objective.maxHp) * 100 : 0}%`;
 }
 function botAppearance(profile: BotTemplate): HeroAppearance {
   return {
@@ -2000,10 +2020,11 @@ function tickBots(dt: number, now: number): void {
   const context = siege
     ? `siege-${siege.id}`
     : visible
-      ? `world-${exploring() ? `explore-${game.player.exploration.region}` : game.player.idle.stage}-${game.player.idle.inTown}-${settings.assist}`
+      ? `world-${exploring() ? `explore-${game.player.exploration.region}` : game.player.idle.stage}-${game.player.idle.inTown}-${settings.assist}-${settings.pvp}`
       : "off";
   if (context !== game.botContext) {
     game.botContext = context;
+    game.enemies = game.enemies.filter(e => !e.rogueUntil);
     game.botHits = [];
     const indices = [0, 1, 4, 2, 3, 5, 6, 7, 8],
       count = siege?.size ?? (settings.assist ? 3 : 4);
@@ -2019,6 +2040,7 @@ function tickBots(dt: number, now: number): void {
           )
       : [];
   }
+  game.enemies = game.enemies.filter(e => !e.rogueUntil || (!e.dead && e.rogueUntil > now));
   for (const [i, bot] of game.bots.entries()) {
     if (bot.hp <= 0) {
       if (now < bot.respawnAt) continue;
@@ -2028,6 +2050,21 @@ function tickBots(dt: number, now: number): void {
         defense: effectiveDefense(),
       });
       Object.assign(bot, fresh);
+    }
+    if (!siege && botEncounter(bot.encounter, distance(bot, game.player), now,
+      game.player.idle.inTown || settings.assist || !settings.pvp || now < botSafeUntil) && !game.enemies.some(e => e.rogueUntil && !e.dead)) {
+      const rogue = createEnemy(`rogue-${bot.id}-${Math.floor(now)}`, `${bot.profile.name} · ĐỒ SÁT`, "normal", bot.x, bot.y, bot.level, "#ff6474");
+      rogue.botProfile = bot.profile; rogue.rogueUntil = now + 45000;
+      rogue.hp = rogue.maxHp = bot.maxHp; rogue.attack = Math.floor(effectiveAttack() * .45);
+      rogue.defense = bot.defense; rogue.speed = 160;
+      game.enemies.push(rogue); bot.hp = 0; bot.respawnAt = now + 60000;
+      if (game.autoBattle && !game.targetId) game.targetId = rogue.id;
+      addLog(`${bot.profile.name} bật Đồ sát! Có thể đánh trả hoặc chạy xa. Đồ sát tự hết sau 45 giây.`);
+      continue;
+    }
+    if (!siege && !settings.assist && (!bot.patrolGoal || distance(bot, bot.patrolGoal) < 25 || now >= bot.patrolUntil)) {
+      bot.patrolGoal = randomPatrolGoal({ width: WORLD_WIDTH, height: WORLD_HEIGHT }, (x, y) => isBlocked(x, y, 19), bot);
+      bot.patrolUntil = now + 18000 + Math.random() * 14000;
     }
     bot.cooldown = Math.max(0, bot.cooldown - dt);
     bot.skillCooldown = Math.max(0, bot.skillCooldown - dt);
@@ -2058,6 +2095,8 @@ function tickBots(dt: number, now: number): void {
             game.player.y +
             Math.sin(now / 5000 + i * 1.9) * (settings.assist ? 60 : 110),
         };
+    if (!target && !siege && !settings.assist && bot.patrolGoal) goal = bot.patrolGoal;
+    if (!target && siege && game.territoryEncounter!.wave === 1) goal = { x: 950 + (i % 3 - 1) * 38, y: 400 + Math.floor(i / 3) * 25 };
     if (siege) goal = siegeTravelGoal(bot, goal);
     const locked =
       bot.motion.actionDuration > 0 &&
@@ -2113,7 +2152,7 @@ function tickSiegeDefender(
 ): void {
   if (!game || !enemy.botProfile) return;
   const profile = enemy.botProfile,
-    candidates = [game.player, ...game.bots.filter((b) => b.hp > 0)];
+    candidates = enemy.rogueUntil ? [game.player] : [game.player, ...game.bots.filter((b) => b.hp > 0)];
   const target = candidates.reduce(
     (best, ally) =>
       distance(enemy, ally) < distance(enemy, best) ? ally : best,
@@ -2124,7 +2163,7 @@ function tickSiegeDefender(
     reach = ranged ? 190 : 53;
   const locked = now - motion.actionAt < motion.actionDuration;
   if (!locked && distance(enemy, target) > reach) {
-    const goal = siegeTravelGoal(enemy, target),
+    const goal = enemy.rogueUntil ? target : siegeTravelGoal(enemy, target),
       d = distance(enemy, goal),
       stride = Math.min(
         d,
@@ -2310,7 +2349,12 @@ function leaveTerritory(message = "Đã rút quân. Thành chưa chiếm không 
   if (record?.outcome === "victory") {
     game.player.gold = Math.min(1e9, game.player.gold + record.silver); game.player.refiningStones = Math.min(1e9, game.player.refiningStones + record.stones);
     record.xp = rewardExperience(awardLevel * 7);
-    message = `Đại thắng ${territoryOf(record.city)!.name}! +${record.silver} bạc · +${record.xp} XP · +${record.stones} đá tinh luyện.`;
+    const prize = createItem(awardLevel, Math.random() < .2 ? "Hoàng Kim" : "Cực phẩm");
+    storeRewardItems(game.player, [prize]);
+    const land = territoryOf(record.city)!;
+    const captured = captureTerritory(game.player.military, record.city, awardLevel);
+    if (captured) { game.player.gold += land.merit * 3; game.player.refiningStones += Math.max(1, Math.floor(land.level / 25)); }
+    message = `Đại thắng ${land.name}! +${record.silver} bạc · +${record.xp} XP · +${record.stones} đá · ${prize.name} [${prize.rarity}].${captured ? ` Chiếm lãnh thổ: +${land.merit} chiến công · +${land.merit * 3} bạc. Vào Ấn quân hàm để nhận sắc phong.` : ""}`;
   } else if (record) message = `${message} Trận #${record.id} đã kết thúc, không nhận thưởng.`;
   addLog(message); persistGame(); refreshUi(true);
 }
@@ -2318,6 +2362,7 @@ function advanceTerritory(): void {
   if (!game?.territoryEncounter || game.enemies.some(enemy => !enemy.dead)) return;
   const encounter = game.territoryEncounter;
   if (encounter.siege) {
+    if (encounter.wave === 1 && encounter.siege.capture.progress < SIEGE_CAPTURE_SECONDS) return;
     if (encounter.wave < 2) {
       encounter.wave++; game.enemies = makeRequestedSiegeEnemies(encounter.id, encounter.wave);
       game.targetId = null; game.botHits = []; game.telegraphs = []; game.zones = []; game.combat = freshCombat();
@@ -3065,6 +3110,12 @@ function killEnemy(enemy: Enemy): void {
   if (!game || enemy.dead) return;
   if (game.goldenEncounter && enemy.id.startsWith("golden-")) { killGoldenBoss(enemy); return; }
   enemy.dead = true;
+  if (enemy.rogueUntil) {
+    enemy.respawnAt = Infinity;
+    game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() });
+    addLog(`Đã đánh bại ${enemy.name}. BOT rời trận, không rơi đồ.`);
+    return;
+  }
   if (game.territoryEncounter?.siege) {
     enemy.respawnAt = Infinity;
     if (!enemy.structure) { game.combat.corpses.push({ enemy: { ...enemy }, at: nowMs() }); if (game.combat.corpses.length > 16) game.combat.corpses.shift(); }
@@ -3211,6 +3262,8 @@ function damagePlayer(amount: number, source: string): void {
     game.targetId = null;
     game.moveTarget = null;
     game.autoBattle = false;
+    game.enemies = game.enemies.filter(e => !e.rogueUntil);
+    botSafeUntil = nowMs() + 15000;
     game.telegraphs = [];
     game.combat = freshCombat();
     addLog(
@@ -3245,7 +3298,11 @@ function pickupNearby(): void {
   let picked = 0;
   for (const loot of nearby) {
     if (loot.item && player.inventory.length >= BAG_CAPACITY) {
-      addLog("Túi đồ đã đầy. Hãy mặc, bán hoặc cường hóa đồ trước.");
+      if (loot.gold || loot.stones) {
+        player.gold += loot.gold; player.refiningStones += loot.stones;
+        animatePickup({ ...loot, item: undefined }); loot.gold = 0; loot.stones = 0; picked++;
+      }
+      addLog("Túi đồ đã đầy. Đã nhặt bạc và đá; hãy mặc hoặc bán đồ để nhặt trang bị.");
       continue;
     }
     if (loot.item) {
@@ -3431,7 +3488,7 @@ function persistGame(): boolean {
       gold,
       stones,
     })),
-    enemies: game.enemies.map((enemy) => ({
+    enemies: game.enemies.filter(enemy => !enemy.rogueUntil).map((enemy) => ({
       ...enemy,
       dead: false,
       respawnAt: 0,
@@ -3767,6 +3824,11 @@ function update(dt: number, now: number): void {
   }
   if ((game.goldenEncounter || exploring()) && player.idle.autoLoot) collectIdleLoot();
   tickBots(dt, now);
+  updateSiegeCapture(dt);
+  if (game.mapMode === "world" && !game.goldenEncounter && now - lastLootMaintenance >= 1000) {
+    lastLootMaintenance = now;
+    if (discardAutomaticLoot()) { persistGame(); refreshUi(true); }
+  }
   if (player.idle.inTown && !game.goldenEncounter && game.mapMode === "world") {
     game.cameraX = clamp(
       player.x - VIEW_WIDTH / 2,
@@ -4124,6 +4186,18 @@ function drawWorld(now: number): void {
     territoryArt ??= createMapArt("dungeon", WORLD_WIDTH, WORLD_HEIGHT);
     if (game.territoryEncounter.siege) { siegeArt ??= createSiegeArt(); ctx.drawImage(siegeArt, 0, 0); }
     else ctx.drawImage(territoryArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    if (game.territoryEncounter.siege && game.territoryEncounter.wave === 1) {
+      const capture = game.territoryEncounter.siege.capture;
+      ctx.save(); ctx.translate(950, 380);
+      ctx.fillStyle = "#78d7b71f"; ctx.strokeStyle = "#92f2cf"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, 0, 115, 90, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "#ffdf86"; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.ellipse(0, 0, 118, 93, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * capture.progress / SIEGE_CAPTURE_SECONDS); ctx.stroke();
+      if (game.enemies.every(e => e.structure !== "banner" || e.dead)) drawSiegeStructure(ctx, "banner", capture.progress / SIEGE_CAPTURE_SECONDS, now);
+      ctx.fillStyle = "#fff1b8"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center";
+      drawOutlinedText(`GIỮ CHIẾN KỲ · ${capture.progress.toFixed(1)}/${SIEGE_CAPTURE_SECONDS}s`, 0, 135);
+      ctx.restore();
+    }
     const land = territoryOf(game.territoryEncounter.id)!;
     ctx.fillStyle = land.color;
     ctx.font = "600 14px 'DM Sans', sans-serif";
@@ -5299,7 +5373,7 @@ function renderInventory(): void {
     .join("");
   inventoryContent.innerHTML = `
     <div class="bag-summary"><span>◆ <b>${formatNumber(player.gold)}</b> bạc</span><span>✦ <b>${formatNumber(player.refiningStones)}</b> đá</span><strong>${player.inventory.length}/${BAG_CAPACITY} ô</strong></div>
-    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-open-sets>Bộ ngũ hành</button><button class="mini-button" data-open-gear-gallery>Mẫu trang bị</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
+    <div class="bag-tools"><button class="mini-button" data-auto-equip>Mặc đồ mạnh nhất</button><button class="mini-button" data-open-sets>Bộ ngũ hành</button><button class="mini-button" data-open-gear-gallery>Mẫu trang bị</button><button class="mini-button" data-open-loot-settings>Lọc nhặt · Tự vứt</button><button class="mini-button" data-discard-filter>Vứt đồ theo lọc</button><button class="mini-button" data-save-progress>Lưu</button><button class="mini-button" data-load-progress>Tải</button><button class="mini-button" data-open-shop>Tiệm</button></div>
     <div class="bag-grid">${Array.from({ length: BAG_CAPACITY }, (_, index) => {
       const item = player.inventory[index];
       return `<button class="bag-slot" ${item ? `data-inspect-item="${escapeHtml(item.id)}" style="--rarity-color:${item.color}" aria-label="${escapeHtml(item.name)}"` : 'disabled aria-label="Ô trống"'}>${item ? `${itemArt(item)}<small>${item.level}</small>${item.enhance ? `<b>+${item.enhance}</b>` : ""}` : ""}</button>`;
@@ -5354,8 +5428,8 @@ function trainingArt(stage: number): HTMLCanvasElement {
       createTrainingArt(region, WORLD_WIDTH, WORLD_HEIGHT),
     );
   const result = trainingArts.get(key)!;
-  // Four cached arenas bound memory; atlas completion changes the cache key.
-  if (trainingArts.size > 4) trainingArts.delete(trainingArts.keys().next().value!);
+  // Two full-resolution arenas bound memory; atlas completion changes the cache key.
+  if (trainingArts.size > 2) trainingArts.delete(trainingArts.keys().next().value!);
   return result;
 }
 function prepareIdleWave(resetPosition = true): void {
@@ -5425,26 +5499,34 @@ function prepareIdleWave(resetPosition = true): void {
   game.worldEnemies = game.enemies;
   canvasBadge.textContent = `${info.name.toLocaleUpperCase("vi")} · ẢI ${info.localStage}${bossWave ? " · TRÙM" : ""}`;
 }
-function collectIdleLoot(force = false): void {
+function discardAutomaticLoot(): number {
+  if (!game) return 0;
+  const items = autoDiscardItems(game.player, game.player.lootSettings);
+  if (items.length) addLog(`Tự vứt ${items.length} món theo bộ lọc · không nhận bạc.`);
+  return items.length;
+}
+function collectIdleLoot(force = false, recover = force): void {
   if (!game || !game.loot.length) return;
   const ready = game.loot.filter(
-    (loot) => force || nowMs() - (loot.bornAt ?? 0) >= 1600,
+    (loot) => (force || nowMs() - (loot.bornAt ?? 0) >= 1600) && (recover || !loot.item || acceptsLoot(loot.item, game!.player.lootSettings) || loot.gold > 0 || loot.stones > 0),
   );
   if (!ready.length) return;
-  const items: Item[] = [];
+  const items: Item[] = [], ids = new Set<string>();
   for (const loot of ready) {
     game.player.gold += loot.gold;
     game.player.refiningStones += loot.stones;
-    if (loot.item) {
-      items.push(loot.item);
-      notifyLoot(loot.item);
+    if (loot.item && !recover && !acceptsLoot(loot.item, game.player.lootSettings)) {
+      if (loot.gold || loot.stones) animatePickup({ ...loot, item: undefined });
+      loot.gold = 0; loot.stones = 0;
+      continue;
     }
-    animatePickup(loot);
+    if (loot.item) { items.push(loot.item); notifyLoot(loot.item); }
+    animatePickup(loot); ids.add(loot.id);
   }
-  const ids = new Set(ready.map((loot) => loot.id));
   game.loot = game.loot.filter((loot) => !ids.has(loot.id));
   storeRewardItems(game.player, items);
   if (game.player.idle.autoEquip) autoEquipBest();
+  discardAutomaticLoot();
   persistGame();
 }
 function autoEquipBest(): number {
@@ -5567,7 +5649,7 @@ function updateIdleProgress(now: number): void {
     lastAutoAction = now;
     if (game.player.idle.autoLoot) collectIdleLoot();
   }
-  if (!game.enemies.length || game.enemies.some((enemy) => !enemy.dead)) {
+  if (!game.enemies.some(enemy => !enemy.rogueUntil) || game.enemies.some((enemy) => !enemy.dead && !enemy.rogueUntil)) {
     idleNextWave = 0;
     return;
   }
@@ -5576,7 +5658,7 @@ function updateIdleProgress(now: number): void {
     return;
   }
   if (now < idleNextWave) return;
-  if (game.player.idle.autoLoot) collectIdleLoot(true);
+  if (game.player.idle.autoLoot) collectIdleLoot(true, false);
   const result = completeWave(game.player.idle);
   if (result.stageCleared) {
     game.player.hp = Math.min(
@@ -5837,6 +5919,12 @@ function refreshIdleUi(): void {
 }
 function hydrateSettings(): void {
   if (!game) return;
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-loot-setting]").forEach(input => {
+    const value = game!.player.lootSettings[input.dataset.lootSetting as keyof LootSettings];
+    if (input instanceof HTMLInputElement && input.type === "checkbox") input.checked = value === true;
+    else input.value = String(value);
+    input.disabled = game!.mapMode !== "world" || Boolean(game!.goldenEncounter);
+  });
   document.querySelector<HTMLInputElement>("#settings-name")!.value =
     game.player.name;
   document.querySelector<HTMLSelectElement>("#settings-sex")!.value =
@@ -5951,7 +6039,7 @@ function openRealmGuide(): void {
   const current = cultivationForPower(currentCombatPower());
   openUtility(
     "Cảnh giới tu tiên",
-    `<p class="dim">Phàm Nhân: dưới 100.000 lực chiến. Luyện Thể: 100.000 đến dưới 1 triệu. Đạo Tổ: từ 10 tỷ; Hỗn Nguyên: 100 tỷ; Hồng Mông: 1.000 tỷ; Vô Cực: 10.000 tỷ. Cảnh giới tự thay đổi theo lực chiến hiện tại. Luyện Thể và Luyện Khí có 9 tầng; từ Trúc Cơ có Sơ kỳ, Trung kỳ, Hậu kỳ, Đỉnh phong và Đại viên mãn. Đạt Chân Tiên là bước vào Tiên giới.</p><table class="realm-table"><thead><tr><th>Bậc</th><th>Cảnh giới</th><th>Lực chiến từ</th></tr></thead><tbody>${REALMS.map((realm, rank) => `<tr class="${rank === current.rank ? "current-realm" : ""}" ${rank === current.rank ? 'aria-current="true"' : ""}><td>${rank + 1}</td><td style="color:${realm.color}">${realm.name}</td><td>${formatNumber(realm.minPower)}</td></tr>`).join("")}</tbody></table>`,
+    `<p class="dim">Phàm Nhân: dưới 100.000 lực chiến. Luyện Thể: 100.000 đến dưới 1 triệu. Đạo Tổ: từ 10 tỷ; Hỗn Nguyên: 12 tỷ; Hồng Mông: 14,5 tỷ; Vô Cực: 17,5 tỷ. Cảnh giới tự thay đổi theo lực chiến hiện tại. Luyện Thể và Luyện Khí có 9 tầng; từ Trúc Cơ có Sơ kỳ, Trung kỳ, Hậu kỳ, Đỉnh phong và Đại viên mãn. Đạt Chân Tiên là bước vào Tiên giới.</p><table class="realm-table"><thead><tr><th>Bậc</th><th>Cảnh giới</th><th>Lực chiến từ</th></tr></thead><tbody>${REALMS.map((realm, rank) => `<tr class="${rank === current.rank ? "current-realm" : ""}" ${rank === current.rank ? 'aria-current="true"' : ""}><td>${rank + 1}</td><td style="color:${realm.color}">${realm.name}</td><td>${formatNumber(realm.minPower)}</td></tr>`).join("")}</tbody></table>`,
   );
 }
 function showItemDetail(item: Item): void {
@@ -6069,7 +6157,9 @@ function validateSave(value: unknown): {
   player.military = normalizeMilitary(player.military);
   if (!validLuckyProgress(player.lucky) || !validBotSettings(player.botSettings) || !validSiegeProgress(player.sieges)) throw new Error("save-invalid");
   player.lucky = normalizeLuckyProgress(player.lucky);
-  player.botSettings = player.botSettings ? { ...player.botSettings } : freshBotSettings();
+  player.botSettings = normalizeBotSettings(player.botSettings);
+  if (!validLootSettings(player.lootSettings)) throw new Error("save-invalid");
+  player.lootSettings = normalizeLootSettings(player.lootSettings);
   player.sieges = normalizeSiegeProgress(player.sieges);
   player.radius = HERO_SIZE.radius;
   player.goldenClears = normalizeGoldenClears(player.goldenClears);
@@ -6503,7 +6593,7 @@ function bindIdleUi(): void {
       const play = target.closest<HTMLButtonElement>("[data-play-lucky]"); if (play && !play.disabled) playLucky(play.dataset.playLucky as LuckyGame);
       const botSetting = target.closest<HTMLButtonElement>("[data-bot-setting]");
       if (game && botSetting && !botSetting.disabled && game.mapMode === "world" && !game.goldenEncounter) {
-        const key = botSetting.dataset.botSetting as keyof BotSettings; if (["enabled", "assist"].includes(key)) {
+        const key = botSetting.dataset.botSetting as keyof BotSettings; if (["enabled", "assist", "pvp"].includes(key)) {
           const backup = { ...game.player.botSettings }; game.player.botSettings[key] = !game.player.botSettings[key];
           if (key === "assist" && game.player.botSettings.assist) game.player.botSettings.enabled = true;
           if (!persistGame()) game.player.botSettings = backup;
@@ -6662,6 +6752,21 @@ function bindIdleUi(): void {
         game.player.equipment[equipment.dataset.equippedPreview as ItemSlot];
       if (item) showItemDetail(item);
     });
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-loot-setting]").forEach(input => input.addEventListener("change", () => {
+    if (!game) return;
+    if (game.mapMode !== "world" || game.goldenEncounter) { hydrateSettings(); return; }
+    const next = { ...game.player.lootSettings, [input.dataset.lootSetting!]: input instanceof HTMLInputElement && input.type === "checkbox" ? input.checked : Number(input.value) };
+    if (!validLootSettings(next)) { hydrateSettings(); return; }
+    const previous = game.player.lootSettings, inventory = [...game.player.inventory];
+    game.player.lootSettings = next;
+    discardAutomaticLoot();
+    if (!persistGame()) {
+      game.player.lootSettings = previous; game.player.inventory = inventory;
+      hydrateSettings(); refreshUi(true); return;
+    }
+    refreshUi(true);
+    showToast(next.autoDiscard ? "Đã lưu lọc đồ và bật tự vứt đồ trong túi." : "Đã lưu bộ lọc nhặt đồ.");
+  }));
   document.getElementById("save-name")!.addEventListener("click", () => {
     if (!game || game.mapMode !== "world") return;
     game.player.name =
@@ -7128,6 +7233,7 @@ inventoryContent.addEventListener("click", (event) => {
     );
     if (item) showItemDetail(item);
   }
+  if (target.closest("[data-open-loot-settings]")) { showIdlePage("more"); document.getElementById("loot-settings-heading")!.scrollIntoView({ block: "start" }); }
   if (target.closest("[data-discard-filter]")) openDiscardFilter();
   if (target.closest("[data-open-shop]")) openMobileSheet("shop");
   if (target.closest("[data-open-bag]")) openMobileSheet("bag");
