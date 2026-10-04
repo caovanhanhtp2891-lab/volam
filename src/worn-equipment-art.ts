@@ -1,6 +1,6 @@
 import type { EquipmentData } from "./equipment";
 import { drawGlow } from "./battle-vfx";
-import { drawEquipmentRadiance } from "./equipment-vfx";
+import { equipmentVisualState, drawEquipmentRadiance } from "./equipment-vfx";
 import { GEAR_SETS } from "./gear-catalog";
 import { drawSetCrest } from "./set-art.ts";
 export type WornVisual = Partial<EquipmentData> & { color: string };
@@ -58,7 +58,7 @@ export function drawWearableDetails(
     }
     if (
       !look.simpleEffects &&
-      (armor.enhance ?? 0) >= 7
+      equipmentVisualState(armor).halo
     ) {
       for (const side of [-1, 1]) {
         const t = (now / 1600 + (side + 1) / 4) % 1;
@@ -145,7 +145,7 @@ export function drawWearableDetails(
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    if ((pendant.enhance ?? 0) >= 7)
+    if (equipmentVisualState(pendant).halo)
       drawEquipmentRadiance(ctx, pendant, now, 8, look.simpleEffects);
     ctx.restore();
   }

@@ -13,7 +13,7 @@ export function idleShell(): string {
       <canvas id="game-canvas" width="600" height="600" aria-label="Sân đấu Giang Hồ Dị Truyện"></canvas>
       <div class="canvas-badge" id="canvas-badge">HOA SƠN · ẢI 1</div><div class="canvas-tip" id="canvas-tip"></div>
       <div id="loot-notices" class="loot-notices" aria-label="Trang bị vừa nhặt"></div>
-      <div class="mobile-map-card"><div class="mobile-map-title"><b id="mobile-map-name">HOA SƠN</b></div><canvas id="mobile-minimap" width="190" height="120" aria-label="Bản đồ nhỏ"></canvas><div class="mobile-map-channel">Đợt 1/4</div><button class="icon-button" id="compact-btn" aria-label="Ẩn hoặc hiện HUD sân đấu" aria-pressed="false">⛶</button></div>
+      <div class="mobile-map-card"><div class="mobile-map-title"><b id="mobile-map-name">HOA SƠN</b><button id="travel-map-btn" aria-label="Mở bản đồ và chuyển map">Bản đồ ›</button></div><canvas id="mobile-minimap" width="190" height="120" aria-label="Bản đồ nhỏ"></canvas><div class="mobile-map-channel">Đợt 1/4</div><button class="icon-button" id="compact-btn" aria-label="Ẩn hoặc hiện HUD sân đấu" aria-pressed="false">⛶</button></div>
       <section class="arena-quest"><button id="arena-quest-toggle" aria-expanded="true" aria-label="Thu gọn nhiệm vụ"><span>♧ Nhiệm vụ</span><b>⌃</b></button><div id="arena-quest-body"><span id="arena-objective">Hạ quái Hoa Sơn</span><div class="arena-objective-progress"><div class="meter"><span id="arena-objective-bar"></span></div><small id="arena-objective-count">0/3</small></div></div></section>
       <button class="arena-chip" id="mobile-auto" aria-pressed="false"><span>⚔</span><small>Tự động</small></button>
       <button class="arena-chip" id="mount-toggle" data-mount-toggle aria-pressed="false" aria-label="Lên ngựa (H)"><span>♞</span><small>Ngựa</small></button>
@@ -31,7 +31,7 @@ export function idleShell(): string {
         <section class="quest-panel"><button id="quest-toggle" class="quest-toggle" aria-label="Mở nhiệm vụ" aria-expanded="false">⌄</button><b id="quest-title">Dấu chân trong Rừng Trúc</b><p id="quest-text"></p><div class="quest-progress"><span id="quest-kill-progress"></span><span id="quest-boss-progress"></span></div><small id="quest-reward"></small></section>
         <div class="log-panel"><div id="log-list" class="log-list"></div></div>
         <div class="target-panel"><div id="target-content"></div></div>
-        <h3>Bản đồ luyện công <small>16 vùng · 160 ải</small></h3><p class="map-unlock-hint">Đủ cấp 11, 21, 31… để vào vùng mới. Cũng có thể mở vùng bằng cách vượt ải.</p><div id="region-list" class="region-list"></div>
+        <h3>Bản đồ luyện công <small>16 vùng · 160 ải</small></h3><p class="map-unlock-hint">Chạm Bản đồ cạnh minimap để chuyển vùng. Đủ cấp quái hoặc đã vượt ải đều được vào.</p><div id="region-list" class="region-list"></div>
         <div class="controls-panel"><p>WASD / joystick: di chuyển · 1–3: võ công · 4: đánh thường · Q/R: thuốc · E: nhặt · H: lên/xuống ngựa · B: hành trang · K: võ công</p></div>
       </section>
       <section class="character-panel tab-page" data-page="char">

@@ -2,6 +2,16 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Sơn hà · Thần huyết · v0.16.0
+
+**Bản đồ** cạnh minimap mở 16 vùng có hình xem trước và chọn trực tiếp ải. Đủ cấp quái **hoặc** đã mở bằng vượt ải đều được di chuyển, kể cả các ải 12, 22…; giữ quyền quay lại map đã mở sau trùng sinh. Chuyển map thu hồi đồ chưa nhặt, reset mục tiêu/chiêu đang bay và đặt nhân vật vào vùng mới. Phụ bản, công thành và boss theo giờ cần rời trận trước. Nền vẽ mới riêng cho 16 vùng, có lá, cánh hoa, sương, cát hoặc tuyết theo địa hình; atlas ~703 KB, cache tối đa bốn nền, có nền dự phòng khi ảnh chưa tải.
+
+**Bảy phẩm chất**: Trắng (Thường) → Lục (Tốt) → Lam (Hiếm) → Tím (Cực phẩm) → Vàng (Hoàng Kim) → Cam (Truyền Thuyết) → Đỏ (Thần Thoại). Đỏ quý nhất, 14 dòng thuộc tính; cam 12 dòng. Từ lam có linh quang nhẹ; vàng có song hoàn, cam có phù văn, đỏ có bát ấn và cột sáng cao nhất khi rơi. Hiệu ứng xuất hiện trong túi, màn Nhân vật, vũ khí cầm, ngựa và sân đấu; +7/+10 tăng thêm hiệu ứng. Quy tắc này thay thế quy tắc chỉ có vòng từ +7 ở các bản trước. Chế độ Gọn và reduced motion giảm chuyển động, giữ màu phẩm chất. Ngũ hành/bộ giữ huy hiệu riêng; màu vòng phẩm chất luôn nhận ra được.
+
+Đồ cam bắt đầu rơi ở cấp quái 61, đỏ ở cấp 101. Quái thường: cam 0,2%, đỏ 0,05% **trong lượt rơi trang bị**; tinh anh: 1,5%/0,2%; boss ải: 4%/1%. Boss vẫn đảm bảo từ Cực phẩm, tinh anh từ Hiếm; boss Hoàng Kim theo giờ vẫn đảm bảo Hoàng Kim như trước. Đồ từ vàng trở lên luôn được bảo vệ khỏi bộ lọc vứt đồ. Save năm phẩm chất cũ tải bình thường, không đổi đồ đang sở hữu.
+
+Kiểm tra: `pnpm test`, `pnpm typecheck`, build `--base=/volam/`, `tests/regions-rarity-browser.cjs` (chuyển map thật từ thành/phiêu lưu, khóa cấp, chọn ải lẻ, 16 nền, đồ đỏ rơi từ boss và lưu/tải), cùng các bài trang bị, cưỡi ngựa và bố cục. Quy trình phát hành đã ghi trong [AGENTS.md](./AGENTS.md): hoàn tất phát triển phải push GitHub và xác nhận Pages của đúng commit thành công.
+
 ## Kỵ mã hành vân · v0.15.0
 
 Sáu loại ngựa có **24 khung bước chân liền thân** thay cho chân cắt từ ảnh đứng. Chu kỳ chạy theo quãng đường thực, dừng khi nhân vật dừng; người ngồi trên yên nhún cùng ngựa. Chế độ Đầy đủ có bụi vó nhỏ, Gọn bỏ bụi. Nhân vật đi bộ giảm xoắn/gãy ở gấu áo và có nhịp thở khi đứng. Kiếm/côn có lấy đà–vung–thu hồi, thương đâm về trước, cung/nỏ kéo dây; điểm cầm giữ tại bàn tay.

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { statSync } from "node:fs";
 import { GEAR_VARIANTS } from "../src/gear-catalog.ts";
 import { PAINTED_ITEM_FRAMES, paintedItemMarkup, resourceMarkup } from "../src/item-art.ts";
+import { RARITIES, rarityTier } from "../src/equipment.ts";
 import { equipmentMarkup } from "../src/equipment-art.ts";
 import { equipmentVisualState, drawEquipmentRadiance, drawEquipmentDropAura } from "../src/equipment-vfx.ts";
 
@@ -21,15 +22,16 @@ test("84 obtainable equipment variants and both potions have distinct in-bounds 
   assert.equal(crops.size, keys.length);
 });
 
-test("rarity alone never activates equipment halos or orbiting motes, including gold quality", () => {
-  for (const rarity of ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"]) {
+test("rarity radiance increases from blue to red; enhancement can awaken low quality equipment", () => {
+  for (const rarity of RARITIES) {
     for (const enhance of [0, 3, 6, 7, 10]) {
       const state = equipmentVisualState({ rarity, enhance });
+      const awakened = rarityTier(rarity) >= 2 || enhance >= 7;
       const svg = equipmentMarkup("weapon", "#ffd75b", rarity, "", { enhance });
-      assert.equal(state.halo, enhance >= 7);
-      assert.equal(svg.includes('class="gear-halo"'), enhance >= 7);
-      assert.equal(svg.includes('class="gear-awakening"'), enhance >= 7);
-      if (enhance < 7) {
+      assert.equal(state.halo, awakened);
+      assert.equal(svg.includes('class="gear-halo"'), awakened);
+      assert.equal(svg.includes('class="gear-awakening"'), awakened);
+      if (!awakened) {
         assert.equal(state.motes, 0);
         drawEquipmentRadiance(new Proxy({}, { get() { throw new Error("unexpected low-enhancement radiance"); } }), { color: "#ffd75b", rarity, enhance }, 1000);
         const calls = [];

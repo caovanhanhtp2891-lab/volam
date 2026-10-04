@@ -11,6 +11,7 @@ import {
   MATERIAL_PALETTES,
   type GearDesign,
 } from "./equipment-design.ts";
+import { equipmentVisualState } from "./equipment-vfx.ts";
 import { SET_CREST_PATHS, drawSetCrest } from "./set-art.ts";
 export const VARIANT_SHAPES = Object.fromEntries(
   Object.entries(GEAR_DESIGNS).map(([key, art]) => [key, art.shape]),
@@ -59,11 +60,13 @@ export function equipmentEffectLabel(rarity?: string, enhancement = 0): string {
   const tier = equipmentTier(rarity),
     enhance = enhanceOf(enhancement);
   const quality = [
-    "Viền bạc mộc",
-    "Viền lục ngọc",
-    "Viền lam bạc",
-    "Ấn văn tím",
-    "Chạm vàng kim",
+    "Trắng · Viền bạc mộc",
+    "Lục · Viền lục ngọc",
+    "Lam · Linh quang lam",
+    "Tím · Tử vân linh khí",
+    "Vàng · Kim quang song hoàn",
+    "Cam · Huyền thiên phù văn",
+    "Đỏ · Thần huyết bát ấn",
   ][tier];
   return `${quality}${enhance >= 10 ? " · +10 tinh tú xoay" : enhance >= 7 ? " · +7 linh khí xoay" : enhance >= 3 ? " · +3 khắc sáng" : ""}`;
 }
@@ -81,10 +84,11 @@ export function equipmentMarkup(
     tier = equipmentTier(rarity),
     grade = gradeOf(item?.level),
     enhance = enhanceOf(item?.enhance);
+  const state = equipmentVisualState({ rarity: rarity as EquipmentData["rarity"], enhance });
   const element = item?.setId && GEAR_SETS[item.setId] ? GEAR_SETS[item.setId] : item?.element
     ? GEAR_SETS[setForElement(item.element)]
     : undefined;
-  const glow = element?.color ?? safeColor,
+  const glow = safeColor,
     jewel = element?.color ?? (tier >= 2 ? safeColor : "#72d5db");
   const elementGlyph = item?.element ? GEAR_SETS[setForElement(item.element)].glyph : "";
   const id = `gear-${(++svgSerial).toString(36)}`,
@@ -96,19 +100,19 @@ export function equipmentMarkup(
       ? `<g class="gear-quality-detail" fill="${safeColor}" opacity=".7"><path d="M32 3l3 4-3 4-3-4z M32 53l3 4-3 4-3-4z M3 32l4-3 4 3-4 3z M53 32l4-3 4 3-4 3z"/></g>`
       : "";
   const crest =
-    tier === 4
-      ? `<path class="gear-quality-crest" d="M10 17L5 9l12 3L25 4l7 5 7-5 8 8 12-3-5 8M7 46l4 10 13 3M57 46l-4 10-13 3" fill="none" stroke="#ffdb75" stroke-width="2"/>`
+    tier >= 4
+      ? `<path class="gear-quality-crest" d="M10 17L5 9l12 3L25 4l7 5 7-5 8 8 12-3-5 8M7 46l4 10 13 3M57 46l-4 10-13 3" fill="none" stroke="${safeColor}" stroke-width="${tier >= 5 ? 2.5 : 2}"/>`
       : "";
   const ornament =
     grade >= 5
       ? `<path d="${corner}" fill="none" stroke="${trim}" stroke-width="${grade >= 9 ? 1.8 : 1}"/>${grade >= 13 ? '<path d="M6 6l7 7M58 6l-7 7M6 58l7-7M58 58l-7-7" stroke="#ffe3a0"/>' : ""}`
       : "";
   const effects =
-    enhance >= 3
-      ? `<path class="gear-enchant" d="M12 6h40q6 0 6 6v40q0 6-6 6H12q-6 0-6-6V12q0-6 6-6z" fill="none" stroke="${glow}" stroke-width="1.8" stroke-dasharray="9 17" opacity=".8"/>${enhance >= 7 ? `<g class="gear-orbit" fill="${glow}" stroke="#fff6da" stroke-width=".6"><path d="M9 14l3 5-3 5-3-5z M55 40l3 5-3 5-3-5z"/>${enhance === 10 ? '<path d="M28 6l4-4 4 4-4 4z M28 58l4-4 4 4-4 4z"/>' : ""}</g>` : ""}`
+    (enhance >= 3 || tier >= 3)
+      ? `<path class="gear-enchant" d="M12 6h40q6 0 6 6v40q0 6-6 6H12q-6 0-6-6V12q0-6 6-6z" fill="none" stroke="${glow}" stroke-width="1.8" stroke-dasharray="9 17" opacity=".8"/>${state.halo ? `<g class="gear-orbit" fill="${glow}" stroke="#fff6da" stroke-width=".6"><path d="M9 14l3 5-3 5-3-5z M55 40l3 5-3 5-3-5z"/>${enhance === 10 || tier >= 5 ? '<path d="M28 6l4-4 4 4-4 4z M28 58l4-4 4 4-4 4z"/>' : ""}</g>` : ""}`
       : "";
   const setBadge = item?.setId && GEAR_SETS[item.setId] ? `<g class="gear-set-crest" data-set-crest="${item.setId}" transform="translate(53 53)"><circle r="8" fill="#101c24" stroke="${glow}"/><path d="${SET_CREST_PATHS[GEAR_SETS[item.setId].crest]}" transform="scale(.44)" fill="none" stroke="${glow}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></g>` : "";
-  return `<svg class="gear-art tier-${tier} grade-${Math.ceil(grade / 4)} enhanced-${enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0} ${enhance === 10 ? "enhanced-max" : ""} ${extraClass}" data-variant="${variant}" data-material="${art.material}" data-enhancement="${enhance}" viewBox="0 0 64 64" aria-hidden="true" focusable="false" style="--gear-color:${safeColor};--gear-element:${glow}"><defs><linearGradient id="${id}-body" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="${light}"/><stop offset=".3" stop-color="${mid}"/><stop offset=".48" stop-color="${light}"/><stop offset=".62" stop-color="${mid}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-gold" x2=".6" y2="1"><stop stop-color="#fff2ba"/><stop offset=".45" stop-color="#d5aa5e"/><stop offset="1" stop-color="#724425"/></linearGradient><linearGradient id="${id}-enamel" x2=".3" y2="1"><stop stop-color="${tint(art.enamel, 0.35)}"/><stop offset="1" stop-color="${tint(art.enamel, -0.35)}"/></linearGradient><radialGradient id="${id}-glow"><stop stop-color="${glow}" stop-opacity=".45"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient><linearGradient id="${id}-gem" x2=".8" y2="1"><stop stop-color="#f2ffff"/><stop offset=".3" stop-color="${jewel}"/><stop offset="1" stop-color="${tint(jewel, -0.58)}"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="9" fill="#09111b"/>${enhance >= 7 ? `<circle class="gear-halo" cx="32" cy="32" r="29" fill="url(#${id}-glow)"/><g class="gear-awakening" fill="none" stroke="${glow}" stroke-width=".8" opacity=".7"><circle cx="32" cy="32" r="28"/>${enhance >= 10 ? `<circle cx="32" cy="32" r="24" stroke-dasharray="3 5"/><path d="M32 3l3 4-3 4-3-4zM32 53l3 4-3 4-3-4zM3 32l4-3 4 3-4 3zM53 32l4-3 4 3-4 3z"/>` : ""}</g>` : ""}<rect class="gear-quality-frame" x="3" y="3" width="58" height="58" rx="8" fill="none" stroke="${safeColor}" stroke-width="${tier >= 2 ? 1.5 : 0.8}" opacity="${tier ? 0.9 : 0.45}"/>${ring}${ornament}${crest}<g class="gear-illustration"><g class="gear-body" data-painted-gear="${variant}">${paintedItemMarkup(variant)}</g><path class="gear-engraving" d="${art.engraving}" fill="none" opacity="0"/>${effects}</g>${tier >= 2 ? '<path class="gear-sparkle" d="M12 9v8m-4-4h8M53 46v10m-5-5h10" fill="none" stroke="#fff7d0" stroke-width="1.4"/>' : ""}${element ? `<g class="gear-element"><circle cx="10" cy="53" r="8" fill="#101c24" stroke="${element.color}"/><text x="10" y="56.5" fill="${element.color}" font-size="10" text-anchor="middle">${elementGlyph}</text></g>` : ""}${setBadge}</svg>`;
+  return `<svg class="gear-art tier-${tier} grade-${Math.ceil(grade / 4)} enhanced-${enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0} ${enhance === 10 ? "enhanced-max" : ""} ${extraClass}" data-variant="${variant}" data-material="${art.material}" data-enhancement="${enhance}" data-rarity="${rarity ?? "Thường"}" viewBox="0 0 64 64" aria-hidden="true" focusable="false" style="--gear-color:${safeColor};--gear-element:${glow}"><defs><linearGradient id="${id}-body" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="${light}"/><stop offset=".3" stop-color="${mid}"/><stop offset=".48" stop-color="${light}"/><stop offset=".62" stop-color="${mid}"/><stop offset="1" stop-color="${dark}"/></linearGradient><linearGradient id="${id}-gold" x2=".6" y2="1"><stop stop-color="#fff2ba"/><stop offset=".45" stop-color="#d5aa5e"/><stop offset="1" stop-color="#724425"/></linearGradient><linearGradient id="${id}-enamel" x2=".3" y2="1"><stop stop-color="${tint(art.enamel, 0.35)}"/><stop offset="1" stop-color="${tint(art.enamel, -0.35)}"/></linearGradient><radialGradient id="${id}-glow"><stop stop-color="${glow}" stop-opacity=".45"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient><linearGradient id="${id}-gem" x2=".8" y2="1"><stop stop-color="#f2ffff"/><stop offset=".3" stop-color="${jewel}"/><stop offset="1" stop-color="${tint(jewel, -0.58)}"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="9" fill="#09111b"/>${state.halo ? `<circle class="gear-halo" cx="32" cy="32" r="29" fill="url(#${id}-glow)"/><g class="gear-awakening" fill="none" stroke="${glow}" stroke-width=".8" opacity=".7"><circle cx="32" cy="32" r="28"/>${enhance >= 10 || tier >= 5 ? `<circle cx="32" cy="32" r="24" stroke-dasharray="3 5"/><path d="M32 3l3 4-3 4-3-4zM32 53l3 4-3 4-3-4zM3 32l4-3 4 3-4 3zM53 32l4-3 4 3-4 3z"/>` : ""}</g>` : ""}<rect class="gear-quality-frame" x="3" y="3" width="58" height="58" rx="8" fill="none" stroke="${safeColor}" stroke-width="${tier >= 5 ? 2.5 : tier >= 2 ? 1.5 : 0.8}" opacity="${tier ? 0.9 : 0.45}"/>${ring}${ornament}${crest}${tier === 6 ? `<g class="gear-mythic-runes" fill="none" stroke="${safeColor}" stroke-width="1.2"><path d="M16 6l3 3-3 3-3-3zM48 6l3 3-3 3-3-3zM6 16l3 3-3 3-3-3zM54 16l3 3-3 3-3-3zM6 48l3 3-3 3-3-3zM54 48l3 3-3 3-3-3zM16 54l3 3-3 3-3-3zM48 54l3 3-3 3-3-3z"/></g>` : ""}<g class="gear-illustration"><g class="gear-body" data-painted-gear="${variant}">${paintedItemMarkup(variant)}</g><path class="gear-engraving" d="${art.engraving}" fill="none" opacity="0"/>${effects}</g>${tier >= 2 ? '<path class="gear-sparkle" d="M12 9v8m-4-4h8M53 46v10m-5-5h10" fill="none" stroke="#fff7d0" stroke-width="1.4"/>' : ""}${element ? `<g class="gear-element"><circle cx="10" cy="53" r="8" fill="#101c24" stroke="${element.color}"/><text x="10" y="56.5" fill="${element.color}" font-size="10" text-anchor="middle">${elementGlyph}</text></g>` : ""}${setBadge}</svg>`;
 }
 const paths = new Map<string, Path2D>();
 const icons = new Map<string, HTMLCanvasElement>();

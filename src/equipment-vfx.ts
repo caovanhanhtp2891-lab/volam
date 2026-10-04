@@ -1,7 +1,7 @@
 import type { EquipmentData } from "./equipment";
-import { rarityTier } from "./equipment.ts";
+import { rarityTier, RARITY_COLORS } from "./equipment.ts";
 import type { Element } from "./idle";
-import { GEAR_SETS, setForElement, type SetId } from "./gear-catalog.ts";
+import { GEAR_SETS, type SetId } from "./gear-catalog.ts";
 import { drawSetCrest } from "./set-art.ts";
 import { drawGlow } from "./battle-vfx.ts";
 export interface EquipmentVisual {
@@ -17,19 +17,22 @@ export function equipmentVisualState(
 ) {
   const tier = rarityTier(item.rarity),
     enhance = Math.max(0, Math.min(10, item.enhance ?? 0));
+  const band = Math.max(
+    [0, 0, 1, 1, 2, 3, 4][tier],
+    enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
+  );
   return {
     tier,
     enhance,
-    halo: enhance >= 7,
-    band: enhance >= 10 ? 3 : enhance >= 7 ? 2 : enhance >= 3 ? 1 : 0,
+    halo: tier >= 2 || enhance >= 7,
+    band,
     motes: simple
       ? 0
-      : enhance >= 10
-        ? 6
-        : enhance >= 7
-          ? 4
-          : 0,
-    beam: [0, 36, 70, 98, 125][tier],
+      : Math.max(
+          [0, 0, 2, 3, 4, 6, 8][tier],
+          enhance >= 10 ? 6 : enhance >= 7 ? 4 : 0,
+        ),
+    beam: [0, 36, 70, 98, 125, 155, 190][tier],
   };
 }
 export function drawElementMote(
@@ -79,9 +82,7 @@ export function drawEquipmentRadiance(
 ): void {
   const state = equipmentVisualState(item, simple);
   if (!state.halo) return;
-  const color = item.setId ? GEAR_SETS[item.setId].color : item.element
-    ? GEAR_SETS[setForElement(item.element)].color
-    : item.color;
+  const color = item.rarity ? RARITY_COLORS[item.rarity] : item.color;
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
@@ -105,20 +106,35 @@ export function drawEquipmentRadiance(
       ctx.arc(0, 0, radius + 3, -now / 1800, -now / 1800 + Math.PI);
       ctx.stroke();
     }
+    if (state.tier >= 5) {
+      ctx.save();
+      ctx.rotate(now / 1700);
+      ctx.lineWidth = state.tier === 6 ? 1.3 : 0.7;
+      for (let i = 0; i < (state.tier === 6 ? 8 : 6); i++) {
+        const a = (i * Math.PI * 2) / (state.tier === 6 ? 8 : 6);
+        ctx.save();
+        ctx.translate(Math.cos(a) * (radius + 5), Math.sin(a) * (radius + 5));
+        ctx.rotate(a);
+        drawElementMote(ctx, item.element, state.tier === 6 ? 3 : 2);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
   }
   if (item.setId && state.band >= 2 && !simple) {
-    ctx.save(); ctx.rotate(-now / 1800);
-    drawSetCrest(ctx, GEAR_SETS[item.setId].crest, radius * .42, color);
+    ctx.save();
+    ctx.rotate(-now / 1800);
+    drawSetCrest(ctx, GEAR_SETS[item.setId].crest, radius * 0.42, color);
     ctx.restore();
   }
   for (let i = 0; i < state.motes; i++) {
     const angle =
-      now / (state.band === 3 ? 750 : 1400) + (i * Math.PI * 2) / state.motes;
+      now / (state.band >= 3 ? 750 : 1400) + (i * Math.PI * 2) / state.motes;
     ctx.save();
     ctx.translate(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.75);
     ctx.rotate(angle);
     ctx.globalAlpha = 0.65 + Math.sin(now / 280 + i) * 0.2;
-    drawElementMote(ctx, item.element, state.band === 3 ? 2.6 : 1.7);
+    drawElementMote(ctx, item.element, state.band >= 3 ? 2.6 : 1.7);
     ctx.restore();
   }
   ctx.restore();
@@ -131,7 +147,7 @@ export function drawEquipmentDropAura(
   simple = false,
 ): void {
   const state = equipmentVisualState(item, simple),
-    color = item.setId ? GEAR_SETS[item.setId].color : item.color;
+    color = item.rarity ? RARITY_COLORS[item.rarity] : item.color;
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
@@ -170,9 +186,9 @@ export function drawEquipmentDropAura(
         ctx.restore();
       }
     }
-    if (state.enhance >= 10) {
+    if (state.enhance >= 10 || state.tier >= 5) {
       ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = "#ffe7a6";
+      ctx.strokeStyle = state.tier === 6 ? "#ffd4dc" : "#ffe7a6";
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
         const a = (i * Math.PI) / 4 + now / 2400;

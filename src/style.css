@@ -2593,3 +2593,33 @@ h2 {
 
 .gear-art.enhanced-2 .gear-halo { opacity: .8; }
 .gear-art.enhanced-max .gear-halo { opacity: 1; }
+
+/* Seven qualities: rarity radiance and enhancement contribute independently. */
+.gear-art:is(.tier-2,.tier-3,.tier-4,.tier-5,.tier-6) .gear-halo { opacity: .65; animation: gear-spark 2.8s ease-in-out infinite; }
+.gear-art:is(.tier-2,.tier-3,.tier-4,.tier-5,.tier-6) .gear-awakening { transform-origin: 32px 32px; animation: gear-runes 16s linear infinite; }
+.gear-art:is(.tier-3,.tier-4,.tier-5,.tier-6) .gear-enchant { opacity: .5; stroke-dasharray: 9 17; animation: gear-runes 10s linear infinite; }
+.gear-art.tier-5 { filter: drop-shadow(0 0 3px #ff963f70); }
+.gear-art.tier-6 { filter: drop-shadow(0 0 5px #ff405d90); }
+.gear-art.tier-6 .gear-halo { opacity: 1; animation-duration: 1.8s; }
+.gear-art.tier-6 .gear-awakening { animation-duration: 8s; }
+.gear-art.tier-6 .gear-mythic-runes { transform-origin: 32px 32px; animation: gear-runes 11s linear infinite reverse; }
+.gear-art:is(.tier-5,.tier-6) .gear-quality-crest { animation: gear-spark 2s ease-in-out infinite; }
+.app-shell[data-effects="simple"] .gear-art :is(.gear-halo,.gear-awakening,.gear-enchant,.gear-mythic-runes,.gear-quality-crest) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gear-art[data-variant] :is(.gear-halo,.gear-awakening,.gear-enchant,.gear-mythic-runes,.gear-quality-crest) { animation: none; }
+}
+#travel-map-btn { position: absolute; top: 22px; right: 4px; z-index: 1; pointer-events: auto; min-height: 0; height: 22px; padding: 2px 5px; font-size: 9px; line-height: 14px; color: #ffe2a0; background: #142b20ef; border: 1px solid #b09a64; border-radius: 3px; }
+.region-row { gap: 9px; padding: 8px; min-height: 72px; }
+.region-row > b { flex: 1; overflow: hidden; }
+.region-row > b em { display: block; margin-top: 4px; font: 9px/1.3 system-ui; color: #b7b7a7; }
+.region-row > span { max-width: 78px; font-size: 10px; white-space: normal; text-align: right; }
+.region-thumbnail { display: block; width: 70px; height: 52px; flex-shrink: 0; border-radius: 4px; border: 1px solid #b19a68; background-size: 400% 400%; background-repeat: no-repeat; }
+.region-row:disabled .region-thumbnail { filter: saturate(.35) brightness(.65); }
+.travel-stage-row { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; }
+.travel-stage-row label { display: grid; gap: 5px; flex: 1; min-width: 0; color: #e3cea0; font-size: 12px; }
+.travel-stage-row select { width: 100%; min-width: 0; }
+.travel-stage-row button { flex-shrink: 0; min-height: 36px; }
+.travel-atlas { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.travel-atlas .region-row { flex-wrap: wrap; }
+.travel-atlas .region-row > span { flex-basis: 100%; max-width: none; }
+@media (max-width: 520px) { .travel-atlas { grid-template-columns: 1fr; } .travel-atlas .region-row { flex-wrap: nowrap; } .travel-atlas .region-row > span { flex-basis: auto; max-width: 75px; } }

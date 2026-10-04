@@ -4,11 +4,13 @@ import { HORSE_SIZE } from "./actor-rig";
 import { horseGait } from "./actor-animation";
 import { horseBreed, horseWalkFrame } from "./horse-animation";
 import { drawEquipmentRadiance } from "./equipment-vfx";
+import type { Rarity } from "./equipment";
 export interface MountAppearance {
   variant: GearVariant;
   color: string;
   tier: number;
   enhancement: number;
+  rarity?: Rarity;
   simpleEffects?: boolean;
 }
 export const HORSE_ATLAS_URL = new URL(
@@ -56,13 +58,13 @@ export function drawHorse(
     }
     ctx.restore();
   }
-  if (horse.enhancement >= 7) {
+  if (horse.tier >= 2 || horse.enhancement >= 7) {
     ctx.save();
     ctx.translate(0, 10);
     ctx.scale(1, 0.28);
     drawEquipmentRadiance(
       ctx,
-      { color: horse.color, enhance: horse.enhancement },
+      { color: horse.color, rarity: horse.rarity, enhance: horse.enhancement },
       now,
       33,
       horse.simpleEffects,

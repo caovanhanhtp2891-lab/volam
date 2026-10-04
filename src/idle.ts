@@ -189,9 +189,7 @@ export function completeWave(progress: IdleProgress): { stageCleared: boolean; a
 }
 export function canEnterStage(progress: IdleProgress, stage: number, level = 1): boolean {
   if (!Number.isInteger(stage) || stage < 1 || stage > MAX_STAGE) return false;
-  return stage <= progress.maxStage || (
-    (stage - 1) % 10 === 0 && Number.isFinite(level) && level >= stage
-  );
+  return stage <= progress.maxStage || (Number.isFinite(level) && level >= stage);
 }
 export function goToStage(progress: IdleProgress, stage: number, level = 1): boolean {
   if (!canEnterStage(progress, stage, level)) return false;

@@ -88,7 +88,7 @@ async function gallery(page) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.15.0",
+      "0.16.0",
     );
     await page.locator("#hero-name-input").fill("Bảo Khố Kiếm Sĩ");
     await page.locator('[data-faction="wudang"]').click();
@@ -106,46 +106,18 @@ async function gallery(page) {
       await page.locator(".gear-sample [data-material]").count(),
       weaponCount,
     );
-    for (const rarity of ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"]) {
+    for (const rarity of ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim", "Truyền Thuyết", "Thần Thoại"]) {
       await page.locator("#gear-gallery-rarity").selectOption(rarity);
       assert.equal(
         await page.locator(".gear-sample .gear-body").count(),
         weaponCount,
       );
     }
+    // Red quality has radiance without enhancement; +7/+10 still layer on top.
     for (const enhance of [0, 3, 7, 10]) {
       await page.locator("#gear-gallery-enhance").selectOption(String(enhance));
-      assert.equal(
-        await page
-          .locator('.gear-sample [data-enhancement="' + enhance + '"]')
-          .count(),
-        weaponCount,
-      );
-      assert.equal(
-        await page.locator(".gear-sample .gear-enchant").count(),
-        enhance >= 3 ? weaponCount : 0,
-      );
-      assert.equal(
-        await page.locator(".gear-sample .gear-orbit").count(),
-        enhance >= 7 ? weaponCount : 0,
-      );
-      assert.equal(
-        await page.locator(".gear-sample .gear-halo").count(),
-        enhance >= 7 ? weaponCount : 0,
-      );
-      assert.equal(
-        await page.locator(".gear-sample [data-painted-item]").count(),
-        weaponCount,
-      );
-      if (enhance < 7)
-        assert.equal(
-          await page
-            .locator(".gear-sample .gear-quality-crest")
-            .first()
-            .evaluate((el) => getComputedStyle(el).animationName),
-          "none",
-          "gold quality has no animated awakening below +7",
-        );
+      for (const selector of [`[data-enhancement="${enhance}"]`, ".gear-enchant", ".gear-orbit", ".gear-halo", ".gear-mythic-runes", "[data-painted-item]"])
+        assert.equal(await page.locator(`.gear-sample ${selector}`).count(), weaponCount);
     }
     await page.locator("#gear-gallery-element").selectOption("hoa");
     assert.ok(
@@ -388,7 +360,7 @@ async function gallery(page) {
           slot: meta.slot,
           name: GEAR_VARIANTS[variant].name,
           variant,
-          rarity: ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim"][i % 5],
+          rarity: ["Thường", "Tốt", "Hiếm", "Cực phẩm", "Hoàng Kim", "Truyền Thuyết", "Thần Thoại"][i % 5],
           color: ["#a6b3bd", "#73d19b", "#64b5f6", "#cf91ff", "#ffd35a"][i % 5],
           enhance: [0, 3, 7, 10][i % 4],
           setId: undefined,

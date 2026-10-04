@@ -78,7 +78,7 @@ async function fit(page, width, height) {
         errors.push(`${response.status()} ${response.url()}`);
     });
     await page.goto(url, { waitUntil: "networkidle" });
-    assert.equal(await page.locator("html").getAttribute("data-version"), "0.15.0");
+    assert.equal(await page.locator("html").getAttribute("data-version"), "0.16.0");
     assert.equal(await page.locator(".sect-card").count(), 10);
     await page.locator("#hero-name-input").fill("Lữ Khách");
     await page.locator('[data-faction="shaolin"]').click();
@@ -125,7 +125,8 @@ async function fit(page, width, height) {
       s.player.gold = 1000;
     });
     await tab(page, "char");
-    assert.equal(await page.locator(".equipment-slot").count(), 11);
+    assert.equal(await page.locator(".equipment-slot").count(), 12);
+    assert.equal(await page.locator("[data-equipped-preview]").count(), 11);
     await page.locator('[data-attribute="strength"][data-delta="1"]').click();
     let snapshot = await state(page);
     assert.equal(snapshot.player.idle.attributes.strength, 1);
@@ -143,7 +144,7 @@ async function fit(page, width, height) {
     snapshot = await state(page);
     assert.equal(snapshot.player.skillRanks.skill1, 1);
     assert.equal(snapshot.player.skillPoints, 5);
-    console.log("PASS eleven equipment slots and point conservation for attributes and skills");
+    console.log("PASS eleven equipment slots plus military seal and point conservation for attributes and skills");
 
     await tab(page, "log");
     await page.locator("#gift-btn").click();
@@ -160,7 +161,7 @@ async function fit(page, width, height) {
     console.log("PASS daily gift awarded once, including after a page reload");
 
     await tab(page, "more");
-    assert.match(await page.locator(".release-stamp").textContent(), /v0\.12\.0/);
+    assert.match(await page.locator(".release-stamp").textContent(), /v0\.16\.0/);
     await page.locator("#settings-name").fill("");
     await page.locator("#settings-name").pressSequentially("WASD Lữ");
     await page.locator("#settings-sex").selectOption("female");
@@ -263,7 +264,7 @@ async function fit(page, width, height) {
       );
     });
     await tab(page, "char");
-    assert.equal(await page.locator(".equipment-slot svg").count(), 11);
+    assert.equal(await page.locator(".equipment-slot > svg").count(), 12);
     assert.equal(await page.locator("#character-preview").isVisible(), true);
     assert.equal(await page.locator(".canvas-frame").isVisible(), false);
     const equipmentLayout = await page.evaluate(() => {
@@ -271,9 +272,9 @@ async function fit(page, width, height) {
       const slots = [...document.querySelectorAll(".equipment-slot")].map((el) => el.getBoundingClientRect());
       return { left: slots.filter((r) => r.right <= middle.x + 1).length, right: slots.filter((r) => r.x >= middle.right - 1).length };
     });
-    assert.deepEqual(equipmentLayout, { left: 6, right: 5 });
+    assert.deepEqual(equipmentLayout, { left: 6, right: 6 });
     const beforeInspect = await state(page);
-    await page.locator('[data-equipped-preview="weapon"] svg').click();
+    await page.locator('[data-equipped-preview="weapon"] > svg').click();
     assert.equal((await state(page)).player.gold, beforeInspect.player.gold, "viewing equipped gear must not spend currency");
     await page.locator("[data-detail-enhance]").click();
     assert.equal((await state(page)).player.gold, beforeInspect.player.gold, "enhancement preview must not spend currency");
@@ -288,10 +289,10 @@ async function fit(page, width, height) {
     await tab(page, "char");
     console.log("PASS classic character preview, equipment on both sides, inspection without spending and explicit enhancement");
     await tab(page, "inv");
-    assert.equal(await page.locator(".bag-slot svg").count(), 11);
+    assert.equal(await page.locator(".bag-slot > svg").count(), 11);
     // Click the picture itself, rather than its parent, to exercise SVG event targets.
     await page
-      .locator('.bag-slot[data-inspect-item="visual-boots"] svg')
+      .locator('.bag-slot[data-inspect-item="visual-boots"] > svg')
       .click();
     assert.match(
       await page.locator("#utility-content").textContent(),

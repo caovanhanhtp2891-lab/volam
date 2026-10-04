@@ -109,9 +109,9 @@ test("level milestones open a new region without clearing the previous boss", ()
   }
 });
 
-test("level unlocks only region entrances and rejects invalid stages and levels", () => {
+test("level unlocks every eligible stage and rejects invalid stages and levels", () => {
   const progress = normalizeIdle();
-  for (const stage of [0, 1.5, 12, 152, MAX_STAGE + 1, Infinity, NaN]) {
+  for (const stage of [0, 1.5, MAX_STAGE + 1, Infinity, NaN]) {
     assert.equal(goToStage(progress, stage, 160), false);
   }
   for (const level of [10, -1, NaN, Infinity]) assert.equal(goToStage(progress, 11, level), false);
@@ -120,6 +120,19 @@ test("level unlocks only region entrances and rejects invalid stages and levels"
   assert.equal(goToStage(progress, 12, 11), false);
   completeWave(Object.assign(progress, { wave: 4 }));
   assert.equal(goToStage(progress, 12, 11), true, "wave completion still opens the next stage");
+});
+
+test("level 12 and 160 can travel beyond region entrances without clearing waves", () => {
+  const progress = normalizeIdle({ stage: 1, maxStage: 1, inTown: true, wave: 3 });
+  const original = structuredClone(progress);
+  assert.equal(goToStage(progress, 12, 11), false);
+  assert.deepEqual(progress, original);
+  assert.equal(goToStage(progress, 12, 12), true);
+  assert.equal(progress.inTown, false);
+  assert.equal(progress.wave, 1);
+  assert.equal(goToStage(progress, 160, 160), true);
+  assert.equal(goToStage(progress, 161, 160), false);
+  assert.equal(goToStage(normalizeIdle(progress), 159, 1), true);
 });
 
 test("all five elemental relationships have an advantage and the reciprocal penalty", () => {

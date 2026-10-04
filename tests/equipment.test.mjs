@@ -47,13 +47,13 @@ test("poor, zero-stone and capped upgrades never consume resources, roll randomn
 test("new rarity rolls increase line count; Golden has ten unique lines; all rolls remain positive", () => {
   for (const [tier, rarity] of RARITIES.entries()) for (const level of [1, 80, 160]) {
     const bonuses = rollGearBonuses(level, rarity, "boots", () => .5);
-    assert.equal(Object.keys(bonuses).length, [2, 3, 5, 7, 10][tier]);
+    assert.equal(Object.keys(bonuses).length, [2, 3, 5, 7, 10, 12, 14][tier]);
     assert.ok(Object.values(bonuses).every(n => Number.isInteger(n) && n > 0));
     assert.ok(bonuses.speed > 0);
   }
 });
-test("five rarity colors and all eleven SVG shapes identify Golden equipment without bitmaps", () => {
-  assert.equal(new Set(Object.values(RARITY_COLORS)).size, 5);
+test("seven rarity colors and all eleven SVG shapes identify Golden equipment without bitmaps", () => {
+  assert.equal(new Set(Object.values(RARITY_COLORS)).size, 7);
   for (const slot of ["weapon", "armor", "helmet", "boots", "belt", "necklace", "ring", "ring2", "bracelet", "pendant", "horse"]) {
     assert.match(equipmentMarkup(slot, RARITY_COLORS["Hoàng Kim"], "Hoàng Kim"), /tier-4/);
   }

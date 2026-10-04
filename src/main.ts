@@ -26,7 +26,8 @@ import {
 import { OnlineClient, type OnlineSnapshot, type OnlineStatus } from "./online";
 import { drawSprite, spriteMarkup, characterPortraitMarkup, type SpriteId } from "./art";
 import { characterArtKey, defaultCharacterSex, type CharacterSex } from "./character-art";
-import { createMapArt, createTrainingArt } from "./map-art";
+import { createMapArt, createTrainingArt, trainingArtRevision, drawRegionWeather } from "./map-art";
+import { REGION_SCENES, regionThumbnail } from "./region-scenes";
 import {
   freshMotion,
   updateMotion,
@@ -53,7 +54,7 @@ import { actorCastOffset } from "./actor-rig";
 import { skillUsesFlight, flightSpeed } from "./skill-flight";
 import { drawEnemyStatus } from "./enemy-status-art";
 import { drawGearAura } from "./gear-effects";
-import { RARITIES, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
+import { RARITIES, RARITY_NAMES, rollEquipmentRarity, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
 import {
   drawBattleEffect,
@@ -622,13 +623,7 @@ function hexToRgba(hex: string, alpha: number): string {
 
 function itemColor(rarity: Rarity): string { return RARITY_COLORS[rarity]; }
 
-function itemRarity(): Rarity {
-  const roll = Math.random();
-  if (roll < 0.02) return "Cực phẩm";
-  if (roll < 0.12) return "Hiếm";
-  if (roll < 0.43) return "Tốt";
-  return "Thường";
-}
+function itemRarity(level: number): Rarity { return rollEquipmentRarity(level); }
 
 function itemPower(level: number, rarity: Rarity, slot: ItemSlot): number {
   const rarityMultiplier: Record<Rarity, number> = {
@@ -637,6 +632,8 @@ function itemPower(level: number, rarity: Rarity, slot: ItemSlot): number {
     Hiếm: 1.42,
     "Cực phẩm": 1.8,
     "Hoàng Kim": 2.5,
+    "Truyền Thuyết": 3.2,
+    "Thần Thoại": 4.2,
   };
   const base = slot === "weapon" ? 9 + level * 2.1 : 8 + level * 2.4;
   return Math.floor(base * rarityMultiplier[rarity] + randomBetween(-2, 3));
@@ -647,7 +644,7 @@ function createItem(
   forcedRarity?: Rarity,
   forcedSlot?: ItemSlot,
 ): Item {
-  const rarity = forcedRarity ?? itemRarity();
+  const rarity = forcedRarity ?? itemRarity(level);
   const slot =
     forcedSlot ??
     (Object.keys(GEAR_SLOTS) as ItemSlot[])[
@@ -660,6 +657,8 @@ function createItem(
     Hiếm: "Tử Vân",
     "Cực phẩm": "Thiên Cơ",
     "Hoàng Kim": "Hoàng Kim",
+    "Truyền Thuyết": "Huyền Thiên",
+    "Thần Thoại": "Thần Huyết",
   };
   const icon = GEAR_SLOTS[slot].icon;
   return {
@@ -1058,7 +1057,7 @@ function setShopVariant(id: SetId, slot: ItemSlot): GearVariant {
 function openEquipmentGallery(): void {
   if (!game) return;
   const variants = variantsForSlot(gallerySlot);
-  openUtility(`Bảo khố · ${Object.keys(GEAR_VARIANTS).length} mẫu trang bị`, `<p class="dim">Phẩm chất đổi màu viền; +7 mở vòng linh khí, +10 thêm phù văn. Đây là mẫu minh họa; chọn mua sẽ tới Tiệm với phẩm chất Tốt, chưa cường hóa.</p><div class="gear-gallery-filters"><label>Vị trí<select id="gear-gallery-slot">${EQUIPMENT_SLOTS.filter(slot => slot !== "ring2").map(slot => `<option value="${slot}" ${slot === gallerySlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label>Phẩm chất<select id="gear-gallery-rarity">${RARITIES.map(rarity => `<option ${rarity === galleryRarity ? "selected" : ""}>${rarity}</option>`).join("")}</select></label><label>Cường hóa<select id="gear-gallery-enhance">${[0,3,7,10].map(enhance => `<option value="${enhance}" ${enhance === galleryEnhance ? "selected" : ""}>+${enhance}</option>`).join("")}</select></label><label>Ngũ hành<select id="gear-gallery-element">${Object.entries(ELEMENTS).map(([element, data]) => `<option value="${element}" ${element === galleryElement ? "selected" : ""}>${data.name}</option>`).join("")}</select></label><label>Bộ trang bị<select id="gear-gallery-set"><option value="">Không chọn bộ</option>${SET_IDS.map(id => `<option value="${id}" ${id === gallerySet ? "selected" : ""}>${GEAR_SETS[id].name}</option>`).join("")}</select></label></div><p class="gear-effect-label">${equipmentEffectLabel(galleryRarity, galleryEnhance)} · Bậc ${Math.ceil(game.player.level / 10)}</p><div class="gear-gallery">${variants.map(variant => {
+  openUtility(`Bảo khố · ${Object.keys(GEAR_VARIANTS).length} mẫu trang bị`, `<p class="dim">Bảy phẩm chất: Trắng → Lục → Lam → Tím → Vàng → Cam → Đỏ. Đỏ (Thần Thoại) quý nhất; phẩm chất cao có linh khí, vòng sáng và phù văn đẹp hơn. +7/+10 tăng cường hiệu ứng. Đây là mẫu minh họa; chọn mua sẽ tới Tiệm với phẩm chất Tốt, chưa cường hóa.</p><div class="gear-gallery-filters"><label>Vị trí<select id="gear-gallery-slot">${EQUIPMENT_SLOTS.filter(slot => slot !== "ring2").map(slot => `<option value="${slot}" ${slot === gallerySlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label>Phẩm chất<select id="gear-gallery-rarity">${RARITIES.map(rarity => `<option value="${rarity}" ${rarity === galleryRarity ? "selected" : ""}>${rarity} · ${RARITY_NAMES[RARITIES.indexOf(rarity)]}</option>`).join("")}</select></label><label>Cường hóa<select id="gear-gallery-enhance">${[0,3,7,10].map(enhance => `<option value="${enhance}" ${enhance === galleryEnhance ? "selected" : ""}>+${enhance}</option>`).join("")}</select></label><label>Ngũ hành<select id="gear-gallery-element">${Object.entries(ELEMENTS).map(([element, data]) => `<option value="${element}" ${element === galleryElement ? "selected" : ""}>${data.name}</option>`).join("")}</select></label><label>Bộ trang bị<select id="gear-gallery-set"><option value="">Không chọn bộ</option>${SET_IDS.map(id => `<option value="${id}" ${id === gallerySet ? "selected" : ""}>${GEAR_SETS[id].name}</option>`).join("")}</select></label></div><p class="gear-effect-label">${equipmentEffectLabel(galleryRarity, galleryEnhance)} · Bậc ${Math.ceil(game.player.level / 10)}</p><div class="gear-gallery">${variants.map(variant => {
     const sample: Item = { id: "art-sample", slot: gallerySlot, name: GEAR_VARIANTS[variant].name, variant, rarity: galleryRarity, element: galleryElement, ...(gallerySet ? { setId: gallerySet } : {}), level: game!.player.level, enhance: galleryEnhance, power: 0, color: itemColor(galleryRarity), icon: "◆" };
     return `<article class="gear-sample" style="--rarity-color:${sample.color}">${itemArt(sample)}<b>${sample.name}</b><button class="mini-button" data-buy-gear-kind="${variant}">Chọn mua</button></article>`;
   }).join("")}</div>`);
@@ -1136,6 +1135,7 @@ function currentMountAppearance(): MountAppearance | undefined {
         variant: variantOf(horse),
         color: horse.color,
         tier: equipmentTier(horse.rarity),
+        rarity: horse.rarity,
         enhancement: horse.enhance,
         simpleEffects: game?.player.preferences.skillEffects === "simple",
       }
@@ -2083,7 +2083,7 @@ function killEnemy(enemy: Enemy): void {
     if (game.mapMode !== "world") {
       addLog(`${enemy.name} đã gục ngã!`);
     } else if (idleFight) {
-      addLog(`${enemy.name} đã gục ngã! Nhận trang bị Cực phẩm.`);
+      addLog(`${enemy.name} đã gục ngã! Nhận trang bị từ Cực phẩm trở lên.`);
     } else {
       player.bossDefeated = true;
       game.lastBossDefeatedAt = nowMs();
@@ -2096,12 +2096,7 @@ function killEnemy(enemy: Enemy): void {
   const chance =
     enemy.kind === "boss" ? 1 : enemy.kind === "elite" ? 0.92 : 0.32;
   if (Math.random() <= chance) {
-    const forced =
-      enemy.kind === "boss"
-        ? "Cực phẩm"
-        : enemy.kind === "elite"
-          ? "Hiếm"
-          : undefined;
+    const forced = rollEquipmentRarity(enemy.level, enemy.kind);
     game.loot.push({
       id: `loot-${enemy.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       x: enemy.x + randomBetween(-12, 12),
@@ -3086,10 +3081,13 @@ function drawWorld(now: number): void {
     } else ctx.drawImage(worldArt, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     ctx.fillStyle = "#fff0bd";
     ctx.font = "600 14px 'DM Sans', sans-serif";
-    drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
+    if (!playerIdleActive() && !game.goldenEncounter) drawOutlinedText("THANH KHÊ TRẤN", 268, 260);
     ctx.fillStyle = "#dde8cd";
     ctx.font = "12px 'DM Sans', sans-serif";
-    drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
+    if (playerIdleActive()) {
+      const info = stageInfo(player.idle.stage);
+      drawRegionWeather(ctx, info.region, now, game.cameraX, game.cameraY, VIEW_WIDTH, VIEW_HEIGHT, player.preferences.skillEffects === "simple");
+    } else if (!game.goldenEncounter) drawOutlinedText("Cổng phía đông · Lang Vương", 1320, 1030);
     if (!playerIdleActive() && !game.goldenEncounter) for (const npc of NPCS) drawNpc(npc, now);
   }
 
@@ -3621,6 +3619,7 @@ function currentHeroAppearance(): HeroAppearance {
     armorColor:
       equipmentTier(equipment.armor?.rarity) >= 2 ? equipment.armor!.color : "",
     auraColor: bestGear?.color ?? "#ffe5a3",
+    quality: bestGear,
     tier: equipmentTier(bestGear?.rarity),
     enhancement: equipment.weapon?.enhance ?? 0,
     auraEnhancement: Math.max(0, ...Object.values(equipment).map(item => item.enhance ?? 0)),
@@ -4174,15 +4173,37 @@ function playerIdleActive(): boolean {
       game.mapMode === "world",
   );
 }
-const trainingArts = new Map<number, HTMLCanvasElement>();
+function regionCards(): string {
+  if (!game) return "";
+  const { idle: progress, level } = game.player;
+  const blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  const current = stageInfo(progress.stage).region;
+  return REGIONS.map((name, index) => {
+    const start = index * 10 + 1, unlocked = canEnterStage(progress, start, level);
+    const active = progress.enabled && !progress.inTown && index === current;
+    const status = blocked ? "Rời trận trước" : !unlocked ? `Cần cấp ${start}` : active ? "Đang luyện · Vào lại ›" : "Vào map ›";
+    return `<button class="region-row ${active ? "current" : ""} ${unlocked ? "unlocked" : ""}" data-region="${index}" ${unlocked && !blocked ? "" : "disabled"} aria-label="${name} · Quái cấp ${start}–${start + 9} · ${status}">${regionThumbnail(index)}<b>${name}<small>Quái cấp ${start}–${start + 9}</small><em>${REGION_SCENES[index].detail}</em></b><span>${status}</span></button>`;
+  }).join("");
+}
+function openTravelMap(): void {
+  if (!game) return;
+  const { player } = game, blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
+  const options = Array.from({ length: MAX_STAGE }, (_, i) => i + 1).filter(stage => canEnterStage(player.idle, stage, player.level));
+  openUtility("Bản đồ · Du ngoạn giang hồ", `<p class="dim">Nhân vật cấp ${player.level}. Chạm vùng để đến ngay; đủ cấp quái hoặc đã mở ải đều được đi. ${blocked ? "Hãy rời boss/phụ bản/công thành trước khi chuyển map." : ""}</p><div class="travel-stage-row"><label>Chọn ải<select id="travel-stage">${options.map(stage => `<option value="${stage}" ${stage === player.idle.stage ? "selected" : ""}>${stageInfo(stage).name} · Cấp ${stage}</option>`).join("")}</select></label><button id="travel-stage-go" class="mini-button" ${blocked ? "disabled" : ""}>Đến ải</button></div><div class="region-list travel-atlas">${regionCards()}</div>`);
+}
+const trainingArts = new Map<string, HTMLCanvasElement>();
 function trainingArt(stage: number): HTMLCanvasElement {
   const region = stageInfo(stage).region;
-  if (!trainingArts.has(region))
+  const key = `${region}:${trainingArtRevision}`;
+  if (!trainingArts.has(key))
     trainingArts.set(
-      region,
+      key,
       createTrainingArt(region, WORLD_WIDTH, WORLD_HEIGHT),
     );
-  return trainingArts.get(region)!;
+  const result = trainingArts.get(key)!;
+  // Four cached arenas bound memory; atlas completion changes the cache key.
+  if (trainingArts.size > 4) trainingArts.delete(trainingArts.keys().next().value!);
+  return result;
 }
 function prepareIdleWave(resetPosition = true): void {
   if (!game || !game.player.idle.enabled || game.goldenEncounter) return;
@@ -4289,7 +4310,7 @@ let discardPreview: { filter: DiscardFilter; ids: Set<string> } | null = null;
 function openDiscardFilter(): void {
   if (!game) return;
   discardPreview = null;
-  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ bộ, đồ Hoàng Kim, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
+  openUtility("Vứt đồ theo bộ lọc", `<p class="dim">Chỉ lọc đồ trong túi. Luôn giữ đồ đang mặc, đồ bộ, đồ từ Hoàng Kim trở lên, đồ đã cường hóa và Đồ chờ nhận.</p><div class="card"><label class="form-row">Phẩm chất tối đa<select id="discard-rarity">${RARITIES.slice(0, 4).map((name, index) => `<option value="${index}" ${index === 1 ? "selected" : ""}>${name}</option>`).join("")}</select></label><label class="form-row">Cấp trang bị tối đa<input id="discard-level" type="number" min="1" max="160" value="${game.player.level}"></label><label class="discard-check"><input id="discard-weaker" type="checkbox" checked> Chỉ vứt đồ yếu hơn hoặc bằng món đang mặc</label></div><button id="preview-discard" class="outline-button">Xem đồ sẽ vứt</button><div id="discard-preview" aria-live="polite"></div>`);
 }
 function previewDiscard(): void {
   if (!game) return;
@@ -4591,16 +4612,10 @@ function refreshIdleUi(): void {
   document
     .querySelector("#skill-dot")!
     .classList.toggle("on", player.skillPoints > 0);
-  const regionKey = `${progress.stage}:${progress.maxStage}:${player.level}:${game.mapMode}:${Boolean(game.goldenEncounter)}`;
+  const regionKey = `${progress.stage}:${progress.maxStage}:${player.level}:${progress.inTown}:${progress.enabled}:${game.mapMode}:${Boolean(game.goldenEncounter)}`;
   if (regionRenderKey !== regionKey) {
     regionRenderKey = regionKey;
-    const blocked = game.mapMode !== "world" || Boolean(game.goldenEncounter);
-    document.getElementById("region-list")!.innerHTML = REGIONS.map(
-      (name, index) => {
-        const start = index * 10 + 1, unlocked = canEnterStage(progress, start, player.level);
-        return `<button class="region-row ${index === info.region ? "current" : ""} ${unlocked ? "unlocked" : ""}" data-region="${index}" ${unlocked && !blocked ? "" : "disabled"} aria-label="${name} · Quái cấp ${start}–${start + 9} · ${unlocked ? "Đã mở" : `Cần cấp ${start}`}"><b>${name}<small>Quái cấp ${start}–${start + 9}</small></b><span>${index === info.region ? "Đang luyện" : unlocked ? "Vào map ›" : `Cần cấp ${start} ♙`}</span></button>`;
-      },
-    ).join("");
+    document.getElementById("region-list")!.innerHTML = regionCards();
   }
   const characterKey = JSON.stringify([
     progress.attributePoints,
@@ -5154,11 +5169,16 @@ function bindIdleUi(): void {
     )
       return;
     game.player.idle.enabled = true;
+    // Unclaimed loot belongs to the old arena; collect before replacing its enemies.
+    collectIdleLoot(true);
+    resetJoystick(); keys.clear();
+    closeUtility(); showIdlePage("log");
     prepareIdleWave();
     addLog(`Đến ${stageInfo(stage).name} · Quái cấp ${stageInfo(stage).level}.`);
     persistGame();
     refreshUi(true);
   };
+  document.getElementById("travel-map-btn")!.addEventListener("click", openTravelMap);
   document
     .getElementById("stage-prev")!
     .addEventListener(
@@ -5271,6 +5291,9 @@ function bindIdleUi(): void {
     .getElementById("utility-content")!
     .addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
+      const travel = target.closest<HTMLButtonElement>("[data-region]");
+      if (travel && !travel.disabled) changeStage(Number(travel.dataset.region) * 10 + 1);
+      if (target.closest("#travel-stage-go")) changeStage(Number((document.getElementById("travel-stage") as HTMLSelectElement).value));
       const selectedLand = target.closest<HTMLElement>("[data-select-territory]");
       if (selectedLand && territoryOf(selectedLand.dataset.selectTerritory!)) openTerritories(selectedLand.dataset.selectTerritory as TerritoryId);
       const challenge = target.closest<HTMLButtonElement>("[data-challenge-territory]");

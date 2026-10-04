@@ -1,3 +1,10 @@
+import { TRAINING_ATLAS_URL, REGION_SCENES, regionFrame } from "./region-scenes";
+const trainingAtlas = new Image();
+trainingAtlas.decoding = "async";
+export let trainingArtRevision = 0;
+trainingAtlas.onload = () => { trainingArtRevision++; };
+trainingAtlas.src = TRAINING_ATLAS_URL;
+
 interface MapObstacle {
   x: number;
   y: number;
@@ -14,6 +21,17 @@ export function createTrainingArt(region: number, width: number, height: number)
   canvas.height = height / 2;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(0.5, 0.5);
+  if (trainingAtlas.complete && trainingAtlas.naturalWidth) {
+    const frame = regionFrame(region, trainingAtlas.naturalWidth, trainingAtlas.naturalHeight);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(trainingAtlas, frame.x, frame.y, frame.width, frame.height, 0, 0, width, height);
+    // A subtle vignette keeps the center readable without hiding painted terrain.
+    const shade = ctx.createRadialGradient(width / 2, height / 2, height * .2, width / 2, height / 2, width * .64);
+    shade.addColorStop(0, "#08132300"); shade.addColorStop(1, "#08132350");
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, width, height);
+    return canvas;
+  }
   const palettes = [
     ["#4c5739", "#8d8060", "#304833", "#647343"],
     ["#3d503f", "#85755b", "#213c33", "#5f7350"],
@@ -147,6 +165,24 @@ export function createTrainingArt(region: number, width: number, height: number)
     ctx.stroke();
   }
   return canvas;
+}
+
+export function drawRegionWeather(ctx: CanvasRenderingContext2D, region: number, now: number, x: number, y: number, width: number, height: number, simple = false): void {
+  const scene = REGION_SCENES[region] ?? REGION_SCENES[0];
+  ctx.save(); ctx.fillStyle = scene.color; ctx.strokeStyle = scene.color;
+  const count = simple ? 4 : scene.weather === "snow" ? 20 : 12;
+  for (let i = 0; i < count; i++) {
+    const phase = now / (scene.weather === "embers" ? 6000 : 13000) + i * .618;
+    const px = x + (((i * .381 + now / 85000) % 1 + 1) % 1) * width;
+    const py = y + ((phase % 1 + 1) % 1) * height;
+    ctx.globalAlpha = scene.weather === "mist" ? .035 : .25 + Math.sin(phase * 6) * .12;
+    ctx.beginPath();
+    if (scene.weather === "mist") ctx.ellipse(px, py, 90, 16, -.2, 0, Math.PI * 2);
+    else if (scene.weather === "snow" || scene.weather === "dust" || scene.weather === "embers") ctx.arc(px, scene.weather === "embers" ? y + height - (py - y) : py, scene.weather === "snow" ? 1.2 + i % 3 * .4 : 1, 0, Math.PI * 2);
+    else ctx.ellipse(px + Math.sin(phase * 8) * 10, py, scene.weather === "petals" ? 2.4 : 3.5, 1.2, phase * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // Static scenery is painted once at half resolution, then reused by the world

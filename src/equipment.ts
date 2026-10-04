@@ -9,15 +9,38 @@ export const RARITIES = [
   "Hiếm",
   "Cực phẩm",
   "Hoàng Kim",
+  "Truyền Thuyết",
+  "Thần Thoại",
 ] as const;
 export type Rarity = (typeof RARITIES)[number];
 export const RARITY_COLORS: Record<Rarity, string> = {
-  Thường: "#a6b3bd",
+  Thường: "#e3e8ec",
   Tốt: "#73d19b",
   Hiếm: "#64b5f6",
   "Cực phẩm": "#cf91ff",
   "Hoàng Kim": "#ffd35a",
+  "Truyền Thuyết": "#ff963f",
+  "Thần Thoại": "#ff405d",
 };
+export const RARITY_NAMES = ["Trắng", "Lục", "Lam", "Tím", "Vàng", "Cam", "Đỏ"] as const;
+// One roll per drop. Red is the rarest and only enters the pool at level 101.
+export function rollEquipmentRarity(level: number, kind: "normal" | "elite" | "boss" = "normal", random = Math.random): Rarity {
+  const roll = random();
+  const [red, orange, gold, purple, blue, green] = kind === "boss"
+    ? [.01, .04, .15, .8, 0, 0]
+    : kind === "elite" ? [.002, .015, .05, .2, .733, 0]
+    : [.0005, .002, .005, .02, .1, .31];
+  let threshold = 0;
+  for (const [rarity, chance] of [
+    ["Thần Thoại", Number.isFinite(level) && level >= 101 ? red : 0],
+    ["Truyền Thuyết", Number.isFinite(level) && level >= 61 ? orange : 0],
+    ["Hoàng Kim", gold], ["Cực phẩm", purple], ["Hiếm", blue], ["Tốt", green],
+  ] as const) {
+    threshold += chance;
+    if (roll < threshold) return rarity;
+  }
+  return kind === "boss" ? "Cực phẩm" : kind === "elite" ? "Hiếm" : "Thường";
+}
 export interface EquipmentData extends GearIdentity {
   id: string;
   slot: string;
@@ -191,7 +214,7 @@ export function rollGearBonuses(
   random = Math.random,
 ): Partial<GearStats> {
   const tier = rarityTier(rarity);
-  const count = [2, 3, 5, 7, 10][tier];
+  const count = [2, 3, 5, 7, 10, 12, 14][tier];
   const keys = Object.keys(STAT_LABELS) as GearStat[];
   const preferred: GearStat =
     slot === "weapon"
@@ -263,7 +286,7 @@ export function discardCandidates<T extends EquipmentData>(
   return owner.inventory.filter(
     (item) =>
       !item.setId &&
-      item.rarity !== "Hoàng Kim" &&
+      rarityTier(item.rarity) < rarityTier("Hoàng Kim") &&
       item.enhance === 0 &&
       rarityTier(item.rarity) <= filter.maxRarity &&
       item.level <= filter.maxLevel &&

@@ -2,6 +2,7 @@ import { GEAR_SETS, setForElement, type SetId } from "./gear-catalog";
 import { drawSetCrest } from "./set-art.ts";
 import { drawGlow } from "./battle-vfx";
 import type { Element } from "./idle";
+import { drawEquipmentRadiance, type EquipmentVisual } from "./equipment-vfx";
 export interface GearAura {
   element?: Element;
   setId?: SetId;
@@ -9,6 +10,7 @@ export interface GearAura {
   tier: number;
   enhancement: number;
   auraEnhancement?: number;
+  quality?: EquipmentVisual;
 }
 function sigil(
   ctx: CanvasRenderingContext2D,
@@ -53,8 +55,20 @@ export function drawGearAura(
   now: number,
   simple = false,
 ): void {
+  if (aura.quality) {
+    ctx.save();
+    ctx.translate(0, 12);
+    ctx.scale(1, 0.32);
+    drawEquipmentRadiance(ctx, aura.quality, now, 24 + aura.tier * 2, simple);
+    ctx.restore();
+  }
   const pieces = aura.pieces ?? 0;
-  if (!aura.element || pieces < 2 || (aura.auraEnhancement ?? aura.enhancement) < 7) return;
+  if (
+    !aura.element ||
+    pieces < 2 ||
+    (aura.auraEnhancement ?? aura.enhancement) < 7
+  )
+    return;
   const set = GEAR_SETS[aura.setId ?? setForElement(aura.element)],
     full = pieces === 11;
   const radius = full ? 44 : pieces >= 6 ? 36 : 28,
@@ -84,8 +98,11 @@ export function drawGearAura(
     ctx.restore();
   }
   if (pieces >= 6) {
-    ctx.save(); ctx.globalAlpha *= .5; ctx.scale(1, .32);
-    drawSetCrest(ctx, set.crest, radius * .55, set.color); ctx.restore();
+    ctx.save();
+    ctx.globalAlpha *= 0.5;
+    ctx.scale(1, 0.32);
+    drawSetCrest(ctx, set.crest, radius * 0.55, set.color);
+    ctx.restore();
   }
   if (full && !simple)
     for (let i = 0; i < 4; i++) {

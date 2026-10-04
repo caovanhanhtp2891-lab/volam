@@ -229,7 +229,7 @@ export function rollGearIdentity(
       ? preferred
       : pick(["kim", "moc", "thuy", "hoa", "tho"] as const);
   const setId =
-    rarity === "Hoàng Kim" || random() < (rarity === "Thường" ? 0.2 : 0.65)
+    ["Hoàng Kim", "Truyền Thuyết", "Thần Thoại"].includes(rarity) || random() < (rarity === "Thường" ? 0.2 : 0.65)
       ? pick(SET_IDS.filter(id => GEAR_SETS[id].element === element))
       : undefined;
   return {

@@ -175,7 +175,7 @@ export function drawHeldWeapon(
     c.bezierCurveTo(18, -20, -14, -42, 5, -48);
     c.stroke();
   }
-  if ((weapon.enhance ?? 0) >= 7) {
+  {
     c.save();
     c.translate(0, pole ? -43 : -20);
     drawEquipmentRadiance(c, weapon, now, 8, simple);
