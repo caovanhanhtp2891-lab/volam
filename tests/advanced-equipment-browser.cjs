@@ -7,7 +7,7 @@ const step = (page, milliseconds) => page.evaluate(ms => window.advanceGame(ms),
 const gear = bonuses => ({ id: "advanced-weapon", slot: "weapon", name: "Bạo Vũ Phi Châm", variant: "poisondarts", rarity: "Hoàng Kim", color: "#ffd35a", icon: "◆", level: 5, power: 0, enhance: 0, bonuses });
 async function seed(page, bonuses = {}, changes = {}) {
   const data = await save(page);
-  Object.assign(data.player, { level: 5, attack: 30, defense: 0, hp: 100, mp: 100, x: 508, y: 330, equipment: { weapon: gear(bonuses) }, inventory: [], gold: 100000, refiningStones: 20, ...changes });
+  Object.assign(data.player, { level: 5, attack: 30, defense: 0, hp: 10000, mp: 10000, x: 508, y: 330, equipment: { weapon: gear(bonuses) }, inventory: [], gold: 100000, refiningStones: 20, ...changes });
   Object.assign(data.player.idle, { enabled: false, inTown: false, autoSkills: false, autoPotions: false, autoEquip: false, autoLoot: false, speed: 1 });
   if (changes.inTown !== undefined) data.player.idle.inTown = changes.inTown;
   data.player.idle.attributes = { strength: 0, dexterity: 0, vitality: 0, energy: 0 };
@@ -23,7 +23,7 @@ async function target(page) {
 }
 (async () => {
   const { STAT_LABELS } = await import("../src/equipment.ts");
-  const { SET_IDS, GEAR_SETS } = await import("../src/gear-catalog.ts");
+  const { SET_IDS, GEAR_SETS, variantsForSlot } = await import("../src/gear-catalog.ts");
   const browser = await chromium.launch({ executablePath: process.env.VOLAM_CHROMIUM_PATH || "/usr/bin/chromium", headless: true, args: ["--no-sandbox"] });
   const errors = [];
   try {
@@ -78,8 +78,8 @@ async function target(page) {
     await page.evaluate(() => window.randomRoll = .99);
     const beforeRegen = await seed(page, { hpRegen: 10, mpRegen: 4 }, { x: 100, y: 100 });
     await step(page, 1000); const afterRegen = await save(page);
-    assert.ok(Math.abs(afterRegen.player.hp - beforeRegen.player.hp - 10) < 1e-6);
-    assert.ok(Math.abs(afterRegen.player.mp - beforeRegen.player.mp - 4.7) < 1e-6);
+    assert.ok(Math.abs(afterRegen.player.hp - beforeRegen.player.hp - 1000) < 1e-6);
+    assert.ok(Math.abs(afterRegen.player.mp - beforeRegen.player.mp - 470) < 1e-6);
     console.log("PASS equipped reduction, dodge and HP/MP regeneration affect real incoming damage and recovery");
 
     const bonuses = Object.fromEntries(Object.keys(STAT_LABELS).map(stat => [stat, 5]));
@@ -106,7 +106,7 @@ async function target(page) {
     const beforeGallery = (await save(page)).player;
     for (const id of SET_IDS) {
       await page.locator("#gear-gallery-set").selectOption(id);
-      assert.equal(await page.locator(`[data-set-crest="${id}"]`).count(), 20);
+      assert.equal(await page.locator(`[data-set-crest="${id}"]`).count(), variantsForSlot("weapon").length);
       assert.equal(await page.locator("#gear-gallery-element").inputValue(), GEAR_SETS[id].element);
     }
     await page.locator("#gear-gallery-set").selectOption("ma-diem");

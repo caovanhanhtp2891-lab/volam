@@ -24,7 +24,7 @@ const design = (
 ): GearDesign => ({ shape, material, enamel, accent, engraving, gem });
 // Each silhouette has its own fittings, seams and gemstone position. The same
 // layers are used by the SVG panels and the cached canvas icons on the field.
-export const GEAR_DESIGNS: Record<GearVariant, GearDesign> = {
+const CLASSIC_GEAR_DESIGNS = {
   sword: design(
     "M13 53l8-13L43 8l7-4-1 9-25 30-7 13z M13 36l18 12-3 5-18-12z",
     "steel",
@@ -625,6 +625,33 @@ export const GEAR_DESIGNS: Record<GearVariant, GearDesign> = {
     "M24 26h11v9H24z M16 42l-4 12M37 42l4 12M47 26h6",
     "M26 26l5-3 5 4-5 7z",
   ),
+};
+export const GEAR_DESIGNS: Record<GearVariant, GearDesign> = {
+  ...CLASSIC_GEAR_DESIGNS,
+  meteorhammer: { ...CLASSIC_GEAR_DESIGNS.hammer, shape: CLASSIC_GEAR_DESIGNS.hammer.shape + " M6 7l3-3 3 3-3 3z", enamel: "#a88ce3", engraving: CLASSIC_GEAR_DESIGNS.hammer.engraving + " M6 7l3-3 3 3-3 3z" },
+  scimitar: { ...CLASSIC_GEAR_DESIGNS.blade, shape: CLASSIC_GEAR_DESIGNS.blade.shape + " M7 8l3-3 3 3-3 3z", enamel: "#d45377", engraving: CLASSIC_GEAR_DESIGNS.blade.engraving + " M7 8l3-3 3 3-3 3z" },
+  iceglaive: { ...CLASSIC_GEAR_DESIGNS.halberd, shape: CLASSIC_GEAR_DESIGNS.halberd.shape + " M8 9l3-3 3 3-3 3z", enamel: "#70d4ec", engraving: CLASSIC_GEAR_DESIGNS.halberd.engraving + " M8 9l3-3 3 3-3 3z" },
+  sunblade: { ...CLASSIC_GEAR_DESIGNS.sword, shape: CLASSIC_GEAR_DESIGNS.sword.shape + " M9 10l3-3 3 3-3 3z", enamel: "#eab253", engraving: CLASSIC_GEAR_DESIGNS.sword.engraving + " M9 10l3-3 3 3-3 3z" },
+  serpentstaff: { ...CLASSIC_GEAR_DESIGNS.staff, shape: CLASSIC_GEAR_DESIGNS.staff.shape + " M10 11l3-3 3 3-3 3z", enamel: "#74b481", engraving: CLASSIC_GEAR_DESIGNS.staff.engraving + " M10 11l3-3 3 3-3 3z" },
+  jadebow: { ...CLASSIC_GEAR_DESIGNS.bow, shape: CLASSIC_GEAR_DESIGNS.bow.shape + " M11 12l3-3 3 3-3 3z", enamel: "#63bfa0", engraving: CLASSIC_GEAR_DESIGNS.bow.engraving + " M11 12l3-3 3 3-3 3z" },
+  tigerarmor: { ...CLASSIC_GEAR_DESIGNS.plate, shape: CLASSIC_GEAR_DESIGNS.plate.shape + " M12 13l3-3 3 3-3 3z", enamel: "#a9d4cb", engraving: CLASSIC_GEAR_DESIGNS.plate.engraving + " M12 13l3-3 3 3-3 3z" },
+  celestialrobe: { ...CLASSIC_GEAR_DESIGNS.robe, shape: CLASSIC_GEAR_DESIGNS.robe.shape + " M13 14l3-3 3 3-3 3z", enamel: "#8c9cd9", engraving: CLASSIC_GEAR_DESIGNS.robe.engraving + " M13 14l3-3 3 3-3 3z" },
+  infernomail: { ...CLASSIC_GEAR_DESIGNS.mail, shape: CLASSIC_GEAR_DESIGNS.mail.shape + " M6 15l3-3 3 3-3 3z", enamel: "#da8245", engraving: CLASSIC_GEAR_DESIGNS.mail.engraving + " M6 15l3-3 3 3-3 3z" },
+  tigerhelm: { ...CLASSIC_GEAR_DESIGNS.helm, shape: CLASSIC_GEAR_DESIGNS.helm.shape + " M7 16l3-3 3 3-3 3z", enamel: "#a4bbb1", engraving: CLASSIC_GEAR_DESIGNS.helm.engraving + " M7 16l3-3 3 3-3 3z" },
+  crystalcrown: { ...CLASSIC_GEAR_DESIGNS.crown, shape: CLASSIC_GEAR_DESIGNS.crown.shape + " M8 17l3-3 3 3-3 3z", enamel: "#87dced", engraving: CLASSIC_GEAR_DESIGNS.crown.engraving + " M8 17l3-3 3 3-3 3z" },
+  demonmask: { ...CLASSIC_GEAR_DESIGNS.mask, shape: CLASSIC_GEAR_DESIGNS.mask.shape + " M9 18l3-3 3 3-3 3z", enamel: "#d27490", engraving: CLASSIC_GEAR_DESIGNS.mask.engraving + " M9 18l3-3 3 3-3 3z" },
+  stormboots: { ...CLASSIC_GEAR_DESIGNS.shadowboots, shape: CLASSIC_GEAR_DESIGNS.shadowboots.shape + " M10 19l3-3 3 3-3 3z", enamel: "#a5a5e5", engraving: CLASSIC_GEAR_DESIGNS.shadowboots.engraving + " M10 19l3-3 3 3-3 3z" },
+  frostgreaves: { ...CLASSIC_GEAR_DESIGNS.greaves, shape: CLASSIC_GEAR_DESIGNS.greaves.shape + " M11 20l3-3 3 3-3 3z", enamel: "#83c1e8", engraving: CLASSIC_GEAR_DESIGNS.greaves.engraving + " M11 20l3-3 3 3-3 3z" },
+  serpentbelt: { ...CLASSIC_GEAR_DESIGNS.jadebelt, shape: CLASSIC_GEAR_DESIGNS.jadebelt.shape + " M12 21l3-3 3 3-3 3z", enamel: "#8ab769", engraving: CLASSIC_GEAR_DESIGNS.jadebelt.engraving + " M12 21l3-3 3 3-3 3z" },
+  aurorabelt: { ...CLASSIC_GEAR_DESIGNS.starbelt, shape: CLASSIC_GEAR_DESIGNS.starbelt.shape + " M13 22l3-3 3 3-3 3z", enamel: "#8f99e2", engraving: CLASSIC_GEAR_DESIGNS.starbelt.engraving + " M13 22l3-3 3 3-3 3z" },
+  sunamulet: { ...CLASSIC_GEAR_DESIGNS.amulet, shape: CLASSIC_GEAR_DESIGNS.amulet.shape + " M6 23l3-3 3 3-3 3z", enamel: "#eac069", engraving: CLASSIC_GEAR_DESIGNS.amulet.engraving + " M6 23l3-3 3 3-3 3z" },
+  serpentchain: { ...CLASSIC_GEAR_DESIGNS.venomchain, shape: CLASSIC_GEAR_DESIGNS.venomchain.shape + " M7 24l3-3 3 3-3 3z", enamel: "#6cb682", engraving: CLASSIC_GEAR_DESIGNS.venomchain.engraving + " M7 24l3-3 3 3-3 3z" },
+  thunderring: { ...CLASSIC_GEAR_DESIGNS.jadering, shape: CLASSIC_GEAR_DESIGNS.jadering.shape + " M8 25l3-3 3 3-3 3z", enamel: "#a593e0", engraving: CLASSIC_GEAR_DESIGNS.jadering.engraving + " M8 25l3-3 3 3-3 3z" },
+  bloodring: { ...CLASSIC_GEAR_DESIGNS.rubyring, shape: CLASSIC_GEAR_DESIGNS.rubyring.shape + " M9 26l3-3 3 3-3 3z", enamel: "#d36a8f", engraving: CLASSIC_GEAR_DESIGNS.rubyring.engraving + " M9 26l3-3 3 3-3 3z" },
+  frostbracer: { ...CLASSIC_GEAR_DESIGNS.guards, shape: CLASSIC_GEAR_DESIGNS.guards.shape + " M10 27l3-3 3 3-3 3z", enamel: "#78cedc", engraving: CLASSIC_GEAR_DESIGNS.guards.engraving + " M10 27l3-3 3 3-3 3z" },
+  dragonbeads: { ...CLASSIC_GEAR_DESIGNS.beads, shape: CLASSIC_GEAR_DESIGNS.beads.shape + " M11 28l3-3 3 3-3 3z", enamel: "#78c596", engraving: CLASSIC_GEAR_DESIGNS.beads.engraving + " M11 28l3-3 3 3-3 3z" },
+  phoenixseal: { ...CLASSIC_GEAR_DESIGNS.seal, shape: CLASSIC_GEAR_DESIGNS.seal.shape + " M12 29l3-3 3 3-3 3z", enamel: "#dd9159", engraving: CLASSIC_GEAR_DESIGNS.seal.engraving + " M12 29l3-3 3 3-3 3z" },
+  starcompass: { ...CLASSIC_GEAR_DESIGNS.mirror, shape: CLASSIC_GEAR_DESIGNS.mirror.shape + " M13 30l3-3 3 3-3 3z", enamel: "#829fdb", engraving: CLASSIC_GEAR_DESIGNS.mirror.engraving + " M13 30l3-3 3 3-3 3z" },
 };
 export const MATERIAL_PALETTES: Record<
   GearMaterial,

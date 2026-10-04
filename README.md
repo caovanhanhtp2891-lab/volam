@@ -2,6 +2,18 @@
 
 Game web kiếm hiệp 2D với giao diện dọc và vòng chơi idle, phát triển theo [PLAN.md](./PLAN.md). Bố cục và luồng thao tác tham khảo [Võ Lâm Idle](https://jxoffline.khoa-vnd92.workers.dev/); mã game và hình ảnh được triển khai trong kho `volam`.
 
+## Vạn pháp · Linh binh · v0.17.0
+
+Kỹ năng có chuyển động theo môn phái: Hỏa long Cái Bang và song đao Thiên Nhẫn có ngọn lửa, lõi nóng và tàn lửa bay; Ngũ Độc/Đường Môn có bọt độc, hơi ăn mòn; Thúy Yên có ánh băng; Côn Lôn có tia điện đổi nhánh; Nga Mi có cánh sen bay; Võ Đang có quỹ đạo kiếm sáng; Thiếu Lâm/Thiên Vương có tia va chạm kim loại. Ra chiêu, đạn bay, dấu trúng và trận kéo dài dùng cùng lớp chuyển động. Chế độ Gọn giảm 14 hạt xuống 4, giữ nguyên tầm và sát thương.
+
+**Thiêu đốt gây sát thương mỗi giây** sau khi trúng chiêu Hỏa; hai nhát Liệt Hỏa không làm lùi nhịp sát thương. **Ăn mòn làm yếu giáp** trong thời gian độc/trận độc của Ngũ Độc. Lửa bám lên quái, độc sủi bọt và vệt ăn mòn ngừng khi hết trạng thái hoặc quái chết. Xem thử tại **Võ công → Xem hiệu ứng**; khi chọn quái, bảng mục tiêu hiện trạng thái và phòng thủ đang có hiệu lực.
+
+**108 chủng loại trang bị**, thêm 24 mẫu vẽ mới: Lưu Tinh Chùy, Huyết Nguyệt Loan Đao, Băng Phách Trường Kích, Thái Dương Thần Kiếm, Xà Vương Pháp Trượng, Bích Vân Thần Cung, Bạch Hổ Chiến Giáp, Tinh Hà Tiên Bào và các mũ/giày/đai/trang sức tương ứng. Sáu thiên hướng có dòng chỉ số ưu tiên được tăng 20% khi tạo món: **Cuồng Phong** (tốc độ/nhịp đánh), **Huyết Sát** (công/hút máu), **Thiết Bích** (HP/phòng/giảm sát thương), **Băng Tâm** (MP/hồi MP), **Thiên Lôi** (chí mạng/sát thương chí mạng), **Dưỡng Sinh** (HP/hồi HP). Số dòng vẫn theo bảy phẩm chất. Mẫu mới rơi trong chiến đấu và mua được tại **Hành trang → Mẫu trang bị → Chọn mua**; tiệm bán Tốt, đồ cam/đỏ vẫn theo bảng rơi. Không cấp đồ mẫu miễn phí. Ngũ hành, bộ 11 món và thuộc tính ẩn giữ nguyên điều kiện.
+
+**HP, MP, công, phòng, hồi phục và sát thương tăng đồng bộ 100 lần**; phần trăm và tốc độ giữ nguyên. Chi phí nội lực, khiên và HP/công/phòng của quái cũng theo thang mới. Lực chiến/cảnh giới của nhân vật cũ giữ nguyên cách quy đổi. File lưu cũ được chuyển một lần, giữ tỷ lệ HP/MP, trang bị, bạc và tiến trình; lưu/tải lại không nhân nhiều lần. Các bảng thuộc tính, so sánh và cường hóa hiển thị cùng đơn vị với chiến đấu.
+
+Kiểm tra: 147 unit tests, typecheck, build `--base=/volam/`; `tests/elemental-upgrade-browser.cjs` kiểm tra nạp bản lưu cũ, giữ lực chiến, thời điểm trúng, sát thương theo thời gian, hết trạng thái và mua/lưu/tải đủ 24 mẫu. Kiểm tra hồi phục/hút máu và bộ bằng `advanced-equipment-browser.cjs`, đường bay/cưỡi ngựa bằng `flight-riding-browser.cjs`, đủ 30 chiêu bằng `sects-browser.cjs`.
+
 ## Sơn hà · Thần huyết · v0.16.0
 
 **Bản đồ** cạnh minimap mở 16 vùng có hình xem trước và chọn trực tiếp ải. Đủ cấp quái **hoặc** đã mở bằng vượt ải đều được di chuyển, kể cả các ải 12, 22…; giữ quyền quay lại map đã mở sau trùng sinh. Chuyển map thu hồi đồ chưa nhặt, reset mục tiêu/chiêu đang bay và đặt nhân vật vào vùng mới. Phụ bản, công thành và boss theo giờ cần rời trận trước. Nền vẽ mới riêng cho 16 vùng, có lá, cánh hoa, sương, cát hoặc tuyết theo địa hình; atlas ~703 KB, cache tối đa bốn nền, có nền dự phòng khi ảnh chưa tải.
@@ -213,7 +225,7 @@ Kiểm tra hình ảnh: `node --experimental-strip-types tests/equipment-art-bro
 
 ## Bộ ngũ hành và cưỡi ngựa · v0.11.0
 
-- Trang bị có **84 chủng loại**: 20 vũ khí, 9 giáp, 9 mũ, 6 giày, 6 đai, 6 dây chuyền, 7 nhẫn, 6 hộ uyển, 9 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Giữ năm phẩm chất và màu cũ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
+- Trang bị có **108 chủng loại**: 26 vũ khí, 12 giáp, 12 mũ, 8 giày, 8 đai, 8 dây chuyền, 9 nhẫn, 8 hộ uyển, 11 ngọc bội/pháp bảo và 6 ngựa. Cấp 1–160 chia 16 bậc; khung họa tiết tăng ở bậc 5/9/13. Bảy phẩm chất từ trắng đến đỏ; mỗi kiểu có hình riêng trong túi, chân dung, món rơi và tay nhân vật.
 - Năm bộ **Kim Phong / Thanh Trúc / Hàn Nguyệt / Xích Diệm / Huyền Nham** ứng với Kim/Mộc/Thủy/Hỏa/Thổ. Đồ Hoàng Kim mới luôn thuộc một bộ; đồ khác có cơ hội thuộc bộ. Đồ rơi ưu tiên hệ môn phái 60% khi chọn hệ. Save cũ giữ nguyên chỉ số, không tự thêm dòng phụ, hệ hoặc bộ.
 - **2 món:** +6 công, +4 phòng; **4 món:** thêm +90 HP, +24 MP; **6 món:** thêm chỉ số đặc trưng của hệ. **Đủ 11 vị trí**, gồm hai nhẫn và ngựa, mở thuộc tính ẩn bên dưới và trận sáng riêng. Công/phòng/HP/MP của bộ nhân với bậc món thấp nhất; cùng hệ môn phái tăng các thuộc tính bộ 20%, làm tròn lên. Bộ chỉ đếm các ô đang mặc; ngựa vẫn tính vào bộ khi đi bộ. Phối nhiều bộ nhận những mốc riêng đã đủ, không nhận thuộc tính ẩn của bộ thiếu món.
 
@@ -413,7 +425,7 @@ Bộ này kiểm tra XP thật từ quái/lửa trại/vắng mặt ở cả 5 h
 
 Giao diện chiếm một viewport, hỗ trợ màn hình dọc và điện thoại xoay ngang: sân đấu ở trên, menu ở dưới, minimap theo vị trí thật, joystick, Auto và nút kỹ năng tròn. Các tab thông tin cuộn nội bộ, không kéo cả trang. Nút thu gọn/mở rộng cho phép tập trung vào sân đấu. Sát thương thường xuất hiện bằng số nổi và nhật ký, không bật toast liên tục che menu.
 
-Đồ họa dùng atlas nhân vật **663.510 byte**, 1223 × 1286, 20 mẫu nam/nữ; atlas NPC/quái/đồ nhặt cũ vẫn **28.026 byte**, 480 × 384. Nhân vật vẽ ở 56 × 76; hình sân, màn Nhân vật và avatar lấy cùng mẫu môn phái/giới tính. Ba atlas trang bị/vật phẩm WebP tổng ~1,82 MB; icon kỹ năng là SVG nội tuyến; 30 chiêu dùng hình Canvas nhiều lớp theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
+Đồ họa dùng atlas nhân vật **621.026 byte**, 1223 × 1286, 20 mẫu nam/nữ; atlas NPC/quái/đồ nhặt cũ vẫn **28.026 byte**, 480 × 384. Nhân vật vẽ ở 56 × 76; hình sân, màn Nhân vật và avatar lấy cùng mẫu môn phái/giới tính. Bốn atlas trang bị/vật phẩm WebP tổng ~2,43 MB; icon kỹ năng là SVG nội tuyến; 30 chiêu dùng hình Canvas nhiều lớp theo côn, thương, ám khí, độc, sen, quạt, băng, rồng, song đao, thái cực, kiếm và lôi. Không tải thêm ảnh chiêu. Nền vẽ một lần, game vẽ tối đa 30 FPS, minimap khoảng 5 lần/giây; tối đa 24 hiệu ứng thoáng và 6 trận kéo dài. Vòng cảnh giới và màu trang bị được giữ. Chi tiết nguồn ảnh và giới hạn animation: [src/assets/README.md](./src/assets/README.md). Chiến đấu online có authority, tổ đội và bang hội vẫn nằm trong lộ trình.
 
 ## Võ công của thập đại môn phái · v0.4.0
 

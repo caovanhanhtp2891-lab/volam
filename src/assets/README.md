@@ -13,7 +13,7 @@ Mười nhân vật được tạo riêng bằng công cụ tạo ảnh OpenAI n
 
 PNG gốc được cắt từng ô, trim, thu nhỏ tối đa 78 × 78, đặt vào ô 96 × 96, giới hạn 64 màu và xuất WebP lossless. PNG nguồn không nằm trong bundle. Không tải asset bên thứ ba. Ngân sách atlas dưới 32 KB được kiểm tra trong unit test.
 
-`sect-characters.webp` là atlas nhân vật mới **621.026 byte**, 1223 × 1286 px, trong suốt, 5 cột × 4 hàng. Hàng 1–2 là 10 môn phái nam, hàng 3–4 là nữ theo cùng thứ tự: Thiếu Lâm, Thiên Vương, Đường Môn, Ngũ Độc, Nga Mi, Thúy Yên, Cái Bang, Thiên Nhẫn, Võ Đang, Côn Lôn. Hình được tạo riêng bằng OpenAI image generation ngày 03/10/2026, lấy cảm hứng kiếm hiệp cổ trang, không dùng asset chính thức. Bản v0.14.0 đã dùng công cụ tạo ảnh sửa 20 ô thành tay không, tránh vũ khí vẽ sẵn trùng với món đang mặc. PNG nguồn được nén WebP chất lượng 88; bundle chỉ chứa WebP. Ngân sách riêng dưới 768 KiB được kiểm tra trong unit test.
+`sect-characters.webp` là atlas nhân vật mới **621.026 byte**, 1223 × 1286 px, trong suốt, 5 cột × 4 hàng. Hàng 1–2 là 10 môn phái nam, hàng 3–4 là nữ theo cùng thứ tự: Thiếu Lâm, Thiên Vương, Đường Môn, Ngũ Độc, Nga Mi, Thúy Yên, Cái Bang, Thiên Nhẫn, Võ Đang, Côn Lôn. Hình được tạo riêng bằng OpenAI image generation ngày 03–04/10/2026, lấy cảm hứng kiếm hiệp cổ trang, không dùng asset chính thức. Bản v0.14.0 đã dùng công cụ tạo ảnh sửa 20 ô thành tay không, tránh vũ khí vẽ sẵn trùng với món đang mặc. PNG nguồn được nén WebP chất lượng 88; bundle chỉ chứa WebP. Ngân sách riêng dưới 768 KiB được kiểm tra trong unit test.
 
 `character-art.ts` cung cấp tọa độ mẫu nam/nữ và vùng khuôn mặt. `art.ts` dùng cùng vùng hình cho chọn phái và Canvas; avatar là SVG cắt khuôn mặt từ đúng mẫu này. `character-preview.ts` phóng cùng renderer `drawAnimatedHero` trong trận, không vẽ nhân vật khác cho chân dung. Đổi giới tính cập nhật avatar, shortcut, hình sân và chân dung.
 
@@ -40,17 +40,18 @@ Danh hiệu v0.7.0 dùng `src/title-art.ts`: 12 motif riêng (lá, mũi kiếm, 
 
 Trang bị v0.11.0 dùng 28 đường vector trong `equipment-art.ts`, không thêm bitmap. Khung bậc, huy hiệu ngũ hành và vệt cường hóa dùng SVG/CSS; tôn trọng giảm chuyển động của trình duyệt. `gear-effects.ts` vẽ tối đa 8 biểu tượng xoay và 4 hạt cho một bộ đủ 11, hai biểu tượng ở chế độ Gọn; từng hệ có kiếm/lá/băng/lửa/ngọc riêng. `mount-art.ts` vẽ bốn dáng ngựa bằng hình học có giới hạn, chân chạy theo quãng đường thật, đảo hướng, yên/giáp theo trang bị; bóng/rider được đặt cùng tọa độ mặt đất, collider giữ bán kính nhân vật. Chân dung cưỡi dùng lại sprite môn phái và cùng renderer ngựa. Atlas giữ nguyên 28.026 byte; tất cả hiệu ứng mới dùng quầng sáng cache có sẵn.
 
-Trang bị/vật phẩm hiện dùng ba atlas vẽ riêng bằng OpenAI image generation ngày 03/10/2026, lấy cảm hứng kiếm hiệp cổ trang, không dùng hình game chính thức. Hình trong suốt, không gắn vòng sáng vào bitmap; PNG nguồn giữ trong workspace tạo ảnh, bundle chỉ có WebP chất lượng 85.
+Trang bị/vật phẩm hiện dùng bốn atlas vẽ riêng bằng OpenAI image generation ngày 03–04/10/2026, lấy cảm hứng kiếm hiệp cổ trang, không dùng hình game chính thức. Hình trong suốt, không gắn vòng sáng vào bitmap; PNG nguồn giữ trong workspace tạo ảnh, bundle chỉ có WebP chất lượng 83–85.
 
 | Atlas | Kích thước | Lưới | Nội dung | Dung lượng |
 | --- | --- | --- | --- | ---: |
 | `gear-weapons.webp` | 1402 × 1122 | 5 × 4 | 20 vũ khí | 500.820 byte |
 | `gear-clothing.webp` | 1145 × 1374 | 5 × 6 | 9 giáp, 9 mũ, 6 giày, 6 đai | 651.948 byte |
 | `gear-jewelry.webp` | 1292 × 1218 | 6 × 6 | 34 trang sức/ngựa và 2 bình HP/MP | 666.418 byte |
+| `gear-relics.webp` | 1536 × 1024 | 6 × 4 | 24 linh binh/giáp/trang sức mới | 610.920 byte |
 
-`item-art.ts` giữ thứ tự/tọa độ của 86 ô, dùng chung crop SVG và Canvas, giữ tỷ lệ nguồn. `equipment-art.ts` giữ khung phẩm chất/ID gradient riêng từng icon, huy hiệu bộ/ngũ hành và cache Canvas 128 × 128 LRU tối đa 160. Đường vector 84 món trong `equipment-design.ts` làm phương án tạm trước khi ảnh Canvas tải xong; cache đổi khóa khi atlas sẵn sàng. `set-art.ts` giữ 14 huy hiệu Path2D tĩnh. Bạc, đá, lệnh bài và rương có SVG tự vẽ; bạc/đá rơi dùng lại hình đó.
+`item-art.ts` giữ thứ tự/tọa độ của 110 ô, dùng chung crop SVG và Canvas, giữ tỷ lệ nguồn. `equipment-art.ts` giữ khung phẩm chất/ID gradient riêng từng icon, huy hiệu bộ/ngũ hành và cache Canvas 128 × 128 LRU tối đa 160. Đường vector 108 món trong `equipment-design.ts` làm phương án tạm trước khi ảnh Canvas tải xong; cache đổi khóa khi atlas sẵn sàng. `set-art.ts` giữ 14 huy hiệu Path2D tĩnh. Bạc, đá, lệnh bài và rương có SVG tự vẽ; bạc/đá rơi dùng lại hình đó.
 
-Phẩm chất chỉ đổi viền/chi tiết tĩnh. +3 có viền khắc nhẹ, **+7 mới có vòng sáng và 4 hạt**, **+10 thêm phù văn/vòng phụ và tối đa 6 hạt**. Đồ Hoàng Kim +0 cũng không có vòng/hạt xoay. Vật phẩm Hiếm trở lên có cột màu báo vị trí; vòng và hạt của đồ rơi cần +7. Vũ khí, pháp bảo, giáp, bộ trang bị và ngựa đang mang đều áp dụng ngưỡng cường hóa này. Gọn bỏ glow/hạt; Gọn và reduced motion dừng hoạt ảnh CSS.
+Bảy phẩm chất giữ viền trắng/lục/lam/tím/vàng/cam/đỏ. Từ lam có linh quang, vàng có song hoàn, cam có phù văn, đỏ có tám ấn/tám hạt và cột rơi cao nhất. +7/+10 tăng thêm vòng và phù văn. Huy hiệu ngũ hành/bộ dùng lớp riêng, không che màu phẩm chất. Gọn giảm chi tiết chuyển động; reduced motion dừng hoạt ảnh CSS. Đây là quy tắc v0.16 trở đi, thay cho ngưỡng +7 của các bản cũ.
 
 `drawSkillImpact` vẽ 10 dấu trúng ngắn riêng, tách khỏi `drawSectEffect` ra chiêu/trận kéo dài. `dealDamage` tạo dấu ở tọa độ quái nhận sát thương; đòn cận chiến, đòn thường và mục tiêu phụ đều được thể hiện, đạn đã mất mục tiêu không tạo dấu. `drawSkillFlight` dùng cùng đường bay cong trong trận và xem thử. Preview có hình mục tiêu tập luyện và ba giai đoạn; chiêu không gây sát thương kết thúc quanh người dùng. Giới hạn 24 hiệu ứng thoáng/6 vùng, chế độ Gọn và cache glow giữ nguyên.
 
@@ -67,3 +68,5 @@ Phẩm chất chỉ đổi viền/chi tiết tĩnh. +3 có viền khắc nhẹ, 
 ## Nền luyện công v0.16.0
 
 `training-regions.webp`: 1536 × 1024, 16 ô 384 × 256 theo thứ tự `REGIONS` (4 cột × 4 hàng), khoảng 703 KB. Hình gốc được tạo mới cho game bằng công cụ sinh ảnh, không lấy ảnh từ game tham khảo. Có nền rừng thông, sơn đạo, cổ mộ, trúc lâm, đạo quán, rừng thu/phong, hoa tím, đồi trà, thiền viện, ghềnh sông, dược viên, sa mạc, biên thành và hai vùng tuyết. Dùng chung cho sân đấu, minimap và thẻ chuyển map. Canvas nền cache tối đa bốn vùng; ảnh tải xong tăng revision để thay nền dự phòng. Thời tiết Canvas tối đa 20 hạt (Gọn: 4), không tạo ảnh/gradient mỗi frame.
+
+`elemental-motion.ts` v0.17 dùng quỹ đạo xác định theo thời gian: lửa đổi ngọn, tàn lửa bay, bọt độc nổi/vệt ăn mòn, tinh thể sáng, lôi điện đổi nhánh, cánh sen và tia kim loại. Mỗi lớp tối đa 14 hạt (Gọn 4); không tạo gradient/filter/blur theo frame. `enemy-status-art.ts` dùng cùng lớp cho thiêu đốt/ăn mòn thật, ngừng khi hết trạng thái hoặc chết. Atlas linh binh mới chứa sáu vũ khí, ba giáp, ba mũ, hai giày, hai đai, hai dây chuyền, hai nhẫn, hai hộ uyển và hai pháp bảo; thứ tự 24 ô nằm trong `item-art.ts`.

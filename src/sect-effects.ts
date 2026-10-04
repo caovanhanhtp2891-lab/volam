@@ -1,3 +1,4 @@
+import { drawElementalMotion, elementalMotionKind } from "./elemental-motion.ts";
 import type { EffectMotif, SectId, SkillKey, SkillDefinition } from "./sects.ts";
 import { SKILL_PALETTES, SECT_SIGILS, type SkillPalette } from "./skill-art.ts";
 import { drawSetCrest } from "./set-art.ts";
@@ -114,6 +115,7 @@ export function drawSkillImpact(c: CanvasRenderingContext2D, effect: SectEffect,
   const count = full ? effect.skill === "ultimate" ? 8 : 6 : 3;
   c.save(); c.translate(effect.x, effect.y); c.rotate(effect.angle ?? 0);
   c.lineCap = "round"; c.lineJoin = "round"; c.globalAlpha *= Math.min(1, p / .06) * (1 - p) ** .7;
+  drawElementalMotion(c, elementalMotionKind(effect.sect, effect.kind), r * .8, p * 600, palette.color, palette.light, !full);
   if (full) drawGlow(c, 0, 0, r * .8, palette.color, .55 * (1 - p));
   if (effect.sect === "cai-bang") {
     // Three curved dragon claws with a coiling remnant of the golden dragon.
@@ -198,7 +200,7 @@ export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, 
   const base = Math.max(8, effect.radius), expand = persistent ? 1 : .48 + .52 * (1 - (1 - p) ** 3);
   const r = base * expand, count = full ? (ult ? 8 : 6) : 4;
   c.save(); c.translate(effect.x, effect.y); c.lineCap = "round"; c.lineJoin = "round";
-  c.globalAlpha *= persistent ? .32 : Math.min(1, p / .12, (1 - p) / .35) * .88;
+  c.globalAlpha *= persistent ? .7 : Math.min(1, p / .12, (1 - p) / .35) * .88;
   if (persistent) { ring(c, base); c.strokeStyle = palette.color; c.lineWidth = 1.2; c.stroke(); }
   if (full) drawGlow(c, 0, 0, Math.min(54, r * .45), palette.color, persistent ? .3 : .48);
   if (effect.phase === "cast") {
@@ -212,6 +214,7 @@ export function drawSectEffect(c: CanvasRenderingContext2D, effect: SectEffect, 
     }
     c.restore(); return;
   }
+  if (effect.sect) drawElementalMotion(c, elementalMotionKind(effect.sect, effect.kind), r * .85, p * 1200, palette.color, palette.light, !full, persistent);
   const motif = effect.kind;
   if (full && (ult || persistent)) seal(c, r * .98, p, palette, ult ? 12 : 6);
   if (full && ult && effect.sect) {
@@ -411,6 +414,7 @@ export function drawSectProjectile(c: CanvasRenderingContext2D, x: number, y: nu
   const palette = SKILL_PALETTES[sect], full = quality === "full", r = key === "ultimate" ? 18 : 12;
   c.save(); c.translate(x, y); c.rotate(angle); c.lineCap = "round"; c.lineJoin = "round";
   if (sect === "thuy-yen") { drawIceMissile(c, r, now, !full); c.restore(); return; }
+  drawElementalMotion(c, elementalMotionKind(sect), r * 1.15, now, palette.color, palette.light, !full);
   if (full) drawGlow(c, -2, 0, r * 1.5, palette.color, .45);
   c.beginPath(); segment(c, -r * 2.7, 0, 0, 0); ink(c, palette, key ? 3 : 2);
   if (full) { c.beginPath(); segment(c, -r * 2, -4, -r * .7, -3); segment(c, -r * 2.3, 4, -r * .8, 3); ink(c, palette, 1.2, true); }

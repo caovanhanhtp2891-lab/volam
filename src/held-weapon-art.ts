@@ -1,4 +1,4 @@
-import type { GearVariant } from "./gear-catalog";
+import { weaponBaseVariant, type GearVariant } from "./gear-catalog.ts";
 import type { EquipmentVisual } from "./equipment-vfx";
 import { drawEquipmentRadiance } from "./equipment-vfx";
 import type { weaponPose } from "./actor-animation";
@@ -10,6 +10,7 @@ export function drawHeldWeapon(
   simple = false,
   activity?: ReturnType<typeof weaponPose>,
 ): void {
+  variant = weaponBaseVariant(variant);
   c.save();
   c.lineCap = "round";
   c.lineJoin = "round";

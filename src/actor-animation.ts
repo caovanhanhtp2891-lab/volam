@@ -1,5 +1,5 @@
 import type { ActorMotion } from "./combat";
-import type { GearVariant } from "./gear-catalog";
+import { weaponBaseVariant, type GearVariant } from "./gear-catalog.ts";
 const TAU = Math.PI * 2;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => {
@@ -16,6 +16,7 @@ export function horseGait(stride: number, moving: number) {
   };
 }
 export function weaponFamily(variant: GearVariant) {
+  variant = weaponBaseVariant(variant);
   if (["spear", "halberd"].includes(variant)) return "thrust";
   if (["bow", "crossbow", "poisondarts"].includes(variant)) return "ranged";
   if (["fan", "lotusfan", "flute", "chakram"].includes(variant)) return "cast";

@@ -101,10 +101,10 @@ export const REGIONS = [
 ] as const;
 export const MAX_STAGE = REGIONS.length * 10;
 export const ATTRIBUTES: Record<Attribute, { name: string; description: string }> = {
-  strength: { name: "Sức mạnh", description: "+2 công / điểm" },
-  dexterity: { name: "Thân pháp", description: "+1 phòng, +1 tốc / điểm" },
-  vitality: { name: "Sinh khí", description: "+12 sinh lực / điểm" },
-  energy: { name: "Nội công", description: "+8 nội lực / điểm" },
+  strength: { name: "Sức mạnh", description: "+200 công / điểm" },
+  dexterity: { name: "Thân pháp", description: "+100 phòng, +1 tốc / điểm" },
+  vitality: { name: "Sinh khí", description: "+1.200 sinh lực / điểm" },
+  energy: { name: "Nội công", description: "+800 nội lực / điểm" },
 };
 
 export interface IdleProgress {

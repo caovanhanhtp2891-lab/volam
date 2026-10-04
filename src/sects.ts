@@ -32,6 +32,8 @@ export interface SkillDefinition {
   slow?: number;
   stun?: number;
   poison?: number;
+  burn?: number;
+  corrode?: number;
   zone?: number;
 }
 
@@ -86,9 +88,9 @@ export const SECTS: Record<SectId, Sect> = {
   "ngu-doc": {
     id: "ngu-doc", name: "Ngũ Độc", element: "Mộc", title: "Độc thuật · Bào mòn", description: "Độc kéo dài, trận độc giữ quái và cổ thuật bào mòn boss.", color: "#b987da", accent: "#caec9a", baseHp: 115, baseMp: 135, baseAttack: 22, baseDefense: 5, speed: 145, basicRange: 190,
     kit: {
-      skill1: skill("Độc Chưởng", "Độc chưởng tầm xa, để lại độc gây sát thương trong 3 giây.", "poison", { range: 340, damage: 1.2, poison: 3 }),
-      skill2: second("Ngũ Độc Trận", "Trận độc 4 giây tại mục tiêu, làm chậm và gây sát thương định kỳ.", "poison", { shape: "area", range: 320, radius: 105, damage: .4, zone: 4, slow: .65 }),
-      ultimate: ultimate("Vạn Cổ Phệ Tâm", "Cổ thuật đánh vùng, gây độc kéo dài 6 giây.", "poison", { anchor: "target", range: 360, radius: 175, damage: 2, poison: 6 }),
+      skill1: skill("Độc Chưởng", "Độc chưởng tầm xa, độc gây sát thương và ăn mòn 28% giáp trong 3 giây.", "poison", { range: 340, damage: 1.2, poison: 3, corrode: 3 }),
+      skill2: second("Ngũ Độc Trận", "Trận độc 4 giây tại mục tiêu, làm chậm, ăn mòn giáp và gây sát thương định kỳ.", "poison", { shape: "area", range: 320, radius: 105, damage: .4, zone: 4, slow: .65, corrode: 2 }),
+      ultimate: ultimate("Vạn Cổ Phệ Tâm", "Cổ thuật đánh vùng, gây độc và ăn mòn 28% giáp trong 6 giây.", "poison", { anchor: "target", range: 360, radius: 175, damage: 2, poison: 6, corrode: 6 }),
     },
   },
   "nga-mi": {
@@ -110,17 +112,17 @@ export const SECTS: Record<SectId, Sect> = {
   "cai-bang": {
     id: "cai-bang", name: "Cái Bang", element: "Hỏa", title: "Chưởng pháp · Hỏa long", description: "Rồng lửa đánh vùng, túy quyền hồi sức và thiêu đốt.", color: "#e6a45d", accent: "#ffe6b8", baseHp: 105, baseMp: 125, baseAttack: 26, baseDefense: 5, speed: 145, basicRange: 150,
     kit: {
-      skill1: skill("Giáng Long Chưởng", "Hỏa long đánh vùng quanh mục tiêu tầm xa.", "dragon", { shape: "area", range: 360, radius: 100, damage: 1.35 }),
+      skill1: skill("Giáng Long Chưởng", "Hỏa long đánh vùng quanh mục tiêu tầm xa, thiêu đốt 2 giây.", "dragon", { shape: "area", range: 360, radius: 100, damage: 1.35, burn: 2 }),
       skill2: second("Túy Điệp Cuồng Vũ", "Túy quyền đánh quanh mình và hồi 10% HP.", "spiral", { shape: "area", anchor: "self", requiresTarget: false, radius: 130, damage: 1.2, heal: .1 }),
-      ultimate: ultimate("Phi Long Tại Thiên", "Rồng lửa giáng xuống vùng mục tiêu, để lại hỏa trận 3 giây.", "dragon", { anchor: "target", range: 400, radius: 170, damage: 3.1, zone: 3 }),
+      ultimate: ultimate("Phi Long Tại Thiên", "Rồng lửa giáng xuống vùng mục tiêu, để lại hỏa trận 3 giây.", "dragon", { anchor: "target", range: 400, radius: 170, damage: 3.1, zone: 3, burn: 3 }),
     },
   },
   "thien-nhan": {
     id: "thien-nhan", name: "Thiên Nhẫn", element: "Hỏa", title: "Song đao · Đột kích", description: "Hai nhát đao, ảnh bộ áp sát và vòng ma diệm hồi sức khi trúng.", color: "#e77177", accent: "#ffc6b6", baseHp: 120, baseMp: 100, baseAttack: 25, baseDefense: 6, speed: 175, basicRange: 80,
     kit: {
-      skill1: skill("Liệt Hỏa Song Nhận", "Hai nhát đao chéo vào mục tiêu cận chiến.", "blades", { range: 155, damage: .98, hits: 2 }),
+      skill1: skill("Liệt Hỏa Song Nhận", "Hai nhát đao chéo, thiêu đốt mục tiêu trong 2 giây.", "blades", { range: 155, damage: .98, hits: 2, burn: 2 }),
       skill2: second("Huyễn Ảnh Bộ", "Lướt áp sát, gây choáng ngắn và tạo khiên 10% HP.", "shadow", { range: 285, damage: 1.4, dash: true, stun: .6, shield: .1 }),
-      ultimate: ultimate("Ma Diệm Thất Sát", "Song đao đánh vòng rộng; hồi 15% HP nếu trúng quái.", "blades", { radius: 195, damage: 2.9, heal: .15, healOnHit: true }),
+      ultimate: ultimate("Ma Diệm Thất Sát", "Song đao đánh vòng rộng; thiêu đốt 3 giây và hồi 15% HP nếu trúng quái.", "blades", { radius: 195, damage: 2.9, burn: 3, heal: .15, healOnHit: true }),
     },
   },
   "vo-dang": {

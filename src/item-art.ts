@@ -1,11 +1,13 @@
 // Original painted, transparent atlases. Frames are shared by SVG inventory
 // art and cached Canvas world art; enhancement light is rendered separately.
 const ATLAS = {
+  relics: { url: new URL("./assets/gear-relics.webp", import.meta.url).href, width: 1536, height: 1024, columns: 6, rows: 4 },
   weapons: { url: new URL("./assets/gear-weapons.webp", import.meta.url).href, width: 1402, height: 1122, columns: 5, rows: 4 },
   clothing: { url: new URL("./assets/gear-clothing.webp", import.meta.url).href, width: 1145, height: 1374, columns: 5, rows: 6 },
   jewelry: { url: new URL("./assets/gear-jewelry.webp", import.meta.url).href, width: 1292, height: 1218, columns: 6, rows: 6 },
 };
 const ORDERS = {
+  relics: "meteorhammer scimitar iceglaive sunblade serpentstaff jadebow tigerarmor celestialrobe infernomail tigerhelm crystalcrown demonmask stormboots frostgreaves serpentbelt aurorabelt sunamulet serpentchain thunderring bloodring frostbracer dragonbeads phoenixseal starcompass".split(" "),
   weapons: "sword blade spear staff crossbow fan axe halberd daggers bow chakram flute whip hammer dragonstaff firesaber poisondarts frostsword thundersword lotusfan".split(" "),
   clothing: "plate robe mail lamellar cloak brocade dragonrobe phoenixmail shadowrobe helm crown hood dragonhelm veiledhat lotuscoronet mask thundercrest phoenixcrown greaves slippers cloudboots sandboots lotusboots shadowboots metalbelt jadebelt silkbelt dragonbelt starbelt emberbelt".split(" "),
   jewelry: "chain amulet moonchain fangchain lotuschain venomchain rubyring jadering dragonring signetring twinring frostring phoenixring guards beads silvercuff chainbracelet thunderbracer lotusbeads seal talisman gourd mirror scroll bell dragonseal taijicharm venomvial bay white warhorse ember dapple night hp mp".split(" "),

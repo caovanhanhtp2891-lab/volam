@@ -14,15 +14,15 @@ import {
 } from "../src/equipment-art.ts";
 import { equipmentVisualState } from "../src/equipment-vfx.ts";
 
-test("all eighty-four types have their own silhouette and material fittings, and are obtainable from ordinary drops", () => {
-  assert.equal(Object.keys(GEAR_VARIANTS).length, 84);
+test("all 108 types have their own silhouette and material fittings, and are obtainable from ordinary drops", () => {
+  assert.equal(Object.keys(GEAR_VARIANTS).length, 108);
   assert.deepEqual(
     Object.keys(GEAR_DESIGNS).sort(),
     Object.keys(GEAR_VARIANTS).sort(),
   );
   assert.equal(
     new Set(Object.values(GEAR_DESIGNS).map((art) => art.shape)).size,
-    84,
+    108,
   );
   for (const [variant, meta] of Object.entries(GEAR_VARIANTS)) {
     const choices = variantsForSlot(meta.slot),

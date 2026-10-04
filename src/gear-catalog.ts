@@ -87,6 +87,30 @@ export const GEAR_VARIANTS = {
   ember: { slot: "horse", name: "Hỏa Vân Mã" },
   dapple: { slot: "horse", name: "Đạp Tuyết Mã" },
   night: { slot: "horse", name: "Ô Truy Mã" },
+  meteorhammer: { slot: "weapon", name: "Lưu Tinh Chùy" },
+  scimitar: { slot: "weapon", name: "Huyết Nguyệt Loan Đao" },
+  iceglaive: { slot: "weapon", name: "Băng Phách Trường Kích" },
+  sunblade: { slot: "weapon", name: "Thái Dương Thần Kiếm" },
+  serpentstaff: { slot: "weapon", name: "Xà Vương Pháp Trượng" },
+  jadebow: { slot: "weapon", name: "Bích Vân Thần Cung" },
+  tigerarmor: { slot: "armor", name: "Bạch Hổ Chiến Giáp" },
+  celestialrobe: { slot: "armor", name: "Tinh Hà Tiên Bào" },
+  infernomail: { slot: "armor", name: "Xích Diễm Ma Giáp" },
+  tigerhelm: { slot: "helmet", name: "Hổ Vương Khôi" },
+  crystalcrown: { slot: "helmet", name: "Băng Tinh Tiên Quan" },
+  demonmask: { slot: "helmet", name: "Quỷ Vương Diện" },
+  stormboots: { slot: "boots", name: "Lôi Ảnh Ngoa" },
+  frostgreaves: { slot: "boots", name: "Băng Phách Chiến Ngoa" },
+  serpentbelt: { slot: "belt", name: "Bích Xà Đai" },
+  aurorabelt: { slot: "belt", name: "Cực Quang Đai" },
+  sunamulet: { slot: "necklace", name: "Thái Dương Hộ Tâm" },
+  serpentchain: { slot: "necklace", name: "Xà Linh Liên" },
+  thunderring: { slot: "ring", name: "Cửu Lôi Giới" },
+  bloodring: { slot: "ring", name: "Huyết Sát Giới" },
+  frostbracer: { slot: "bracelet", name: "Hàn Ngọc Hộ Uyển" },
+  dragonbeads: { slot: "bracelet", name: "Long Hồn Châu" },
+  phoenixseal: { slot: "pendant", name: "Phượng Hoàng Thần Ấn" },
+  starcompass: { slot: "pendant", name: "Tinh Hà La Bàn" },
 } as const;
 export type GearVariant = keyof typeof GEAR_VARIANTS;
 export const EQUIPMENT_SLOTS = [
@@ -314,4 +338,55 @@ export function setBonuses(
     for (const key of Object.keys(stats) as (keyof GearStats)[])
       stats[key] += set.bonuses[key];
   return stats;
+}
+
+// Relic blueprints favor a distinct build while retaining rarity affix limits.
+export const GEAR_TRAITS = {
+  wind: { name: "Cuồng Phong", stats: ["speed", "attackSpeed"] },
+  blood: { name: "Huyết Sát", stats: ["attack", "lifeSteal"] },
+  fortress: { name: "Thiết Bích", stats: ["hp", "defense", "damageReduction"] },
+  frost: { name: "Băng Tâm", stats: ["mp", "mpRegen"] },
+  storm: { name: "Thiên Lôi", stats: ["crit", "critDamage"] },
+  vital: { name: "Dưỡng Sinh", stats: ["hp", "hpRegen"] },
+} as const;
+export const RELIC_TRAITS = {
+  meteorhammer: "storm",
+  scimitar: "blood",
+  iceglaive: "frost",
+  sunblade: "storm",
+  serpentstaff: "vital",
+  jadebow: "wind",
+  tigerarmor: "fortress",
+  celestialrobe: "frost",
+  infernomail: "blood",
+  tigerhelm: "fortress",
+  crystalcrown: "frost",
+  demonmask: "blood",
+  stormboots: "wind",
+  frostgreaves: "fortress",
+  serpentbelt: "vital",
+  aurorabelt: "frost",
+  sunamulet: "storm",
+  serpentchain: "vital",
+  thunderring: "storm",
+  bloodring: "blood",
+  frostbracer: "fortress",
+  dragonbeads: "vital",
+  phoenixseal: "blood",
+  starcompass: "wind",
+} as const;
+export function gearTrait(variant?: GearVariant) {
+  const key = variant && RELIC_TRAITS[variant as keyof typeof RELIC_TRAITS];
+  return key ? GEAR_TRAITS[key] : undefined;
+}
+const RELIC_WEAPON_BASES: Partial<Record<GearVariant, GearVariant>> = {
+  meteorhammer: "hammer",
+  scimitar: "blade",
+  iceglaive: "halberd",
+  sunblade: "sword",
+  serpentstaff: "staff",
+  jadebow: "bow",
+};
+export function weaponBaseVariant(variant: GearVariant): GearVariant {
+  return RELIC_WEAPON_BASES[variant] ?? variant;
 }

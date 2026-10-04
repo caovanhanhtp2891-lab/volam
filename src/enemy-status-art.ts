@@ -1,3 +1,4 @@
+import { drawElementalMotion } from "./elemental-motion.ts";
 import { enemyStatusVisual, type EnemyStatus } from "./enemy-status.ts";
 export function drawEnemyStatus(
   c: CanvasRenderingContext2D,
@@ -6,10 +7,19 @@ export function drawEnemyStatus(
   simple = false,
 ) {
   const status = enemyStatusVisual(enemy, now);
-  if (!status.frozen && !status.chilled && !status.poisoned && !status.stunned)
+  if (!status.frozen && !status.chilled && !status.poisoned && !status.stunned && !status.burning && !status.corroded)
     return;
   const r = Math.min(32, Math.max(14, enemy.radius));
   c.save();
+  if (status.burning) drawElementalMotion(c, "fire", r * 1.15, now, "#ff792d", "#fff0a0", simple, true);
+  if (status.corroded) {
+    drawElementalMotion(c, "acid", r, now, "#81db45", "#e5ff8d", simple, true);
+    c.strokeStyle = "#b1e873"; c.lineWidth = 1.6;
+    for (let i = 0; i < (simple ? 2 : 4); i++) {
+      const x = (i - 1.5) * r * .38, drip = (now / 70 + i * 9) % (r * .7);
+      c.beginPath(); c.moveTo(x, -r * .7 + drip); c.lineTo(x + 2, -r * .45 + drip); c.stroke();
+    }
+  }
   if (status.frozen) {
     c.globalAlpha *= status.iceAlpha;
     c.fillStyle = "#81d7f54a";

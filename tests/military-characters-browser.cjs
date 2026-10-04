@@ -123,12 +123,12 @@ const openMap = async (page, id) => { await close(page); await click(page, '.tod
     for (const rank of MILITARY_RANKS) { assert.equal(await page.locator(`[data-claim-seal="${rank.id}"]`).isDisabled(), false); await click(page, `[data-claim-seal="${rank.id}"]`); }
     assert.equal((await save(page)).player.maxHp, hpBefore);
     await click(page, '[data-wear-seal="hoang-de"]');
-    const imperial = await save(page); assert.equal(imperial.player.maxHp, hpBefore + 900); assert.equal(imperial.player.military.equipped, "hoang-de");
+    const imperial = await save(page); assert.equal(imperial.player.maxHp, hpBefore + 90000); assert.equal(imperial.player.military.equipped, "hoang-de");
     assert.equal(await page.locator('#military-seal-slot [data-seal-art]').getAttribute("data-seal-art"), "hoang-de");
     await page.screenshot({ path: `${captures}/ranks-mobile.png` });
     await close(page); await click(page, "#combat-stats-btn"); assert.equal(Number((await page.locator('[data-combat-stat="lifeSteal"] strong').textContent()).replace("%", "")), Math.min(20, lifeStealBefore + 4)); await close(page);
-    await click(page, "#load-btn"); await step(page, 100); assert.equal((await save(page)).player.maxHp, hpBefore + 900);
-    await openRanks(page); await click(page, '[data-wear-seal="thai-thu"]'); assert.equal((await save(page)).player.maxHp, hpBefore + 200);
+    await click(page, "#load-btn"); await step(page, 100); assert.equal((await save(page)).player.maxHp, hpBefore + 90000);
+    await openRanks(page); await click(page, '[data-wear-seal="thai-thu"]'); assert.equal((await save(page)).player.maxHp, hpBefore + 20000);
     await click(page, '[data-remove-seal]'); assert.equal((await save(page)).player.maxHp, hpBefore);
     await click(page, '[data-wear-seal="hoang-de"]'); await close(page);
     await click(page, "#rebirth-btn"); await click(page, "#confirm-rebirth"); await step(page, 100);
@@ -141,7 +141,7 @@ const openMap = async (page, id) => { await close(page); await click(page, '.tod
     await step(page, 241000); await step(page, 100);
     assert.equal((await save(page)).player.military.captured.length, 0);
     assert.match(await page.locator("#log-list").textContent(), /Hết giờ công thành/);
-    await seed(page, s => { s.player.level = 160; s.player.defense = 0; s.player.equipment = {}; s.player.hp = 1; s.player.idle.autoPotions = false; s.player.idle.inTown = true; s.player.maxHp = 5511; });
+    await seed(page, s => { s.player.level = 160; s.player.defense = 0; s.player.equipment = {}; s.player.hp = 100; s.player.idle.autoPotions = false; s.player.idle.inTown = true; s.player.maxHp = 551100; });
     await openMap(page, "bien-thanh"); await click(page, '[data-challenge-territory="bien-thanh"]'); await click(page, "#mobile-auto"); await step(page, 20000);
     assert.equal((await save(page)).player.military.captured.length, 0);
     assert.match(await page.locator("#log-list").textContent(), /Công thành thất bại/);

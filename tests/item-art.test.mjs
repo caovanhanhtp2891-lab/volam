@@ -7,7 +7,7 @@ import { RARITIES, rarityTier } from "../src/equipment.ts";
 import { equipmentMarkup } from "../src/equipment-art.ts";
 import { equipmentVisualState, drawEquipmentRadiance, drawEquipmentDropAura } from "../src/equipment-vfx.ts";
 
-test("84 obtainable equipment variants and both potions have distinct in-bounds painted cells", () => {
+test("108 obtainable equipment variants and both potions have distinct in-bounds painted cells", () => {
   const keys = [...Object.keys(GEAR_VARIANTS), "hp", "mp"];
   assert.equal(Object.keys(PAINTED_ITEM_FRAMES).length, keys.length);
   const crops = new Set();

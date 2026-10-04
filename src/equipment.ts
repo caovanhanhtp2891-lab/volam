@@ -1,5 +1,5 @@
 import type { Element } from "./idle";
-import { setBonuses, type GearIdentity, type SetId } from "./gear-catalog.ts";
+import { gearTrait, setBonuses, type GearVariant, type GearIdentity, type SetId } from "./gear-catalog.ts";
 import { STAT_LABELS, emptyStats, secondaryScore, type GearStat, type GearStats } from "./gear-stats.ts";
 export { STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife } from "./gear-stats.ts";
 export type { GearStat, GearStats } from "./gear-stats.ts";
@@ -212,6 +212,7 @@ export function rollGearBonuses(
   rarity: Rarity,
   slot: string,
   random = Math.random,
+  variant?: GearVariant,
 ): Partial<GearStats> {
   const tier = rarityTier(rarity);
   const count = [2, 3, 5, 7, 10, 12, 14][tier];
@@ -225,7 +226,9 @@ export function rollGearBonuses(
           ? "hp"
           : "crit";
   const chosen: GearStat[] = [preferred];
-  const remaining = keys.filter((key) => key !== preferred);
+  const trait = gearTrait(variant);
+  for (const key of trait?.stats ?? []) if (chosen.length < count && !chosen.includes(key)) chosen.push(key);
+  const remaining = keys.filter((key) => !chosen.includes(key));
   while (chosen.length < count)
     chosen.push(
       remaining.splice(
@@ -235,7 +238,7 @@ export function rollGearBonuses(
     );
   const bonuses: Partial<GearStats> = {};
   for (const key of chosen) {
-    const strength = (1 + tier * 0.3) * (0.85 + random() * 0.3);
+    const strength = (1 + tier * 0.3) * (0.85 + random() * 0.3) * ((trait?.stats as readonly GearStat[] | undefined)?.includes(key) ? 1.2 : 1);
     const base = {
       attack: 2 + level * 0.3,
       defense: 2 + level * 0.35,

@@ -1,3 +1,6 @@
+import { COMBAT_SCALE_VERSION, toCombat, toCore, displayedStat, migrateCombatScale, scaledOutgoingDamage, scaledIncomingDamage } from "./combat-scale";
+import { applyElementalAilments, takeBurnTick } from "./skill-ailments";
+import { gearTrait } from "./gear-catalog";
 import { resourceMarkup, drawResource } from "./item-art";
 import "./style.css";
 import { idleShell } from "./idle-ui";
@@ -54,7 +57,7 @@ import { actorCastOffset } from "./actor-rig";
 import { skillUsesFlight, flightSpeed } from "./skill-flight";
 import { drawEnemyStatus } from "./enemy-status-art";
 import { drawGearAura } from "./gear-effects";
-import { RARITIES, RARITY_NAMES, rollEquipmentRarity, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, outgoingDamage, incomingDamage, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
+import { RARITIES, RARITY_NAMES, rollEquipmentRarity, RARITY_COLORS, STAT_LABELS, emptyStats, statUnit, secondaryScore, combatModifiers, stolenLife, gearStats, loadoutStats, gearScore, rollGearBonuses, equipBestGear, equipSetPieces, discardCandidates, validBonuses, equipmentGrade, enhancementInfo, attemptEnhancement, type Rarity, type GearStats, type GearStat, type DiscardFilter } from "./equipment";
 import { goldenStatus, goldenWindows, normalizeGoldenClears, claimGoldenKill, countdown, type GoldenWindow } from "./golden-boss";
 import {
   drawBattleEffect,
@@ -206,6 +209,11 @@ interface Enemy {
   poisonUntil: number;
   poisonNextTick: number;
   poisonDamage: number;
+  burnUntil: number;
+  burnNextTick: number;
+  burnDamage: number;
+  burnSect: SchoolId;
+  corrodedUntil: number;
 }
 
 interface GroundLoot {
@@ -266,6 +274,7 @@ interface Projectile {
   theme: Element;
 }
 interface PendingStrike {
+  sect?: SchoolId;
   definition?: SkillDefinition;
   range?: number;
   healing?: { ratio: number; used: boolean };
@@ -669,7 +678,7 @@ function createItem(
     rarity,
     level,
     power: itemPower(level, rarity, slot),
-    bonuses: rollGearBonuses(level, rarity, slot),
+    bonuses: rollGearBonuses(level, rarity, slot, Math.random, identity.variant),
     enhance: 0,
     color: itemColor(rarity),
     icon,
@@ -709,12 +718,12 @@ function createEnemy(
     y,
     radius: kind === "boss" ? 38 : kind === "elite" ? 25 : 19,
     level,
-    hp: Math.floor((65 + level * 22) * scale),
-    maxHp: Math.floor((65 + level * 22) * scale),
-    attack: Math.floor(
+    hp: toCombat(Math.floor((65 + level * 22) * scale)),
+    maxHp: toCombat(Math.floor((65 + level * 22) * scale)),
+    attack: toCombat(Math.floor(
       (8 + level * 2.6) * (kind === "boss" ? 1.6 : kind === "elite" ? 1.2 : 1),
-    ),
-    defense: Math.floor((3 + level * 1.4) * (kind === "boss" ? 1.3 : 1)),
+    )),
+    defense: toCombat(Math.floor((3 + level * 1.4) * (kind === "boss" ? 1.3 : 1))),
     speed: kind === "boss" ? 52 : kind === "elite" ? 62 : 70,
     color,
     dead: false,
@@ -731,6 +740,7 @@ function createEnemy(
     poisonUntil: 0,
     poisonNextTick: 0,
     poisonDamage: 0,
+    burnUntil: 0, burnNextTick: 0, burnDamage: 0, burnSect: "cai-bang", corrodedUntil: 0,
   };
 }
 
@@ -843,10 +853,10 @@ function createGame(sectId: SectId, factionId?: FactionId): GameState {
     sect: sectId,
     level: 1,
     xp: 0,
-    hp: sect.baseHp,
-    maxHp: sect.baseHp,
-    mp: sect.baseMp,
-    maxMp: sect.baseMp,
+    hp: toCombat(sect.baseHp),
+    maxHp: toCombat(sect.baseHp),
+    mp: toCombat(sect.baseMp),
+    maxMp: toCombat(sect.baseMp),
     attack: sect.baseAttack,
     defense: sect.baseDefense,
     speed: sect.speed,
@@ -942,15 +952,15 @@ function itemArt(item: Item, extraClass = ""): string {
   return equipmentMarkup(item.slot, item.color, item.rarity, extraClass, item);
 }
 function gearIdentityMarkup(item: Item): string {
-  const element = item.element ? ELEMENTS[item.element] : undefined;
-  return `<div class="gear-identity"><span>${item.variant ? GEAR_VARIANTS[item.variant].name : GEAR_SLOTS[item.slot].name}</span>${element ? `<span class="gear-element-label" style="color:${element.color}">Hệ ${element.name}</span>` : ""}${item.setId ? `<span class="gear-set-label" style="color:${GEAR_SETS[item.setId].color}">Bộ ${GEAR_SETS[item.setId].name}</span>` : ""}</div>`;
+  const element = item.element ? ELEMENTS[item.element] : undefined, trait = gearTrait(item.variant);
+  return `<div class="gear-identity"><span>${item.variant ? GEAR_VARIANTS[item.variant].name : GEAR_SLOTS[item.slot].name}</span>${trait ? `<span class="gear-trait-label">Thiên hướng ${trait.name}</span>` : ""}${element ? `<span class="gear-element-label" style="color:${element.color}">Hệ ${element.name}</span>` : ""}${item.setId ? `<span class="gear-set-label" style="color:${GEAR_SETS[item.setId].color}">Bộ ${GEAR_SETS[item.setId].name}</span>` : ""}</div>`;
 }
 function statsText(stats: Partial<GearStats>): string {
   return Object.entries(stats)
     .filter(([, value]) => value)
     .map(
       ([key, value]) =>
-        `+${formatNumber(value!)}${statUnit(key as GearStat)} ${STAT_LABELS[key as GearStat].toLocaleLowerCase("vi")}`,
+        `+${formatNumber(displayedStat(key as GearStat, value!))}${statUnit(key as GearStat)} ${STAT_LABELS[key as GearStat].toLocaleLowerCase("vi")}`,
     )
     .join(" · ");
 }
@@ -1059,7 +1069,7 @@ function openEquipmentGallery(): void {
   const variants = variantsForSlot(gallerySlot);
   openUtility(`Bảo khố · ${Object.keys(GEAR_VARIANTS).length} mẫu trang bị`, `<p class="dim">Bảy phẩm chất: Trắng → Lục → Lam → Tím → Vàng → Cam → Đỏ. Đỏ (Thần Thoại) quý nhất; phẩm chất cao có linh khí, vòng sáng và phù văn đẹp hơn. +7/+10 tăng cường hiệu ứng. Đây là mẫu minh họa; chọn mua sẽ tới Tiệm với phẩm chất Tốt, chưa cường hóa.</p><div class="gear-gallery-filters"><label>Vị trí<select id="gear-gallery-slot">${EQUIPMENT_SLOTS.filter(slot => slot !== "ring2").map(slot => `<option value="${slot}" ${slot === gallerySlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label>Phẩm chất<select id="gear-gallery-rarity">${RARITIES.map(rarity => `<option value="${rarity}" ${rarity === galleryRarity ? "selected" : ""}>${rarity} · ${RARITY_NAMES[RARITIES.indexOf(rarity)]}</option>`).join("")}</select></label><label>Cường hóa<select id="gear-gallery-enhance">${[0,3,7,10].map(enhance => `<option value="${enhance}" ${enhance === galleryEnhance ? "selected" : ""}>+${enhance}</option>`).join("")}</select></label><label>Ngũ hành<select id="gear-gallery-element">${Object.entries(ELEMENTS).map(([element, data]) => `<option value="${element}" ${element === galleryElement ? "selected" : ""}>${data.name}</option>`).join("")}</select></label><label>Bộ trang bị<select id="gear-gallery-set"><option value="">Không chọn bộ</option>${SET_IDS.map(id => `<option value="${id}" ${id === gallerySet ? "selected" : ""}>${GEAR_SETS[id].name}</option>`).join("")}</select></label></div><p class="gear-effect-label">${equipmentEffectLabel(galleryRarity, galleryEnhance)} · Bậc ${Math.ceil(game.player.level / 10)}</p><div class="gear-gallery">${variants.map(variant => {
     const sample: Item = { id: "art-sample", slot: gallerySlot, name: GEAR_VARIANTS[variant].name, variant, rarity: galleryRarity, element: galleryElement, ...(gallerySet ? { setId: gallerySet } : {}), level: game!.player.level, enhance: galleryEnhance, power: 0, color: itemColor(galleryRarity), icon: "◆" };
-    return `<article class="gear-sample" style="--rarity-color:${sample.color}">${itemArt(sample)}<b>${sample.name}</b><button class="mini-button" data-buy-gear-kind="${variant}">Chọn mua</button></article>`;
+    return `<article class="gear-sample" style="--rarity-color:${sample.color}">${itemArt(sample)}<b>${sample.name}</b>${gearTrait(variant) ? `<small class="gear-trait-label">${gearTrait(variant)!.name}</small>` : ""}<button class="mini-button" data-buy-gear-kind="${variant}">Chọn mua</button></article>`;
   }).join("")}</div>`);
 }
 function openSetShop(id?: SetId): void {
@@ -1088,7 +1098,7 @@ function openSetShop(id?: SetId): void {
     player.gold < price;
   openUtility(
     "Thương nhân · Mảnh bộ",
-    `<label class="form-row">Bộ <select id="set-shop-id">${SET_IDS.map((id) => `<option value="${id}" ${id === setShopId ? "selected" : ""}>${GEAR_SETS[id].name} · ${GEAR_SETS[id].sect ?? ELEMENTS[GEAR_SETS[id].element].name}</option>`).join("")}</select></label><label class="form-row">Vị trí <select id="set-shop-slot">${EQUIPMENT_SLOTS.map((slot) => `<option value="${slot}" ${slot === setShopSlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label class="form-row">Kiểu món <select id="set-shop-variant">${variantsForSlot(setShopSlot).map(variant => `<option value="${variant}" ${variant === preview.variant ? "selected" : ""}>${GEAR_VARIANTS[variant].name}</option>`).join("")}</select></label><div class="item-detail">${itemArt(preview, "detail-gear-art")}<b>${preview.name}</b>${gearIdentityMarkup(preview)}<p>Tốt · Cấp ${player.level} · ${equipmentGrade(player.level)} · Ba dòng phụ ngẫu nhiên. Kiểu món thay đổi hình dáng; chỉ số vẫn theo vị trí, cấp và phẩm chất.</p></div><p class="dim">Mua vào túi, tự chọn mặc. Ghép được với đồ rơi cùng bộ. Đang có ${formatNumber(player.gold)} bạc · ${player.inventory.length}/${BAG_CAPACITY} ô.</p><button class="outline-button" id="buy-set-piece" ${blocked ? "disabled" : ""}>${game.mapMode !== "world" ? "Rời phụ bản để mua" : player.inventory.length >= BAG_CAPACITY ? "Túi đã đầy" : `Mua mảnh bộ · ${price} bạc`}</button>`,
+    `<label class="form-row">Bộ <select id="set-shop-id">${SET_IDS.map((id) => `<option value="${id}" ${id === setShopId ? "selected" : ""}>${GEAR_SETS[id].name} · ${GEAR_SETS[id].sect ?? ELEMENTS[GEAR_SETS[id].element].name}</option>`).join("")}</select></label><label class="form-row">Vị trí <select id="set-shop-slot">${EQUIPMENT_SLOTS.map((slot) => `<option value="${slot}" ${slot === setShopSlot ? "selected" : ""}>${GEAR_SLOTS[slot].name}</option>`).join("")}</select></label><label class="form-row">Kiểu món <select id="set-shop-variant">${variantsForSlot(setShopSlot).map(variant => `<option value="${variant}" ${variant === preview.variant ? "selected" : ""}>${GEAR_VARIANTS[variant].name}</option>`).join("")}</select></label><div class="item-detail">${itemArt(preview, "detail-gear-art")}<b>${preview.name}</b>${gearIdentityMarkup(preview)}<p>Tốt · Cấp ${player.level} · ${equipmentGrade(player.level)} · Ba dòng phụ ngẫu nhiên. Linh binh có thiên hướng chỉ số riêng; các dòng còn lại theo cấp và phẩm chất.</p></div><p class="dim">Mua vào túi, tự chọn mặc. Ghép được với đồ rơi cùng bộ. Đang có ${formatNumber(player.gold)} bạc · ${player.inventory.length}/${BAG_CAPACITY} ô.</p><button class="outline-button" id="buy-set-piece" ${blocked ? "disabled" : ""}>${game.mapMode !== "world" ? "Rời phụ bản để mua" : player.inventory.length >= BAG_CAPACITY ? "Túi đã đầy" : `Mua mảnh bộ · ${price} bạc`}</button>`,
   );
 }
 function buySetPiece(): void {
@@ -1104,6 +1114,7 @@ function buySetPiece(): void {
     variant: setShopVariant(setShopId, setShopSlot),
     name: `${set.name} ${GEAR_VARIANTS[setShopVariant(setShopId, setShopSlot)].name}`,
   });
+  item.bonuses = rollGearBonuses(item.level, item.rarity, item.slot, Math.random, item.variant);
   game.player.gold -= price;
   game.player.inventory.push(item);
   persistGame();
@@ -1218,31 +1229,31 @@ function openCombatStats(): void {
     armorPen: "Bỏ qua một phần phòng thủ của quái. Tối đa 60%.",
     damageReduction: "Giảm sát thương sau phòng thủ, trước hộ thể. Tối đa 50%.",
     dodge: "Có cơ hội tránh toàn bộ một đòn đánh. Tối đa 35%.",
-    hpRegen: "Tự hồi sinh lực mỗi giây, tối đa 1.000/giây.",
-    mpRegen: "Cộng thêm vào hồi nội lực cơ bản 0,7/giây. Tối đa 300/giây.",
+    hpRegen: "Tự hồi sinh lực mỗi giây, tối đa 100.000/giây.",
+    mpRegen: "Cộng thêm vào hồi nội lực cơ bản 70/giây. Tối đa 30.000/giây.",
   };
-  openUtility("Chỉ số chiến đấu nâng cao", `<p class="dim">Giá trị đang có hiệu lực từ trang bị, thuộc tính bộ, danh hiệu và ấn quân hàm.</p><div class="combat-stat-details">${(Object.keys(mods) as (keyof typeof mods)[]).map(key => `<article data-combat-stat="${key}"><div><b>${STAT_LABELS[key]}</b><strong>${key === "critDamage" ? "+" : ""}${mods[key]}${statUnit(key)}</strong></div><small>${descriptions[key]}</small></article>`).join("")}</div>`);
+  openUtility("Chỉ số chiến đấu nâng cao", `<p class="dim">Giá trị đang có hiệu lực từ trang bị, thuộc tính bộ, danh hiệu và ấn quân hàm.</p><div class="combat-stat-details">${(Object.keys(mods) as (keyof typeof mods)[]).map(key => `<article data-combat-stat="${key}"><div><b>${STAT_LABELS[key]}</b><strong>${key === "critDamage" ? "+" : ""}${formatNumber(displayedStat(key, mods[key]))}${statUnit(key)}</strong></div><small>${descriptions[key]}</small></article>`).join("")}</div>`);
 }
 
 function effectiveAttack(): number {
   return game
-    ? game.player.attack +
+    ? toCombat(game.player.attack +
         equipmentAttack() + characterBonuses().attack +
-        game.player.idle.attributes.strength * 2
+        game.player.idle.attributes.strength * 2)
     : 0;
 }
 
 function effectiveDefense(): number {
   return game
-    ? game.player.defense +
+    ? toCombat(game.player.defense +
         equipmentDefense() + characterBonuses().defense +
-        game.player.idle.attributes.dexterity
+        game.player.idle.attributes.dexterity)
     : 0;
 }
 
 function currentStrengthScore(): number {
   const gear = equipmentBonuses(), bonus = characterBonuses();
-  return strengthScore(effectiveAttack(), effectiveDefense(), game?.player.maxHp ?? 0,
+  return strengthScore(toCore(effectiveAttack()), toCore(effectiveDefense()), toCore(game?.player.maxHp ?? 0),
     secondaryScore(combinedStats(gear, bonus)));
 }
 function currentCombatPower(): number { return powerFromScore(currentStrengthScore()); }
@@ -1252,8 +1263,8 @@ function projectedGearPower(item: Item, current?: Item): number {
   const after = loadoutStats([...Object.values(game.player.equipment).filter(gear => gear.slot !== item.slot), item], factionOf(game.player.factionId).element);
   const defenseDelta = after.defense - gear.defense;
   const hpDelta = after.hp - gear.hp + Math.floor(after.defense * 1.45) - Math.floor(gear.defense * 1.45);
-  return combatPower(effectiveAttack() + after.attack - gear.attack, effectiveDefense() + defenseDelta,
-    game.player.maxHp + hpDelta,
+  return combatPower(toCore(effectiveAttack()) + after.attack - gear.attack, toCore(effectiveDefense()) + defenseDelta,
+    toCore(game.player.maxHp) + hpDelta,
     secondaryScore(combinedStats(after, bonus)));
 }
 
@@ -1657,20 +1668,20 @@ function syncStats(fullHeal = false): void {
   const sect = playerSect(player);
   const oldMaxHp = player.maxHp;
   const bonus = characterBonuses();
-  player.maxHp =
+  player.maxHp = toCombat(
     sect.baseHp +
     (player.level - 1) * 34 +
     Math.floor(equipmentDefense() * 1.45) +
-    player.idle.attributes.vitality * 12 + equipmentBonuses().hp + bonus.hp;
-  player.maxMp =
-    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp + bonus.mp;
+    player.idle.attributes.vitality * 12 + equipmentBonuses().hp + bonus.hp);
+  player.maxMp = toCombat(
+    sect.baseMp + (player.level - 1) * 13 + player.idle.attributes.energy * 8 + equipmentBonuses().mp + bonus.mp);
   player.mounted = normalizeMounted(player.mounted, player.equipment.horse);
   player.speed = ridingSpeed(sect.speed + player.idle.attributes.dexterity + equipmentBonuses().speed + bonus.speed, player.equipment.horse, player.mounted);
   if (fullHeal) {
     player.hp = player.maxHp;
     player.mp = player.maxMp;
   } else {
-    player.hp = clamp(player.hp + player.maxHp - oldMaxHp, 1, player.maxHp);
+    player.hp = clamp(player.hp + player.maxHp - oldMaxHp, toCombat(1), player.maxHp);
     player.mp = clamp(player.mp, 0, player.maxMp);
   }
 }
@@ -1712,7 +1723,7 @@ function movePlayer(dx: number, dy: number): void {
 
 function enemyDefense(enemy: Enemy): number {
   return enemy.defenseDownUntil > nowMs()
-    ? Math.floor(enemy.defense * 0.72)
+    ? toCombat(Math.floor(toCore(enemy.defense) * 0.72))
     : enemy.defense;
 }
 
@@ -1754,7 +1765,7 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect
       : 1);
   playCombatSound(critical ? 460 : 280);
   const stats = combinedStats();
-  const damage = outgoingDamage(raw, enemyDefense(enemy), game.player.level, critical, stats);
+  const damage = scaledOutgoingDamage(raw, enemyDefense(enemy), game.player.level, critical, stats);
   const healing = Math.min(game.player.maxHp - game.player.hp, stolenLife(damage, enemy.hp, stats));
   if (healing > 0) game.player.hp += healing;
   enemy.hp = Math.max(0, enemy.hp - damage);
@@ -1763,7 +1774,7 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect
   if (enemyMotion) enemyMotion.hurtUntil = nowMs() + 150;
   const sect = SCHOOL_KITS[visualSect ?? playerSect(game.player).id];
   const skill = SKILL_KEYS.find(key => sect.kit[key].name === source);
-  const tick = source === "Độc";
+  const tick = source === "Độc" || source === "Thiêu đốt";
   addSkillEffect({
     x: enemy.x, y: enemy.y - 24, sect: sect.id, skill,
     radius: tick ? 14 : skill === "ultimate" ? 52 : critical ? 40 : skill ? 34 : 24,
@@ -1775,11 +1786,11 @@ function dealDamage(enemy: Enemy, multiplier: number, source: string, visualSect
   addFloatingText(
     enemy.x + randomBetween(-8, 8),
     enemy.y - enemy.radius - 7,
-    `-${damage}`,
+    `-${formatNumber(damage)}`,
     critical ? "#ffe28a" : "#fff1d1",
     critical ? 23 : 18,
   );
-  if (critical) addLog(`${source}: chí mạng ${damage} sát thương.`);
+  if (critical) addLog(`${source}: chí mạng ${formatNumber(damage)} sát thương.`);
   if (enemy.hp <= 0) killEnemy(enemy);
 }
 
@@ -1917,9 +1928,10 @@ function planDash(player: Player, target: Enemy): { x: number; y: number } | nul
   return { x, y };
 }
 
-function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier: number, now: number): void {
+function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier: number, now: number, sect = game ? playerSect(game.player).id : "cai-bang" as SchoolId): void {
   if (enemy.dead) return;
-  if (definition.breakArmor) enemy.defenseDownUntil = now + definition.breakArmor * 1000;
+  applyElementalAilments(enemy, definition, multiplier, now, sect);
+  if (definition.breakArmor) enemy.defenseDownUntil = Math.max(enemy.defenseDownUntil, now + definition.breakArmor * 1000);
   if (definition.slow) { enemy.slowUntil = now + 3000; enemy.slowFactor = definition.slow; }
   if (definition.stun) enemy.stunUntil = now + Math.min(definition.stun, enemy.kind === "boss" ? .35 : 2) * 1000;
   if (definition.motif === "fan" || definition.motif === "frost") {
@@ -1927,8 +1939,8 @@ function applySkillStatus(enemy: Enemy, definition: SkillDefinition, multiplier:
     if (definition.stun) enemy.frozenUntil = enemy.stunUntil;
   }
   if (definition.poison) {
-    enemy.poisonUntil = now + definition.poison * 1000;
-    enemy.poisonNextTick = now + 1000;
+    if (enemy.poisonUntil <= now) enemy.poisonNextTick = now + 1000;
+    enemy.poisonUntil = Math.max(enemy.poisonUntil, now + definition.poison * 1000);
     enemy.poisonDamage = multiplier * .28;
   }
 }
@@ -1939,7 +1951,7 @@ function castSkill(key: SkillKey, automatic = false): void {
   const warn = (message: string) => { if (!automatic) showToast(message); };
   if (player.level < definition.unlock) return warn(`${definition.name} mở ở cấp ${definition.unlock}.`);
   if (player.cooldowns[key] > 0 || actionLocked()) return;
-  if (player.mp < definition.mp) return warn(`Cần ${definition.mp} MP để dùng ${definition.name}.`);
+  if (player.mp < toCombat(definition.mp)) return warn(`Cần ${formatNumber(toCombat(definition.mp))} MP để dùng ${definition.name}.`);
   if (key === "ultimate" && player.rage < 100) return warn("Chưa đủ 100 nộ để thi triển tuyệt chiêu.");
   // A selected distant target stays selected: never silently cast at a different enemy.
   const target = currentTarget() ?? nearestEnemy(definition.range);
@@ -1951,7 +1963,7 @@ function castSkill(key: SkillKey, automatic = false): void {
     return warn("Đường lướt bị vật cản chặn. Hãy chọn vị trí khác.");
   }
   const now = nowMs();
-  player.mp -= definition.mp;
+  player.mp -= toCombat(definition.mp);
   player.cooldowns[key] = definition.cooldown;
   onlineClient.sendSkill(key);
   if (target) faceTarget(target);
@@ -1981,7 +1993,7 @@ function castSkill(key: SkillKey, automatic = false): void {
         previousFlight = projectile;
         projectile.startedAt += hit * 70;
       } else {
-        game.combat.strikes.push({ target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : 150) + hit * 70, definition, range: definition.range, healing });
+        game.combat.strikes.push({ sect: sect.id, target: enemy, x: enemy.x, y: enemy.y, radius: 0, multiplier: multiplier * falloff, source: definition.name, at: now + (dashPoint ? 240 : 150) + hit * 70, definition, range: definition.range, healing });
       }
     }
   }
@@ -2007,7 +2019,7 @@ function castSkill(key: SkillKey, automatic = false): void {
   }
   // Damage ticks build rage; casting an ultimate itself always consumes all rage.
   player.rage = key === "ultimate" ? 0 : clamp(player.rage + (key === "skill1" ? 10 : 14), 0, 100);
-  addLog(`${definition.name} · -${definition.mp} MP.`);
+  addLog(`${definition.name} · -${formatNumber(toCombat(definition.mp))} MP.`);
   if (!automatic) refreshUi(true);
 }
 
@@ -2162,7 +2174,7 @@ function damagePlayer(amount: number, source: string): void {
     addFloatingText(player.x, player.y - 39, "NÉ", "#a4eddf", 16);
     return;
   }
-  let remaining = incomingDamage(amount, effectiveDefense(), player.level, stats);
+  let remaining = scaledIncomingDamage(amount, effectiveDefense(), player.level, stats);
   if (player.shieldUntil > nowMs() && player.shield > 0) {
     const blocked = Math.min(player.shield, remaining);
     player.shield -= blocked;
@@ -2298,7 +2310,7 @@ function openEnhancement(item: Item, result = ""): void {
   const equipped = game.player.equipment[item.slot]?.id === item.id;
   const blocked = game.mapMode !== "world";
   const poor = game.player.gold < info.cost || game.player.refiningStones < info.stones;
-  openUtility("Cường hóa trang bị", `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${before[key]}${statUnit(key)}</td><td>${after[key]}${statUnit(key)}</td><td>${after[key] > before[key] ? `+${after[key] - before[key]}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số chính tăng mỗi bậc; các dòng phụ tăng theo tỷ lệ. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? '<p class="enhancement-result">Đã đạt cường hóa tối đa +10.</p>' : `<div class="enhancement-cost"><b>${info.cost} bạc + ${info.stones} đá</b><span>Tỷ lệ ${Math.round(info.chance * 100)}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? "+10 tối đa" : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
+  openUtility("Cường hóa trang bị", `<div class="item-detail">${itemArt(item, "detail-gear-art")}<b style="color:${item.color}">${escapeHtml(item.name)} +${item.enhance}</b><p>${equipped ? "Đang mặc: thành công sẽ cộng ngay cho nhân vật." : "Trong túi: chỉ số cộng cho nhân vật sau khi mặc."}</p></div><table class="enhancement-table"><thead><tr><th>Chỉ số</th><th>Hiện tại</th><th>+${next.enhance}</th><th>Tăng</th></tr></thead><tbody>${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => before[key] || after[key]).map(key => `<tr data-enhance-stat="${key}"><td>${STAT_LABELS[key]}</td><td>${formatNumber(displayedStat(key, before[key]))}${statUnit(key)}</td><td>${formatNumber(displayedStat(key, after[key]))}${statUnit(key)}</td><td>${after[key] > before[key] ? `+${formatNumber(displayedStat(key, after[key] - before[key]))}` : "—"}</td></tr>`).join("")}</tbody></table><p class="dim">${equipped ? `<span id="enhance-character-power">Lực chiến nhân vật ${formatNumber(currentCombatPower())} → ${formatNumber(projectedGearPower(next, item))}.</span> ` : ""}Điểm trang bị ${formatNumber(gearScore(item))} → ${formatNumber(gearScore(next))}. Chỉ số chính tăng mỗi bậc; các dòng phụ tăng theo tỷ lệ. Thất bại giữ nguyên cấp và chỉ số.</p>${info.capped ? '<p class="enhancement-result">Đã đạt cường hóa tối đa +10.</p>' : `<div class="enhancement-cost"><b>${info.cost} bạc + ${info.stones} đá</b><span>Tỷ lệ ${Math.round(info.chance * 100)}%</span></div><small class="dim">Đang có ${formatNumber(game.player.gold)} bạc · ${game.player.refiningStones} đá.</small>`}${result ? `<p id="enhance-result" class="enhancement-result" role="status">${escapeHtml(result)}</p>` : ""}<button class="outline-button" data-confirm-enhance="${escapeHtml(item.id)}" data-enhance-rank="${item.enhance}" ${info.capped || blocked || poor ? "disabled" : ""}>${info.capped ? "+10 tối đa" : blocked ? "Rời phụ bản để cường hóa" : poor ? "Thiếu bạc hoặc đá tinh luyện" : `Cường hóa +${next.enhance}`}</button>`);
 }
 function confirmEnhancement(id: string, rank: number): void {
   if (!game || game.mapMode !== "world") return;
@@ -2392,6 +2404,7 @@ function persistGame(): boolean {
   updateTitles();
   const snapshot = {
     version: 2,
+    combatScaleVersion: COMBAT_SCALE_VERSION,
     savedAt: Date.now(),
     campfires: game.campfires.filter(fire => fire.expiresAt > Date.now() && !fire.area.startsWith("dungeon-")),
     wildElite: saveWildElite(),
@@ -2646,7 +2659,7 @@ function updateCombat(now: number): void {
         withinReach(game.player, strike.target, strike.range ?? 180, strike.target.radius)
       )
       {
-        if (strike.definition) applySkillStatus(strike.target, strike.definition, strike.multiplier, now);
+        if (strike.definition) applySkillStatus(strike.target, strike.definition, strike.multiplier, now, strike.sect);
         dealDamage(strike.target, strike.multiplier, strike.source);
         if (strike.healing && !strike.healing.used) {
           strike.healing.used = true;
@@ -2694,7 +2707,7 @@ function updateCombat(now: number): void {
         });
         if (game.zones.length > 6) game.zones.shift();
       }
-      if (projectile.definition) applySkillStatus(target, projectile.definition, projectile.multiplier, now);
+      if (projectile.definition) applySkillStatus(target, projectile.definition, projectile.multiplier, now, projectile.sect);
       if (projectile.area)
         dealAreaDamage(
           target.x,
@@ -2760,8 +2773,8 @@ function update(dt: number, now: number): void {
   player.cooldowns.ultimate = Math.max(0, player.cooldowns.ultimate - dt);
   player.potionCooldown = Math.max(0, player.potionCooldown - dt);
   const regeneration = combatModifiers(combinedStats());
-  player.hp = Math.min(player.maxHp, player.hp + dt * regeneration.hpRegen);
-  player.mp = Math.min(player.maxMp, player.mp + dt * (0.7 + regeneration.mpRegen));
+  player.hp = Math.min(player.maxHp, player.hp + dt * toCombat(regeneration.hpRegen));
+  player.mp = Math.min(player.maxMp, player.mp + dt * toCombat(0.7 + regeneration.mpRegen));
   if (player.shieldUntil <= now) player.shield = 0;
   player.rage = clamp(player.rage + dt * 1.1, 0, 100);
   if (game.autoBattle && player.idle.autoSkills && currentTarget()) {
@@ -2862,7 +2875,7 @@ function update(dt: number, now: number): void {
         enemy.dead = false;
         enemy.hp = enemy.maxHp;
         enemy.attackCooldown = 1;
-        enemy.poisonUntil = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = enemy.chilledUntil = enemy.frozenUntil = 0;
+        enemy.poisonUntil = enemy.poisonNextTick = enemy.stunUntil = enemy.slowUntil = enemy.defenseDownUntil = enemy.chilledUntil = enemy.frozenUntil = enemy.burnUntil = enemy.burnNextTick = enemy.corrodedUntil = 0;
         enemy.x += randomBetween(-22, 22);
         enemy.y += randomBetween(-22, 22);
       }
@@ -2871,6 +2884,11 @@ function update(dt: number, now: number): void {
     if (enemy.poisonNextTick > 0 && enemy.poisonNextTick <= now && enemy.poisonNextTick <= enemy.poisonUntil) {
       enemy.poisonNextTick += 1000;
       dealDamage(enemy, enemy.poisonDamage, "Độc");
+      if (enemy.dead) continue;
+    }
+    const burn = takeBurnTick(enemy, now);
+    if (burn > 0) {
+      dealDamage(enemy, burn, "Thiêu đốt", enemy.burnSect);
       if (enemy.dead) continue;
     }
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
@@ -2953,7 +2971,8 @@ function update(dt: number, now: number): void {
     zone.nextTick += 1000;
     for (const enemy of game.enemies) if (!enemy.dead && distance(zone, enemy) <= zone.radius + enemy.radius) {
       if (zone.slow < 1) { enemy.slowUntil = now + 1500; enemy.slowFactor = zone.slow; }
-      dealDamage(enemy, zone.multiplier, zone.source);
+      dealDamage(enemy, zone.multiplier, zone.source, zone.sect);
+      if (zone.sect && zone.skill) applySkillStatus(enemy, SCHOOL_KITS[zone.sect].kit[zone.skill], zone.multiplier, now, zone.sect);
     }
   }
   game.zones = game.zones.filter(zone => now - zone.startedAt <= zone.duration);
@@ -3892,13 +3911,16 @@ function refreshUi(force = false): void {
         : target.kind === "elite"
           ? "TINH ANH"
           : "ĐANG GIAO CHIẾN";
+    const ailmentTime = nowMs();
+    const ailments = [[target.burnUntil > ailmentTime, "Thiêu đốt"], [target.corrodedUntil > ailmentTime, "Ăn mòn giáp"], [target.poisonUntil > ailmentTime, "Trúng độc"], [target.frozenUntil > ailmentTime, "Đóng băng"]].filter(([active]) => active).map(([, label]) => label).join(" · ");
     targetContent.innerHTML = `
       <div class="target-heading"><div class="target-orb" style="--target-color:${target.color}"></div><div><strong>${escapeHtml(target.name)}</strong><span>${status} · Cấp ${target.level}</span></div></div>
       <div class="target-hp-row"><span>HP</span><strong>${formatNumber(target.hp)} / ${formatNumber(target.maxHp)}</strong></div>
       <div class="meter enemy-meter"><span style="width:${(target.hp / target.maxHp) * 100}%"></span></div>
-      <div class="target-meta"><span>Phòng ${target.defense}</span><span>Khoảng cách ${Math.floor(distance(player, target))}</span></div>
+      ${ailments ? `<small class="target-ailments">${ailments}</small>` : ""}
+      <div class="target-meta"><span>Phòng ${formatNumber(enemyDefense(target))}</span><span>Khoảng cách ${Math.floor(distance(player, target))}</span></div>
     `;
-    combatStatusText.textContent = `${target.name} · ${Math.floor(target.hp)} HP`;
+    combatStatusText.textContent = `${target.name} · ${formatNumber(target.hp)} HP`;
   } else {
     targetContent.classList.add("target-empty");
     targetContent.innerHTML = `<div class="target-empty">Click vào quái để chọn mục tiêu</div>`;
@@ -3946,7 +3968,7 @@ function renderSkillBar(): void {
     skillBar.innerHTML = skillData
       .map(
         (skill) =>
-          `<button class="skill-button" data-skill="${skill.key}" title="${skill.name} · ${skillReachLabel(sect.kit[skill.key])} · ${sect.kit[skill.key].mp} MP · ${sect.kit[skill.key].cooldown}s"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`,
+          `<button class="skill-button" data-skill="${skill.key}" title="${skill.name} · ${skillReachLabel(sect.kit[skill.key])} · ${formatNumber(toCombat(sect.kit[skill.key].mp))} MP · ${sect.kit[skill.key].cooldown}s"><span class="skill-number">${skill.number}</span>${skillGlyphMarkup(skill.key, sect.id)}<span class="skill-name">${skill.name}</span><span class="skill-cooldown"></span></button>`,
       )
       .join("");
     renderedSkillSect = player.factionId;
@@ -3966,18 +3988,18 @@ function renderSkillBar(): void {
       ? "KHÓA"
       : cooldown > 0
         ? `${cooldown.toFixed(1)}s`
-        : player.mp < sect.kit[skill.key].mp
+        : player.mp < toCombat(sect.kit[skill.key].mp)
           ? "THIẾU MP"
           : outOfRange ? "XA QUÁ"
           : skill.key === "ultimate"
           ? `${Math.floor(player.rage)}% nộ`
-          : `${sect.kit[skill.key].mp} MP`;
+          : `${formatNumber(toCombat(sect.kit[skill.key].mp))} MP`;
     const button = skillBar.querySelector<HTMLButtonElement>(
       `[data-skill="${skill.key}"]`,
     )!;
     button.classList.toggle("locked", locked);
     button.classList.toggle("out-of-range", outOfRange);
-    button.classList.toggle("ultimate-ready", skill.key === "ultimate" && !locked && cooldown <= 0 && player.rage >= 100 && player.mp >= sect.kit[skill.key].mp);
+    button.classList.toggle("ultimate-ready", skill.key === "ultimate" && !locked && cooldown <= 0 && player.rage >= 100 && player.mp >= toCombat(sect.kit[skill.key].mp));
     button.setAttribute("aria-label", `${skill.name}: ${coolText} · ${skillReachLabel(definition)}`);
     button.querySelector(".skill-cooldown")!.textContent = coolText;
   }
@@ -4091,7 +4113,7 @@ function renderInventory(): void {
         .map((skill) => {
           const rank = player.skillRanks[skill.key] ?? 0;
           const unlocked = player.level >= skill.unlock;
-          return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skillGlyphMarkup(skill.key, sect.id)}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span class="skill-range">${skillReachLabel(skill)}</span><span>${skill.description} · ${skill.mp} MP · Hồi ${skill.cooldown}s</span><small>${unlocked ? `Bậc ${rank}/20 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 20 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 20 ? "TỐI ĐA" : "NÂNG +1"}</button><button class="mini-button skill-refund" data-refund-skill="${skill.key}" ${rank <= 1 ? "disabled" : ""} aria-label="Rút một điểm ${escapeHtml(skill.name)}">−</button></div>`;
+          return `<div class="skill-row ${unlocked ? "" : "locked-row"}"><div class="skill-row-icon">${skillGlyphMarkup(skill.key, sect.id)}</div><div class="skill-row-copy"><strong>${escapeHtml(skill.name)}</strong><span class="skill-range">${skillReachLabel(skill)}</span><span>${skill.description} · ${formatNumber(toCombat(skill.mp))} MP · Hồi ${skill.cooldown}s</span><small>${unlocked ? `Bậc ${rank}/20 · Mở từ cấp ${skill.unlock}` : `Mở ở cấp ${skill.unlock}`}</small></div><button class="mini-button skill-upgrade" data-skill-rank="${skill.key}" ${!unlocked || rank >= 20 || player.skillPoints < 1 ? "disabled" : ""}>${rank >= 20 ? "TỐI ĐA" : "NÂNG +1"}</button><button class="mini-button skill-refund" data-refund-skill="${skill.key}" ${rank <= 1 ? "disabled" : ""} aria-label="Rút một điểm ${escapeHtml(skill.name)}">−</button></div>`;
         })
         .join("")}</div>
     `;
@@ -4303,7 +4325,7 @@ function gearStatsMarkup(item: Item, current?: Item): string {
   const stats = gearStats(item), old = current ? gearStats(current) : null;
   return `<div class="gear-stat-lines">${(Object.keys(STAT_LABELS) as GearStat[]).filter(key => stats[key] || old?.[key]).map(key => {
     const diff = stats[key] - (old?.[key] ?? 0);
-    return `<span><small>${STAT_LABELS[key]}</small><b>+${stats[key]}${statUnit(key)}</b>${old ? `<em class="${diff < 0 ? "weaker" : ""}">${diff > 0 ? "+" : ""}${diff}${statUnit(key)}</em>` : ""}</span>`;
+    return `<span><small>${STAT_LABELS[key]}</small><b>+${formatNumber(displayedStat(key, stats[key]))}${statUnit(key)}</b>${old ? `<em class="${diff < 0 ? "weaker" : ""}">${diff > 0 ? "+" : ""}${formatNumber(displayedStat(key, diff))}${statUnit(key)}</em>` : ""}</span>`;
   }).join("")}</div>`;
 }
 let discardPreview: { filter: DiscardFilter; ids: Set<string> } | null = null;
@@ -4829,6 +4851,7 @@ function openSlots(): void {
   );
 }
 function validateSave(value: unknown): {
+  combatScaleVersion?: number;
   player: Player;
   enemies: Enemy[];
   savedAt?: number;
@@ -4838,6 +4861,7 @@ function validateSave(value: unknown): {
 } {
   if (!value || typeof value !== "object") throw new Error("save-invalid");
   const data = value as {
+      combatScaleVersion?: number;
       player: Player;
       enemies: Enemy[];
       savedAt?: number;
@@ -4870,7 +4894,7 @@ function validateSave(value: unknown): {
       typeof player[key] !== "number" ||
       !Number.isFinite(player[key]) ||
       player[key] < 0 ||
-      player[key] > 1e9
+      player[key] > (["hp", "maxHp", "mp", "maxMp"].includes(key) ? 1e12 : 1e9)
     )
       throw new Error("save-invalid");
   }
@@ -5032,7 +5056,7 @@ function validateSave(value: unknown): {
   player.rage = Number.isFinite(player.rage) ? clamp(player.rage, 0, 100) : 0;
   player.hp = Math.min(player.hp, player.maxHp);
   player.mp = Math.min(player.mp, player.maxMp);
-  return data;
+  return migrateCombatScale(data);
 }
 function importCharacter(raw: string): void {
   if (game && game.mapMode !== "world")
@@ -5613,7 +5637,7 @@ function selectionSex(id: SchoolId): CharacterSex {
 function renderSectDetail(): void {
   const school = SCHOOL_KITS[SECT_BY_FACTION[selectedFaction]], definition = school.kit[previewSkill];
   for (const button of sectCards.querySelectorAll<HTMLButtonElement>("[data-faction]")) button.setAttribute("aria-pressed", String(button.dataset.faction === selectedFaction));
-  document.querySelector("#sect-detail")!.innerHTML = `<strong>${school.name} · ${school.title}</strong><div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><b>${definition.name}</b><span>${definition.description}</span><small class="skill-range">${skillReachLabel(definition)}</small><small>${definition.mp} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
+  document.querySelector("#sect-detail")!.innerHTML = `<strong>${school.name} · ${school.title}</strong><div class="sect-preview-skills">${SKILL_KEYS.map(key => `<button data-preview-skill="${key}" aria-pressed="${previewSkill === key}">${skillIconMarkup(school.kit[key], key, school.color)}<span>${school.kit[key].name}<small>Cấp ${school.kit[key].unlock}</small></span></button>`).join("")}</div><div class="sect-preview-description"><canvas id="sect-preview" width="128" height="86" aria-label="Xem thử ${definition.name}"></canvas><p><b>${definition.name}</b><span>${definition.description}</span><small class="skill-range">${skillReachLabel(definition)}</small><small>${formatNumber(toCombat(definition.mp))} MP · Hồi ${definition.cooldown}s${previewSkill === "ultimate" ? " · 100 nộ" : ""}</small></p></div>`;
   previewCanvas = document.querySelector<HTMLCanvasElement>("#sect-preview");
   document.querySelector("#join-sect")!.textContent = `Gia nhập ${school.name}`;
 }
@@ -5630,7 +5654,7 @@ function openSkillArt(key: SkillKey = "skill1"): void {
   if (!game) return;
   artPreviewSkill = key;
   const sect = playerSect(game.player), skill = sect.kit[key];
-  openUtility(`Võ công · ${sect.name}`, `<div class="skill-art-preview"><canvas id="skill-art-canvas" width="360" height="210" aria-label="Hiệu ứng ${skill.name}"></canvas><div class="sect-preview-skills">${SKILL_KEYS.map(k => `<button data-art-skill="${k}" aria-pressed="${k === key}">${skillIconMarkup(sect.kit[k], k, sect.color)}<span>${sect.kit[k].name}</span></button>`).join("")}</div><p><b>${skill.name}</b> · ${skill.mp} MP · Hồi ${skill.cooldown}s</p><p class="skill-range">${skillReachLabel(skill)}</p><p class="dim">${skill.description}</p><small class="dim">Nét đứt minh họa tầm đánh. Xem thử không tốn nội lực hoặc nộ. Hiệu ứng ${game.player.preferences.skillEffects === "simple" ? "gọn" : "đầy đủ"}; đổi tại Cài đặt.</small></div>`);
+  openUtility(`Võ công · ${sect.name}`, `<div class="skill-art-preview"><canvas id="skill-art-canvas" width="360" height="210" aria-label="Hiệu ứng ${skill.name}"></canvas><div class="sect-preview-skills">${SKILL_KEYS.map(k => `<button data-art-skill="${k}" aria-pressed="${k === key}">${skillIconMarkup(sect.kit[k], k, sect.color)}<span>${sect.kit[k].name}</span></button>`).join("")}</div><p><b>${skill.name}</b> · ${formatNumber(toCombat(skill.mp))} MP · Hồi ${skill.cooldown}s</p><p class="skill-range">${skillReachLabel(skill)}</p><p class="dim">${skill.description}</p><small class="dim">Nét đứt minh họa tầm đánh. Xem thử không tốn nội lực hoặc nộ. Hiệu ứng ${game.player.preferences.skillEffects === "simple" ? "gọn" : "đầy đủ"}; đổi tại Cài đặt.</small></div>`);
 }
 function drawSkillArtPreview(now: number): void {
   if (!game || document.getElementById("utility-overlay")!.classList.contains("hidden")) return;
@@ -5664,6 +5688,7 @@ function drawSkillArtPreview(now: number): void {
       drawEnemyStatus(c, {
         radius: 17, slowUntil: skill.slow ? activeUntil : 0,
         stunUntil: skill.stun ? activeUntil : 0, poisonUntil: skill.poison ? activeUntil : 0,
+        burnUntil: skill.burn ? activeUntil : 0, corrodedUntil: skill.corrode ? activeUntil : 0,
         chilledUntil: cold && skill.slow ? activeUntil : 0, frozenUntil: cold && skill.stun ? activeUntil : 0,
       }, now, quality === "simple");
       c.restore();

@@ -6,8 +6,7 @@ const read = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)),
 async function save(page) { await page.locator("#save-btn").evaluate(el => el.click()); return read(page); }
 async function seed(page, change) {
   const value = await save(page); change(value);
-  await page.evaluate(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), { key, value });
-  await page.locator("#load-btn").evaluate(el => el.click());
+  await page.evaluate(({ key, value }) => { localStorage.setItem(key, JSON.stringify(value)); document.querySelector("#load-btn").click(); }, { key, value });
 }
 async function time(page, delta) { await page.evaluate(delta => window.__huntNow += delta, delta); await page.waitForTimeout(200); }
 const gear = (id, slot, changes = {}) => ({ id, name: id, slot, power: 10, enhance: 0, level: 5, rarity: "Tốt", color: "#73d19b", icon: "◆", ...changes });
@@ -45,14 +44,14 @@ async function clickEnemy(page, enemy) {
     await page.locator('[data-idle-tab="char"]').click(); await page.locator('[data-equipped-preview="weapon"]').click(); await page.locator('[data-detail-enhance]').click();
     assert.match(await page.locator(".enhancement-cost").textContent(), /45 bạc.*100%/);
     assert.equal((await read(page)).player.gold, base.gold, "preview does not charge");
-    const preview = await page.locator('[data-enhance-stat="attack"] td').allTextContents(); assert.deepEqual(preview, ["Tấn công", "12", "14", "+2"]);
+    const preview = await page.locator('[data-enhance-stat="attack"] td').allTextContents(); assert.deepEqual(preview, ["Tấn công", "1.200", "1.400", "+200"]);
     await page.locator('[data-confirm-enhance]').click();
     const upgraded = (await read(page)).player;
     assert.equal(upgraded.equipment.weapon.enhance, 1); assert.equal(upgraded.gold, base.gold - 45); assert.equal(upgraded.refiningStones, base.refiningStones - 1);
-    assert.equal(upgraded.maxMp, base.maxMp + 1); assert.equal(upgraded.speed, base.speed + 1); assert.ok(upgraded.maxHp > base.maxHp);
+    assert.equal(upgraded.maxMp, base.maxMp + 100); assert.equal(upgraded.speed, base.speed + 1); assert.ok(upgraded.maxHp > base.maxHp);
     assert.match(await page.locator("#enhance-result").textContent(), /Thành công/);
     await page.locator("#utility-close").click();
-    assert.match(await page.locator("#stat-grid").textContent(), /44/);
+    assert.match(await page.locator("#stat-grid").textContent(), /4[.,]400/);
     const cp = await page.locator("#header-combat-power").textContent(); await page.reload({ waitUntil: "networkidle" }); assert.equal(await page.locator("#header-combat-power").textContent(), cp);
     console.log("PASS equipped enhancement preview, exact cost, all real character bonuses and reload without double addition");
 

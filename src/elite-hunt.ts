@@ -13,7 +13,7 @@ export interface SavedWildElite { id: string; name: string; area: string; x: num
 export function validWildElite(value: unknown): boolean {
   if (value === undefined) return true;
   const e = value as SavedWildElite;
-  return Boolean(e && typeof e.id === "string" && e.id.startsWith("wild-elite-") && e.id.length <= 180 && typeof e.name === "string" && e.name.length <= 150 && validHuntArea(e.area) && Number.isFinite(e.x) && e.x >= 24 && e.x <= 1876 && Number.isFinite(e.y) && e.y >= 24 && e.y <= 1176 && Number.isInteger(e.level) && e.level >= 1 && e.level <= 160 && Number.isFinite(e.hp) && e.hp > 0 && e.hp <= 1e7 && (e.element === undefined || ["kim", "moc", "thuy", "hoa", "tho"].includes(e.element)));
+  return Boolean(e && typeof e.id === "string" && e.id.startsWith("wild-elite-") && e.id.length <= 180 && typeof e.name === "string" && e.name.length <= 150 && validHuntArea(e.area) && Number.isFinite(e.x) && e.x >= 24 && e.x <= 1876 && Number.isFinite(e.y) && e.y >= 24 && e.y <= 1176 && Number.isInteger(e.level) && e.level >= 1 && e.level <= 160 && Number.isFinite(e.hp) && e.hp > 0 && e.hp <= 1e9 && (e.element === undefined || ["kim", "moc", "thuy", "hoa", "tho"].includes(e.element)));
 }
 export const validHuntArea = (area: unknown): area is string => typeof area === "string" && (area === "world" || /^stage-([1-9]|[1-9]\d|1[0-5]\d|160)$/.test(area) || /^dungeon-(tomb|bamboo)$/.test(area));
 export function normalizeEliteHunt(value: unknown): EliteHunt {

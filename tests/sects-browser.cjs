@@ -21,7 +21,7 @@ async function saved(page) {
 async function seed(page, changes) {
   const snapshot = await saved(page);
   await page.evaluate(() => { window.sectColors = new Set(); });
-  Object.assign(snapshot.player, { level: 5, xp: 0, attack: 10, defense: 1000, hp: 50, mp: 500, rage: 100, x: 460, y: 330, cooldowns: { skill1: 0, skill2: 0, ultimate: 0 }, skillRanks: { skill1: 1, skill2: 1, ultimate: 1 }, idle: { ...snapshot.player.idle, enabled: false, inTown: false, autoSkills: false, autoLoot: false, autoEquip: false }, ...changes });
+  Object.assign(snapshot.player, { level: 5, xp: 0, attack: 10, defense: 1000, hp: 5000, mp: 50000, rage: 100, x: 460, y: 330, cooldowns: { skill1: 0, skill2: 0, ultimate: 0 }, skillRanks: { skill1: 1, skill2: 1, ultimate: 1 }, idle: { ...snapshot.player.idle, enabled: false, inTown: false, autoSkills: false, autoLoot: false, autoEquip: false }, ...changes });
   if (changes.factionId === null) delete snapshot.player.factionId;
   await page.evaluate(({ key, data }) => { localStorage.setItem(key, JSON.stringify(data)); document.querySelector('#load-btn').click(); }, { key: saveKey, data: snapshot });
   await page.waitForTimeout(80); // Let the camera settle before projecting a world target.
@@ -81,7 +81,7 @@ async function castAndSave(page, key, aimId = 'bandit-1') {
         assert.equal(await page.locator(`[data-skill="${key}"] svg`).getAttribute('data-motif'), definition.motif);
         assert.equal(await page.locator(`[data-skill="${key}"] svg`).getAttribute('data-visual'), `${sect.id}-${key}`);
         const after = await castAndSave(page, key);
-        assert.equal(after.player.mp, after.before.player.mp - definition.mp, `${sect.name} ${key}: MP cost`);
+        assert.equal(after.player.mp, after.before.player.mp - definition.mp * 100, `${sect.name} ${key}: MP cost`);
         assert.ok(after.player.cooldowns[key] > 0, `${sect.name} ${key}: cooldown`);
         assert.equal(after.player.radius, 12);
         await page.waitForTimeout(800);

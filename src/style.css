@@ -2623,3 +2623,6 @@ h2 {
 .travel-atlas .region-row { flex-wrap: wrap; }
 .travel-atlas .region-row > span { flex-basis: 100%; max-width: none; }
 @media (max-width: 520px) { .travel-atlas { grid-template-columns: 1fr; } .travel-atlas .region-row { flex-wrap: nowrap; } .travel-atlas .region-row > span { flex-basis: auto; max-width: 75px; } }
+
+.gear-identity .gear-trait-label { color: #e6c990; }
+.target-ailments { display: block; color: #e9be81; padding: 3px 0; }

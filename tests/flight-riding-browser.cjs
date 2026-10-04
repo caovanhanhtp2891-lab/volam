@@ -155,7 +155,7 @@ async function cast(page, skill) {
     await page.goto(url, { waitUntil: "networkidle" });
     assert.equal(
       await page.locator("html").getAttribute("data-version"),
-      "0.16.0",
+      "0.17.0",
     );
     await click(page, '[data-sect="thuy-yen"]');
     await click(page, "#join-sect");
@@ -175,7 +175,7 @@ async function cast(page, skill) {
           factionId: faction,
           sect: FACTIONS.find((f) => f.id === faction).archetype,
           level: 5,
-          mp: 500,
+          mp: 50000,
           rage: 100,
           x: 460,
           y: 330,
@@ -198,7 +198,7 @@ async function cast(page, skill) {
       });
       await cast(page, skill);
       const immediate = await saved(page);
-      assert.equal(immediate.player.mp, before.player.mp - definition.mp);
+      assert.equal(immediate.player.mp, before.player.mp - definition.mp * 100);
       assert.equal(
         immediate.enemies[0].hp,
         before.enemies[0].hp,
@@ -446,7 +446,7 @@ async function cast(page, skill) {
       viewport: { width: 1200, height: 900 },
     });
     await gallery.setContent(
-      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.16.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
+      `<meta charset="utf-8"><style>body{background:#101714;color:#f5dcaf;font:16px system-ui}main{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}article{background:#1d2924;text-align:center}img{width:50%}</style><h1>v0.17.0 · Đứng / Cưỡi ngựa · 20 mẫu</h1><main>${cards.map((c) => `<article><p>${c.name}</p><img src="${c.standing}"><img src="${c.mounted}"></article>`).join("")}</main>`,
     );
     await gallery.screenshot({
       path: path.join(captures, "all-20-riding-poses.png"),
